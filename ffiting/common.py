@@ -1,4 +1,4 @@
-""" Global imports
+""" Global imports for internal use.
 """
 import numpy as np
 import sympy as sp

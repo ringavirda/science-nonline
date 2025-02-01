@@ -1,42 +1,26 @@
-"""FFitting main interface for external access.
+""" FFitting interface for external access. Populated with functions that "simplify"
+underlying framework infrastructure. Limited functionality.
 """
 
 from .common import np
-from .model import ModelLite, Model
-from .options import FittingOptions
-
-
-def nonline_fit(
-    data: np.ndarray, expr: str, var: str, options: FittingOptions = FittingOptions()
-) -> Model | ModelLite:
-    """Primary fitting method that utilizes developed experimental methods."""
-    # Prepare data
-    model = Model(data)
-    # Perform fitting
-    # Additional optimization
-    # Final
-    return model if options.full_model else model.as_lite()
+from . import ModelLite, Model, FittingModes, FittingOptions, Models
 
 
 def poly_fit(data: np.ndarray, rank: int) -> ModelLite:
-    """Wrapper for the default `polyfit` function from `numpy`, that returns
+    """Wrapper for the default `poly_fit` function from `numpy`, that returns
     common for `ffitting` model type.
 
     Arguments:
-        data -- raw data used to train the LSM model.
-        rank -- the amount of terms/coeffs the polynomial should have.
+        data (np.ndarray): raw data used to train the LSM model.
+        rank (int): the amount of terms/coeffs the polynomial should have.
 
     Returns:
-        ModelLite instance with fitted data.
+        ModelLite: An instance with fitted data.
     """
+    return Models.ranked_poly(rank).fit(data)
 
-    # Create horizontal axis for calculations.
-    x = np.arange(data.size)
-    # Extract optimal coefficients for the chosen poly rank.
-    coeffs = np.polyfit(x, data, rank - 1)
-    # Construct standard polynomial model.
-    polynomial = np.poly1d(coeffs)
 
-    return ModelLite(
-        data_raw=data, data_fit=polynomial(x), model=polynomial, coeffs=coeffs
-    )
+def nonline_fit(data: np.ndarray, expr: str, var: str) -> ModelLite:
+    """Primary fitting method that utilizes developed experimental approaches."""
+    options = FittingOptions(expr_raw=expr, var=var, fitting_mode=FittingModes.DSB)
+    return Model(options).fit(data)
