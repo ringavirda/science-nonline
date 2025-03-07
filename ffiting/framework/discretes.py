@@ -1,5 +1,4 @@
-"""Classes to do with differential spectra analysis.
-"""
+"""Classes to do with differential spectra analysis."""
 
 from dataclasses import dataclass
 from typing import Self
@@ -34,8 +33,8 @@ class Spectrum:
         self.expr_coeffs: list[sp.Symbol] = sorted(
             self.expr_sp.free_symbols, key=lambda s: s.name
         )
-        self.var: sp.Symbol = sp.var(var_main)
-        self.expr_coeffs.remove(self.var)
+        self.var_main: sp.Symbol = sp.var(var_main)
+        self.expr_coeffs.remove(self.var_main)
         self.expr_rank: int = len(self.expr_coeffs)
 
     def __reflect(self, sequence: sp.Expr, add: bool = True) -> sp.Expr:
@@ -43,7 +42,7 @@ class Spectrum:
         for term in sequence.args:
             discrete = term
             if term.is_Symbol:
-                if term == self.var:
+                if term == self.var_main:
                     discrete = Discretes.C.subs(((w, 1), (n, 1)))
                 elif add:
                     discrete = Discretes.I.subs(w, term)
@@ -111,8 +110,10 @@ class Spectrum:
         model: sp.Expr = self.expr_sp
         for i, a in enumerate(self.expr_coeffs):
             model = model.subs(a, coeffs[i])
-        func = sp.lambdify(self.var, model)
-        return ModelLite(self.expr_raw, self.expr_sp, collapse(func), coeffs)
+        func = sp.lambdify(self.var_main, model)
+        return ModelLite(
+            str(self.var_main), self.expr_raw, self.expr_sp, collapse(func), coeffs
+        )
 
     def as_model(self, mode: FittingModes) -> Model:
         """Converts this spectrum into trainable model.
@@ -123,13 +124,19 @@ class Spectrum:
         Returns:
             Model: A trainable instance.
         """
-        options = FittingOptions(mode, self.expr_raw, expr_sp=self.expr_sp)
+        options = FittingOptions(
+            mode,
+            self.expr_raw,
+            expr_sp=self.expr_sp,
+            rank=self.expr_rank,
+            var_main=self.var_main,
+        )
         return Model(options)
 
     @staticmethod
     def from_model(model: Model | ModelLite) -> Self:
         """Creates differential spectrum representation of this model for symbolic operations."""
-        return Spectrum(model.options.expr_raw, model.options.var)
+        return Spectrum(model.options.expr_raw, model.options.var_main)
 
 
 class PolySpectrum(Spectrum):
@@ -149,5 +156,11 @@ class PolySpectrum(Spectrum):
 
     def as_model(self, mode=FittingModes.POLY) -> Model:
         """Polynomial specific override that initializes return model as poly type."""
-        options = FittingOptions(mode, self.expr_raw, expr_sp=self.expr_sp)
+        options = FittingOptions(
+            mode,
+            self.expr_raw,
+            expr_sp=self.expr_sp,
+            rank=self.expr_rank,
+            var_main=self.var_main,
+        )
         return Model(options)

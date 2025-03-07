@@ -1,5 +1,4 @@
-""" Classes used to represent fitted data and models.
-"""
+"""Classes used to represent fitted data and models."""
 
 from collections.abc import Collection
 from dataclasses import dataclass
@@ -16,10 +15,27 @@ class ModelLite:
     as well as callable model function.
     """
 
+    var_main: str  # Primary free variable
     expr_raw: str  # Generic string model representation
     expr_sp: sp.Expr  # Symbolic object model representation
     model: Callable[[float | np.ndarray], float]  # Labdified fitted model
     coeffs: list[float]  # Model weights
+
+    @property
+    def label(self) -> str:
+        """Returns a string representation of expression with coeffs substituted."""
+        expr_coeffs: list[sp.Symbol] = sorted(
+            self.expr_sp.free_symbols, key=lambda s: s.name
+        )
+        expr_coeffs.remove(sp.Symbol(self.var_main))
+        expr: sp.Expr = self.expr_sp
+        for i, a in enumerate(expr_coeffs):
+            expr = expr.subs(a, self.coeffs[i])
+        return str(expr)
+
+    def __call__(self, data: float | np.ndarray) -> float | np.ndarray:
+        """This overload calls internal models to generate fitted values."""
+        return self.model(data)
 
 
 class Model:
@@ -54,11 +70,13 @@ class Model:
         """Change internal state of this model to that of the given one if it is fitted."""
         if model_new.model is None:
             raise ValueError("Cannot apply unfitted model.")
-        elif model_new.options.expr_raw is not self.__options.expr_raw:
-            raise ValueError("Cannot apply values from different form model.")
+        if not isinstance(model_new, ModelLite):
+            self.__options = model_new.options
+            self.__data_raw = model_new.data_raw
+            self.__data_fit = model_new.data_fit
+        else:
+            self.__options.expr_raw = model_new.expr_raw
 
-        self.__options = model_new.options
-        self.__data_fit = model_new.model(self.__data_raw)
         self.__model = model_new.model
         self.__coeffs = model_new.coeffs
         self.__expr = model_new.expr_sp
@@ -98,6 +116,8 @@ class Model:
             raise NotImplementedError("Stay tuned.")
 
         if options.update_model:
+            self.__data_raw = data
+            self.__data_fit = fitted(data)
             self.apply_fitted(fitted)
         return fitted
 
@@ -146,25 +166,22 @@ class Model:
         )
 
     @property
-    @__only_fitted
-    def data_raw(self) -> np.ndarray:
+    def data_raw(self) -> np.ndarray | None:
         """Return the underlining training dataset."""
         return self.__data_raw
 
     @property
-    @__only_fitted
-    def data_fit(self) -> np.ndarray:
+    def data_fit(self) -> np.ndarray | None:
         """Return data generated with fitted model."""
         return self.__data_fit
 
     @property
-    @__only_fitted
-    def coeffs(self) -> list[float]:
+    def coeffs(self) -> list[float] | None:
         """Return weights of the fitted model."""
         return self.__coeffs
 
     @property
-    def expr(self) -> sp.Expr:
+    def expr_sp(self) -> sp.Expr:
         """Return symbolic representation of the fitted model."""
         return self.__expr
 
@@ -190,4 +207,10 @@ class Model:
     @__only_fitted
     def as_lite(self) -> ModelLite:
         """Returns a simplified immutable representation of the model."""
-        return ModelLite(self.__data_raw, self.data_fit, self.__model, self.__coeffs)
+        return ModelLite(
+            self.__options.var_main,
+            self.__data_raw,
+            self.__data_fit,
+            self.__model,
+            self.__coeffs,
+        )

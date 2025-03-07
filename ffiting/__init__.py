@@ -23,5 +23,14 @@ Required packages:
 from .framework import *
 from .prefabs import Generators, Models
 from .facade import poly_fit, nonline_fit
+from .visualization import PlotRequest, multi_plot, sep_plot
 
-__all__ = ["poly_fit", "nonline_fit", "Generators", "Models"]
+__all__ = [
+    "poly_fit",
+    "nonline_fit",
+    "Generators",
+    "Models",
+    "PlotRequest",
+    "multi_plot",
+    "sep_plot",
+]

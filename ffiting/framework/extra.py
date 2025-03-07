@@ -1,5 +1,4 @@
-""" Fitting functions themselves an some optimization helpers.
-"""
+"""Fitting functions themselves an some optimization helpers."""
 
 from ..common import np, sp, sc
 from . import ModelLite, Metrics, FittingOptions, Spectrum, PolySpectrum
@@ -21,13 +20,15 @@ def poly_fit_(data: np.ndarray, options: FittingOptions) -> ModelLite:
     """
     data_x: np.ndarray = np.arange(data.size)
     rank = options.rank
-    if options.raise_rank or rank <= 0:
+    if options.raise_rank:
         rank = find_poly_rank(data)
         print(f"Model rank was raised to {rank}")
     poly_c = np.polyfit(data_x, data, rank)
     poly_f = np.poly1d(poly_c)
-    poly_s = PolySpectrum(rank, str(options.var))
-    return ModelLite(poly_s.expr_raw, poly_s.expr_sp, poly_f, poly_c)
+    poly_s = PolySpectrum(rank, str(options.var_main))
+    return ModelLite(
+        str(poly_s.var_main), poly_s.expr_raw, poly_s.expr_sp, poly_f, poly_c
+    )
 
 
 def poly_fit_lite(data: np.ndarray, rank: int) -> np.ndarray:
@@ -59,9 +60,9 @@ def nonline_fit_(data: np.ndarray, options: FittingOptions) -> ModelLite:
     Returns:
         ModelLite: Object for the achieved fit.
     """
-    nonline = Spectrum(options.expr_raw, str(options.var))
+    nonline = Spectrum(options.expr_raw, str(options.var_main))
     rank = options.rank
-    if options.raise_rank or rank == 0:
+    if not options.raise_rank:
         rank = find_poly_rank(data, rank)
         if rank != nonline.expr_rank:
             if any(d == 0 for d in nonline.ranked(rank)):
@@ -72,7 +73,7 @@ def nonline_fit_(data: np.ndarray, options: FittingOptions) -> ModelLite:
             else:
                 print(f"Model rank was raised to {rank}")
 
-    poly = PolySpectrum(rank, str(options.var))
+    poly = PolySpectrum(rank, str(options.var_main))
     poly_s = poly.ranked(rank)
 
     data_x = np.arange(data.size)
@@ -117,8 +118,17 @@ def find_poly_rank(data: np.ndarray, rank: int = 0, rank_range: int = 12) -> int
     rank_rse = np.zeros(rank_range)
     rank_rsq = np.zeros(rank_range)
 
+    prev_corr = 0
+    prev_diff = 0
     for i in range(rank_range):
         data_y = poly_fit_lite(data, rank + i)
+
+        corr = np.corrcoef(data, data_y)[0, 1]
+        diff = np.abs(corr - prev_corr)
+        if prev_diff < diff:
+            return rank + i
+        prev_corr = corr
+
         rank_rse[i] = Metrics.rse(data, data_y)
         rank_rsq[i] = Metrics.r_sq(data, data_y)
 
@@ -181,7 +191,7 @@ def numeric_optimize(
     """
     data_x = np.arange(data.size)
     factors = spectrum.expr_coeffs.copy()
-    factors.insert(0, spectrum.var)
+    factors.insert(0, spectrum.var_main)
     solution = sc.optimize.curve_fit(
         spectrum.apply_trained(solution).model,
         data_x,

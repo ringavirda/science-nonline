@@ -22,5 +22,5 @@ def poly_fit(data: np.ndarray, rank: int) -> ModelLite:
 
 def nonline_fit(data: np.ndarray, expr: str, var: str) -> ModelLite:
     """Primary fitting method that utilizes developed experimental approaches."""
-    options = FittingOptions(expr_raw=expr, var=var, fitting_mode=FittingModes.DSB)
+    options = FittingOptions(expr_raw=expr, var_main=var, fitting_mode=FittingModes.DSB)
     return Model(options).fit(data)

@@ -1,5 +1,4 @@
-"""Objects needed to configure fitting functions.
-"""
+"""Objects needed to configure fitting functions."""
 
 from dataclasses import dataclass, field
 from enum import Enum
@@ -31,12 +30,15 @@ class FittingOptions:
     # for the nonlinear methods.
     expr_raw: str
     # Free variable to use in expression forms. Default is "x".
-    var: sp.Symbol = field(default=sp.Symbol("x"))
-    # If set to `False` doesn't use the fitting results for the internal structure. Default is `True`.
+    var_main: str = field(default="x")
+    # If set to `False` doesn't use the fitting results for the internal structure.
+    # Default is `True`.
     update_model: bool = field(default=True)
-    # Return result as a Model instance, instead of ModelLite. By default is set to `False`.
+    # Return result as a Model instance, instead of ModelLite. By default is
+    # set to `False`.
     model_full: bool = field(default=False)
-    # Perform additional numeric fitting if possible, may cause additional overhead. Default value is `False`.
+    # Perform additional numeric fitting if possible, may cause additional overhead.
+    # Default value is `False`.
     numeric_optimize: bool = field(default=False)
     # Try to increase underlying polynomial rank to extend the
     # flexibility of the DSB approach to larger data sets. It is set

@@ -2,7 +2,7 @@
 """
 
 from dataclasses import dataclass, field
-from typing import Callable, Any, Self, Tuple
+from typing import Callable, Any, Optional, Tuple
 from time import perf_counter
 from scipy.interpolate import interp1d
 
@@ -24,6 +24,49 @@ class ModelMetrics:
     r_sq: float  # Determination Coefficient
     corr: float  # Correlation Coefficient
     ccord: float  # Concordance Coefficient
+
+    def __str__(self) -> str:
+        return (
+            f"Residual SE: {self.rse:.3f}\n"
+            f"Mean SE: {self.mse:.3f}\n"
+            f"Linear Div: {self.lin_div:.3f}\n"
+            f"Standard Div: {self.std_div:.3f}\n"
+            f"Standard Err: {self.std_err:.3f}\n"
+            f"Determination Coeff: {self.r_sq:.3f}\n"
+            f"Correlation Coeff: {self.corr:.3f}\n"
+            f"Concordance Coeff: {self.ccord:.3f}"
+        )
+
+
+def get_metrics(
+    model: fr.Model | fr.ModelLite, data_origin: Optional[np.ndarray] = None
+) -> ModelMetrics:
+    """Calculates most used metrics for given model. Uses implementations from
+    `Metrics` container and from `numpy` directly.
+
+    Arguments:
+        model (Model | ModelLite): An instance to perform calculations on.
+
+    Returns:
+        ModelMetrics: Data object with fields populated using data from given model.
+    """
+    if model.data_raw is None or model.data_fit is None:
+        raise ValueError("Cannot calculate metrics for the unfitted model.")
+    raw = model.data_raw
+    if data_origin is not None:
+        raw = data_origin
+    fit = model.data_fit
+
+    return ModelMetrics(
+        rse=Metrics.rse(raw, fit),
+        mse=Metrics.mse(raw, fit),
+        r_sq=Metrics.r_sq(raw, fit),
+        lin_div=Metrics.lin_div(raw, fit),
+        std_div=np.std(fit),
+        std_err=np.std(fit) / np.sqrt(raw.size),
+        corr=np.corrcoef(raw, fit)[0, 1],
+        ccord=Metrics.concord(raw, fit),
+    )
 
 
 class Metrics:
@@ -123,16 +166,16 @@ class Metrics:
         """Returns Concordance coefficient for given vectors.
 
         Formula:
-            concord := abs(2 * cov(left, right) /
-                (var(left) + var(right) + pow(median(left) - median(right), 2)))
+            concord := abs(2 * cov(left, right) * var(left) * var(right) /
+                (var(left)^2 + var(right)^2 + (mean(left) - mean(right)^2))
         """
         return np.abs(
             2
             * np.cov(left, right, bias=True)[0][1]
             / (
-                np.var(left)
-                + np.var(right)
-                + np.power(np.median(left) - np.median(right), 2)
+                np.square(np.var(left))
+                + np.square(np.var(right))
+                + np.square(np.mean(left) - np.mean(right))
             )
         )
 
@@ -162,8 +205,7 @@ class Metrics:
         return (np.square(left - right)).mean()
 
     @classmethod
-    @__size_equal
-    def rse(cls: Self, left: np.ndarray, right: np.ndarray) -> float:
+    def rse(cls, left: np.ndarray, right: np.ndarray) -> float:
         """Returns Residual Squared Error for given data vectors. Uses the `rss`
         metric internally.
 
@@ -171,40 +213,21 @@ class Metrics:
             n := left.size = right.size
             rse := sqrt(rss(left, right) / n - 2)
         """
+        if left.size != right.size:
+            raise RuntimeError("Array sizes must be equal.")
         return np.sqrt(cls.rss(left, right) / (left.size - 2))
 
     @classmethod
-    @__size_equal
-    def r_sq(cls: Self, left: np.ndarray, right: np.ndarray) -> float:
+    def r_sq(cls, left: np.ndarray, right: np.ndarray) -> float:
         """Returns Determination Coefficient (R Squared) for given data vectors.
         Uses `rss` and `tss` metrics internally.
 
         Formula:
             r_sq := 1 - rss(left, right) / tss(right)
         """
+        if left.size != right.size:
+            raise RuntimeError("Array sizes must be equal.")
         return 1 - cls.rss(left, right) / cls.tss(right)
-
-
-def get_metrics(model: fr.Model | fr.ModelLite) -> ModelMetrics:
-    """Calculates most used metrics for given model. Uses implementations from
-    `Metrics` container and from `numpy` directly.
-
-    Arguments:
-        model (Model | ModelLite): An instance to perform calculations on.
-
-    Returns:
-        ModelMetrics: Data object with fields populated using data from given model.
-    """
-    return ModelMetrics(
-        rse=Metrics.rse(model.data_raw, model.data_fit),
-        mse=Metrics.mse(model.data_raw, model.data_fit),
-        r_sq=Metrics.r_sq(model.data_raw, model.data_fit),
-        lin_div=Metrics.lin_div(model.data_raw, model.data_fit),
-        std_div=np.std(model.data_raw, model.data_fit),
-        std_err=np.std(model.data_raw, model.data_fit) / np.sqrt(model.data_raw.size),
-        corr=np.corrcoef(model.data_raw, model.data_fit)[0, 1],
-        ccord=Metrics.concord(model.data_raw, model.data_fit),
-    )
 
 
 def scale_data(data: np.ndarray, coeff: float) -> np.ndarray:
@@ -249,41 +272,35 @@ class NoiseConfig:
     """Contains configuration necessary for noise generation in data generators."""
 
     mu: float = field(default=0.0)
-    sigma: float = field(default=5.0)
+    sigma: Optional[float] = field(default=None)
     abnormals: bool = field(default=False)
     coeff: float = field(default=3.0)
     density: float = field(default=10.0)
 
 
-def apply_noise(data: float | np.ndarray, config=NoiseConfig()) -> float | np.ndarray:
+def apply_noise(data: np.ndarray, config=NoiseConfig()) -> np.ndarray:
     """Configurable noise generator to simulate absolute error in generated datasets."""
-    if isinstance(data, float):
-        error = np.random.normal(config.mu, config.sigma, 1)
-        return data + error[0]
-    elif isinstance(data, np.ndarray):
-        # Normal deviations
-        polluted = np.empty(data.shape)
-        errors = np.random.normal(config.mu, config.sigma, data.size)
-        with np.nditer(polluted, op_flags=["readwrite"], flags=["f_index"]) as it:
+    sigma = config.sigma
+    if not sigma:
+        sigma = (np.max(data) - np.min(data)) / 10
+
+    # Normal deviations
+    polluted = np.zeros(data.shape)
+    errors = np.random.normal(config.mu, sigma, data.size)
+    with np.nditer(polluted, op_flags=["readwrite"], flags=["f_index"]) as it:
+        for value in it:
+            value[...] += data[it.index] + errors[it.index]
+    if config.abnormals:
+        # Abnormal deviations
+        abnormal_count = int((data.size * config.density) / 100)
+        abnormal_pos = np.zeros(abnormal_count)
+        # Fill in positions using normal distribution
+        with np.nditer(abnormal_pos, op_flags=["readwrite"]) as it:
             for value in it:
-                value[...] += data[it.index] + errors[it.index]
-        if config.abnormals:
-            # Abnormal deviations
-            abnormal_count = int((data.size * config.density) / 100)
-            abnormal_pos = np.zeros(abnormal_count)
-            # Fill in positions using normal distribution
-            with np.nditer(abnormal_pos, op_flags=["readwrite"]) as it:
-                for value in it:
-                    value[...] = np.ceil(np.random.randint(0, data.size))
-            # Fill in abnormals
-            abnormals = np.random.normal(
-                config.mu, config.sigma * config.coeff, abnormal_count
-            )
-            with np.nditer(
-                abnormal_pos, op_flags=["readwrite"], flags=["f_index"]
-            ) as it:
-                for value in it:
-                    polluted[int(value)] += abnormals[it.index]
-        return polluted
-    else:
-        raise ValueError("Noise can only be applied to float or array values.")
+                value[...] = np.ceil(np.random.randint(0, data.size))
+        # Fill in abnormals
+        abnormals = np.random.normal(config.mu, sigma * config.coeff, abnormal_count)
+        with np.nditer(abnormal_pos, op_flags=["readwrite"], flags=["f_index"]) as it:
+            for value in it:
+                polluted[int(value)] += abnormals[it.index]
+    return polluted
