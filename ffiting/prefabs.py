@@ -20,7 +20,7 @@ class Prefabs:
 
     var_main = "x"
     exponential_raw = "a0 + a1*x + a2*exp(a3*x)"
-    transcendental_raw = "a0*sin(a1*x) + a2*cos(a1*x)"
+    transcendental_raw = "a0*cos(a1*x) + a2*sin(a1*x)"
     combined_lint_raw = "a0 + a1*x + a2*sin(a3*x) + a4*cos(a3*x)"
 
 
@@ -204,7 +204,7 @@ class Models(Prefabs):
         Returns:
             Model: Trainable object for use with other library infrastructure.
         """
-        return PolySpectrum(rank, cls.var_main).as_model()
+        return PolySpectrum(rank, cls.var_main, coeff_sig="a").as_model()
 
     @classmethod
     def exponential(cls, mode: FittingModes) -> Model:
@@ -221,7 +221,7 @@ class Models(Prefabs):
             Model: Trainable object for use with other library infrastructure.
         """
         options = FittingOptions(
-            fitting_mode=mode, expr_raw=cls.exponential_raw, rank=3
+            fitting_mode=mode, expr_raw=cls.exponential_raw, rank=4
         )
         return Model(options)
 
@@ -240,7 +240,7 @@ class Models(Prefabs):
             Model: Trainable object for use with other library infrastructure.
         """
         options = FittingOptions(
-            fitting_mode=mode, expr_raw=cls.transcendental_raw, rank=2
+            fitting_mode=mode, expr_raw=cls.transcendental_raw, rank=3
         )
         return Model(options)
 

@@ -29,20 +29,21 @@ class Spectrum:
 
     def __init__(self, expr: str, var_main: str) -> None:
         self.expr_sp: sp.Expr = sp.parse_expr(expr)
-        self.expr_raw: str = expr
+        self.expr_raw = expr
         self.expr_coeffs: list[sp.Symbol] = sorted(
             self.expr_sp.free_symbols, key=lambda s: s.name
         )
-        self.var_main: sp.Symbol = sp.var(var_main)
-        self.expr_coeffs.remove(self.var_main)
-        self.expr_rank: int = len(self.expr_coeffs)
+        self.var_main = var_main
+        self.var_main_sp: sp.Symbol = sp.var(var_main)
+        self.expr_coeffs.remove(self.var_main_sp)
+        self.expr_rank = len(self.expr_coeffs)
 
     def __reflect(self, sequence: sp.Expr, add: bool = True) -> sp.Expr:
         reflection = None
         for term in sequence.args:
             discrete = term
             if term.is_Symbol:
-                if term == self.var_main:
+                if term == self.var_main_sp:
                     discrete = Discretes.C.subs(((w, 1), (n, 1)))
                 elif add:
                     discrete = Discretes.I.subs(w, term)
@@ -110,9 +111,9 @@ class Spectrum:
         model: sp.Expr = self.expr_sp
         for i, a in enumerate(self.expr_coeffs):
             model = model.subs(a, coeffs[i])
-        func = sp.lambdify(self.var_main, model)
+        func = sp.lambdify(self.var_main_sp, model)
         return ModelLite(
-            str(self.var_main), self.expr_raw, self.expr_sp, collapse(func), coeffs
+            self.var_main, self.expr_raw, self.expr_sp, collapse(func), coeffs
         )
 
     def as_model(self, mode: FittingModes) -> Model:
@@ -145,13 +146,13 @@ class PolySpectrum(Spectrum):
     from the rank value.
     """
 
-    def __init__(self, rank: int, var_main: str) -> None:
-        super().__init__(self.__construct_expr(rank, var_main), var_main)
+    def __init__(self, rank: int, var_main: str, coeff_sig: str = "c") -> None:
+        super().__init__(self.__construct_expr(rank, var_main, coeff_sig), var_main)
 
-    def __construct_expr(self, rank: int, main_var: str) -> str:
-        terms: list[str] = ["c0"]
+    def __construct_expr(self, rank: int, var_main: str, coeff_sig: str) -> str:
+        terms: list[str] = [f"{coeff_sig}0"]
         for i in range(1, rank):
-            terms.append(f"c{i}*{main_var}**{i}")
+            terms.append(f"{coeff_sig}{i}*{var_main}**{i}")
         return " + ".join(terms)
 
     def as_model(self, mode=FittingModes.POLY) -> Model:

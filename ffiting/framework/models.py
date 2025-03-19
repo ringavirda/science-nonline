@@ -110,14 +110,12 @@ class Model:
 
         if options.fitting_mode == FittingModes.POLY:
             fitted = fr.poly_fit_(data, options)
-        elif options.fitting_mode == FittingModes.DSB or FittingModes.AUTO:
-            fitted = fr.nonline_fit_(data, options)
         else:
-            raise NotImplementedError("Stay tuned.")
-
+            fitted = fr.nonline_fit_(data, options)
+        
         if options.update_model:
             self.__data_raw = data
-            self.__data_fit = fitted(data)
+            self.__data_fit = fitted(np.arange(data.size))
             self.apply_fitted(fitted)
         return fitted
 

@@ -1,5 +1,4 @@
-""" Additional utilities for statistics and data manipulation.
-"""
+"""Additional utilities for statistics and data manipulation."""
 
 from dataclasses import dataclass, field
 from typing import Callable, Any, Optional, Tuple
@@ -38,35 +37,51 @@ class ModelMetrics:
         )
 
 
-def get_metrics(
-    model: fr.Model | fr.ModelLite, data_origin: Optional[np.ndarray] = None
-) -> ModelMetrics:
+def get_metrics(data_model: np.ndarray, data_origin: np.ndarray) -> ModelMetrics:
     """Calculates most used metrics for given model. Uses implementations from
     `Metrics` container and from `numpy` directly.
 
     Arguments:
-        model (Model | ModelLite): An instance to perform calculations on.
+        data_model (np.ndarray): Vector with fitted data.
+        data_origin (np.ndarray): Vector with training data.
 
     Returns:
         ModelMetrics: Data object with fields populated using data from given model.
     """
-    if model.data_raw is None or model.data_fit is None:
-        raise ValueError("Cannot calculate metrics for the unfitted model.")
-    raw = model.data_raw
-    if data_origin is not None:
-        raw = data_origin
-    fit = model.data_fit
-
     return ModelMetrics(
-        rse=Metrics.rse(raw, fit),
-        mse=Metrics.mse(raw, fit),
-        r_sq=Metrics.r_sq(raw, fit),
-        lin_div=Metrics.lin_div(raw, fit),
-        std_div=np.std(fit),
-        std_err=np.std(fit) / np.sqrt(raw.size),
-        corr=np.corrcoef(raw, fit)[0, 1],
-        ccord=Metrics.concord(raw, fit),
+        rse=Metrics.rse(data_origin, data_model),
+        mse=Metrics.mse(data_origin, data_model),
+        r_sq=Metrics.r_sq(data_origin, data_model),
+        lin_div=Metrics.lin_div(data_origin, data_model),
+        std_div=np.std(data_model),
+        std_err=np.std(data_model) / np.sqrt(data_origin.size),
+        corr=np.corrcoef(data_origin, data_model)[0, 1],
+        ccord=Metrics.concord(data_origin, data_model),
     )
+
+
+def get_metrics_m(model: fr.Model, data_origin: np.ndarray = None) -> ModelMetrics:
+    """Get generic metrics directly from model object. Only uses provided data and
+    statistic method implementations from `Metrics` or numpy. May be not suitable
+    for predictions.
+
+    Arguments:
+        model (Model): An object with modelling data
+        data_origin (np.ndarray, optional): Directly set original data to do statistics
+        against. Defaults to None.
+
+    Returns:
+        ModelMetrics: Data object with fields populated using data from given model.
+    """
+    if model.data_fit is None:
+        raise RuntimeError("Cannot display metrics for the unfitted model.")
+    elif model.data_raw is None and data_origin is None:
+        raise RuntimeError("No data origin provided.")
+
+    fit = model.data_fit
+    data = data_origin if data_origin is not None else model.data_raw
+
+    return get_metrics(fit, data)
 
 
 class Metrics:
@@ -89,6 +104,7 @@ class Metrics:
                 return position
             else:
                 position += 1
+        return 0
 
     @staticmethod
     def growth(data: np.ndarray) -> float:
@@ -133,7 +149,7 @@ class Metrics:
 
     @staticmethod
     def __size_equal(
-        func: Callable[[np.ndarray, np.ndarray], Any]
+        func: Callable[[np.ndarray, np.ndarray], Any],
     ) -> Callable[[np.ndarray, np.ndarray], Any]:
         """Internal class decorator to guard against the use of methods on
         inappropriate data vectors. Fails if those have different size.
@@ -173,9 +189,9 @@ class Metrics:
             2
             * np.cov(left, right, bias=True)[0][1]
             / (
-                np.square(np.var(left))
-                + np.square(np.var(right))
-                + np.square(np.mean(left) - np.mean(right))
+                np.var(left)
+                + np.var(right)
+                + np.square(np.median(left) - np.median(right))
             )
         )
 
@@ -251,7 +267,7 @@ def scale_data(data: np.ndarray, coeff: float) -> np.ndarray:
 
 
 def collapse(
-    func: Callable[[float], float]
+    func: Callable[[float], float],
 ) -> Callable[[float | np.ndarray], float | np.ndarray]:
     """Wrapper for generation or modelling functions that cannot automatically parse arrays."""
 
