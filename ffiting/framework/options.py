@@ -2,7 +2,8 @@
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
+from typing import Any, Callable, Optional
+from IPython.display import display
 
 from ..common import sp
 
@@ -40,6 +41,11 @@ class FittingOptions:
     # Perform additional numeric fitting if possible, may cause additional overhead.
     # Default value is `False`.
     numeric_optimize: bool = field(default=False)
+    # Turns on the display for steps of the fitting.
+    echo_on: bool = field(default=False)
+    # Specifies the exact method to use for displaying echo values. Uses IPython's
+    # `display` by default.
+    echo_method: Callable[[Any | None], None] = field(default=display)
     # Try to increase underlying polynomial rank to extend the
     # flexibility of the DSB approach to larger data sets. It is set
     # to `False` by default.
@@ -49,3 +55,5 @@ class FittingOptions:
     # Used wherever the "ranking" is needed. Default is "0" usually standing for
     # "figure out automatically".
     rank: Optional[int] = field(default=None)
+    # To substitute H value in integral methods.
+    dsbi_h: float = field(default=1.0)

@@ -7,14 +7,14 @@ fitting nonline models developed using non-taylor transformations, which a part
 of authors PHD dissertation. Use with care.
 
 Interface:
-    nonline_fit(): generic function that organizes lover level actions. 
+    nonline_fit(): generic function that organizes lover level actions.
     Provides most customization in terms of fitting options.
     poly_fit(): performs classical polynomial fitting for the given data.
-    ModelLite: a dataclass encapsulating original data, fitted model data, 
+    ModelLite: a dataclass encapsulating original data, fitted model data,
     as well as a callable version of it.
-    Model: comprehensive class that not only contains modelling data but 
+    Model: comprehensive class that not only contains modelling data but
     also provides a variety of analytics options for the data.
-    
+
 Required packages:
     numpy, sympy, scipy
 """

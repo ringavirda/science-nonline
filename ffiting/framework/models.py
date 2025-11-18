@@ -112,7 +112,7 @@ class Model:
             fitted = fr.poly_fit_(data, options)
         else:
             fitted = fr.nonline_fit_(data, options)
-        
+
         if options.update_model:
             self.__data_raw = data
             self.__data_fit = fitted(np.arange(data.size))

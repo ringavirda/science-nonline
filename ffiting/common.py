@@ -1,5 +1,5 @@
-""" Global imports for internal use.
-"""
+"""Global imports for internal use."""
+
 import numpy as np
 import sympy as sp
 import scipy as sc

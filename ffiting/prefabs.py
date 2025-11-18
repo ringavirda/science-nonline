@@ -49,7 +49,9 @@ class Generators(Prefabs):
             given coeffs.
         """
         poly = PolySpectrum(len(coeffs), cls.var_main)
-        poly_m = poly.apply_trained(coeffs)
+        poly_m = ModelLite(
+            poly.var_main, poly.expr_raw, poly.expr_sp, np.poly1d(coeffs[::-1]), coeffs
+        )
         return (
             poly_m
             if not noise
@@ -228,7 +230,7 @@ class Models(Prefabs):
     @classmethod
     def transcendental(cls, mode: FittingModes) -> Model:
         """Generates new trainable object of transcendental model.
-        
+
         Formula:
             f(x) = a0*cos(a1*x) + a2*sin(a1*x)
 

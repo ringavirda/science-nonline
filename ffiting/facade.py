@@ -1,4 +1,4 @@
-""" FFitting interface for external access. Populated with functions that "simplify"
+"""FFitting interface for external access. Populated with functions that "simplify"
 underlying framework infrastructure. Limited functionality.
 """
 
@@ -8,7 +8,7 @@ from . import ModelLite, Model, FittingModes, FittingOptions, Models
 
 def poly_fit(data: np.ndarray, rank: int) -> ModelLite:
     """Wrapper for the default `poly_fit` function from `numpy`, that returns
-    common for `ffitting` model type.
+    common for `ffiting` model type.
 
     Arguments:
         data (np.ndarray): raw data used to train the LSM model.

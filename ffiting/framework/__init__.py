@@ -1,5 +1,5 @@
-""" Internal package with all the stuff necessary for fitting. It is separated
-from everything else to allow better focus. Here are the quick descriptions of 
+"""Internal package with all the stuff necessary for fitting. It is separated
+from everything else to allow better focus. Here are the quick descriptions of
 some classes from the framework:
 
 Model:
@@ -12,8 +12,8 @@ Spectrum:
     Dedicated interface for symbolic operations to deal with differential discretes.
 
 PolySpectrum:
-    Specific case for automatic generation of expression. 
-    
+    Specific case for automatic generation of expression.
+
 Metrics:
     Contains most useful methods to calculate statistical values for models.
 """

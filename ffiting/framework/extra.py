@@ -1,5 +1,6 @@
 """Fitting functions themselves an some optimization helpers."""
 
+from typing import Any
 from sympy.abc import H
 
 from ffiting.framework.options import FittingModes
@@ -7,7 +8,34 @@ from ..common import np, sp, sc
 from . import ModelLite, Metrics, FittingOptions, Spectrum, PolySpectrum
 
 
-def poly_fit_(data: np.ndarray, options: FittingOptions) -> ModelLite:
+def echo_if_(
+    options: FittingOptions,
+    message: str,
+    value: list[Any] | Any | None = None,
+) -> None:
+    """Universal logging method that uses options specified to fitting methods
+    themselves to determine how to perform logging.
+
+    Args:
+        options (FittingOptions): Object containing `echo_on` flag, which turns on
+        the logging, and specific method to use for values through `echo_method`.
+        message (str): Forward message to display before values.
+        value (list[Any] | Any | None, optional): Variable amount of values to
+        display. Defaults to None.
+    """
+    if options.echo_on:
+        options.echo_method(message)
+        if value is not None:
+            if isinstance(value, list):
+                for val in value:
+                    options.echo_method(val)
+            else:
+                options.echo_method(value)
+
+
+def poly_fit_(
+    data: np.ndarray, options: FittingOptions, data_x: np.ndarray | None = None
+) -> ModelLite:
     """Fits this model using LMS method. Uses some infrastructure.
 
     Arguments:
@@ -21,20 +49,32 @@ def poly_fit_(data: np.ndarray, options: FittingOptions) -> ModelLite:
     Returns:
         ModelLite: Vector of the fitting results.
     """
-    data_x: np.ndarray = np.arange(data.size)
+    data_x: np.ndarray = data_x if data_x is not None else np.arange(data.size)
+
     rank = options.rank
     if options.raise_rank:
         rank = find_poly_rank(data, rank)
-        print(f"Model rank was raised to {rank}")
-    poly_c = np.polyfit(data_x, data, rank)
+        echo_if_(
+            options,
+            (
+                f"Model rank was raised to: {rank}"
+                if options.rank != rank
+                else f"Model rank remains at: {rank}"
+            ),
+        )
+
+    poly_c = filter_poly_coeffs(np.polyfit(data_x, data, rank))
     poly_f = np.poly1d(poly_c)
     poly_s = PolySpectrum(rank, str(options.var_main))
+
     return ModelLite(
         str(poly_s.var_main_sp), poly_s.expr_raw, poly_s.expr_sp, poly_f, poly_c
     )
 
 
-def poly_fit_lite(data: np.ndarray, rank: int) -> np.ndarray:
+def poly_fit_lite(
+    data: np.ndarray, rank: int, data_x: np.ndarray | None = None
+) -> np.ndarray:
     """Lightweight version of `poly_fit` without library infrastructure.
     Pure numpy and stuff.
 
@@ -45,13 +85,15 @@ def poly_fit_lite(data: np.ndarray, rank: int) -> np.ndarray:
     Returns:
         np.ndarray: Vector of the fitted results.
     """
-    data_x = np.arange(data.size)
-    poly_c = np.polyfit(data_x, data, rank)
+    data_x = data_x if data_x is not None else np.arange(data.size)
+    poly_c = filter_poly_coeffs(np.polyfit(data_x, data, rank))
     poly_f = np.poly1d(poly_c)
     return poly_f(data_x)
 
 
-def nonline_fit_(data: np.ndarray, options: FittingOptions) -> ModelLite:
+def nonline_fit_(
+    data: np.ndarray, options: FittingOptions, data_x: np.ndarray | None = None
+) -> ModelLite:
     """Internal call to `nonline_fit_` that fits this model using experimental
     methods from this library. It can update internal fields of the instance,
     after which it qualifies as being fitted.
@@ -70,79 +112,74 @@ def nonline_fit_(data: np.ndarray, options: FittingOptions) -> ModelLite:
     rank = options.rank if options.rank >= nonline.expr_rank else nonline.expr_rank
     if options.raise_rank:
         rank_new = find_poly_rank(data, rank)
-        if rank_new != nonline.expr_rank:
+        if rank_new > nonline.expr_rank:
             rank = rank_new
-            print(f"Polynomial model rank was raised to {rank}.")
+            echo_if_(options, f"Polynomial model rank was raised to: {rank}")
         else:
-            print(f"Polynomial model rank was not raised, value is {rank}.")
+            echo_if_(options, f"Polynomial model rank remains at: {rank}")
     poly = PolySpectrum(rank, options.var_main)
 
-    data_x = np.arange(data.size)
-    poly_c = np.polyfit(data_x, data, rank - 1)[::-1]
+    data_x = data_x if data_x is not None else np.arange(data.size)
+    poly_c = filter_poly_coeffs(np.polyfit(data_x, data, rank - 1)[::-1])
+    echo_if_(options, "Polynomial coeffs were calculated", poly_c)
 
     if options.fitting_mode == FittingModes.DSB:
-        balance = dsb_(poly, nonline)
-
-        print("The balance was formed:")
-        for expr in balance:
-            display(expr)
+        balance = dsb_(poly, nonline, poly_c)
+        echo_if_(options, "The balance was formed:", balance)
 
         if rank == nonline.expr_rank:
             solution = sp.nonlinsolve(balance, nonline.expr_coeffs).args[0]
-
-            for i in np.arange(poly.expr_rank):
-                solution = solution.subs(poly.expr_coeffs[i], poly_c[i])
-            
-            print("Solutions were found:")
-            display(solution)
-            
+            solution = np.array([sp.N(sol) for sol in solution], dtype=np.float32)
+            echo_if_(options, "Solution was found:", solution)
         else:
-            for i in np.arange(poly.expr_rank):
-                for j in np.arange(poly.expr_rank):
-                    balance[i] = balance[i].subs(poly.expr_coeffs[j], poly_c[j])
-            
-            solution0 = sp.nonlinsolve(
+            solutions = sp.nonlinsolve(
                 balance[: nonline.expr_rank], nonline.expr_coeffs
             )
+            if len(solutions) == 0:
+                raise RuntimeError(
+                    "No suitable solutions were found, try using another method!"
+                )
 
-            print("Solutions were found:")
-            for sol in solution0.args:
-                display(sol)
+            echo_if_(options, "Solutions were found:", solutions.args)
+            solution0 = solutions.args[0]
 
-            solution0 = solution0.args[0]
-            
             solution = nonline_lsm(balance, nonline.expr_coeffs, solution0)
-
-            print("Solution was rank optimized:")
-            display(solution)
+            echo_if_(options, "Solution was rank optimized:", solution)
 
     elif options.fitting_mode == FittingModes.DSBI:
-        balance = dsb_i_(poly, nonline, poly_c, 1.002)
+        balance = dsb_i_(poly, nonline, poly_c, options)
+        echo_if_(options, "The balance was formed:", balance)
 
-        print("The balance was formed:")
-        for expr in balance:
-            display(expr)
+        solutions0 = sp.nonlinsolve(balance, nonline.expr_coeffs)
+        echo_if_(options, "Solutions were found:", solutions0.args)
 
-        solution = sp.nonlinsolve(balance, nonline.expr_coeffs)
+        # Add metrics filtering
+        solutions = []
+        for sol in solutions0.args:
+            err = False
+            for val in sol:
+                if val == 0 or sp.im(val) != 0:
+                    err = True
+            if not err:
+                solutions.append(sol)
+        if len(solutions) == 0:
+            raise RuntimeError(
+                "No suitable solutions were found, try using another method!"
+            )
 
-        print("Solutions were found:")
-        for expr in solution.args:
-            display(expr)
-
-        solution = solution.args[-1]
+        solution = solutions[0]
+        solution = np.array([sp.N(sol) for sol in solution], dtype=np.float32)
     else:
         raise RuntimeError("Unrecognized fitting mode was passed.")
 
     if options.numeric_optimize:
         solution = numeric_optimize(data, solution, nonline)
-
-        print("Solution was numerically optimized:")
-        display(solution)
+        echo_if_(options, "Solution was numerically optimized:", solution)
 
     return nonline.apply_trained(solution)
 
 
-def dsb_(poly: Spectrum, nonline: Spectrum) -> list[sp.Expr]:
+def dsb_(poly: Spectrum, nonline: Spectrum, poly_c: np.ndarray) -> list[sp.Expr]:
     """Implementation of differential spectra balance creation using "strong"
     criteria for difference minimization. It can be applied with for most basic
     datasets and models with good enough results.
@@ -156,6 +193,8 @@ def dsb_(poly: Spectrum, nonline: Spectrum) -> list[sp.Expr]:
     """
     nonline_s = nonline.ranked()
     poly_s = poly.ranked()
+    for i, d in enumerate(poly_s):
+        poly_s[i] = d.subs(poly.expr_coeffs[i], poly_c[i])
 
     def ns(i: int) -> sp.Expr:
         return nonline_s[i] if i < nonline.expr_rank else 0
@@ -168,7 +207,7 @@ def dsb_(poly: Spectrum, nonline: Spectrum) -> list[sp.Expr]:
 
 
 def dsb_i_(
-    poly: Spectrum, nonline: Spectrum, poly_c: np.ndarray, h: float
+    poly: Spectrum, nonline: Spectrum, poly_c: np.ndarray, options: FittingOptions
 ) -> list[sp.Expr]:
     """Method for creation of the differential spectra balance using the "soft"
     difference minimization criteria. It theoretically can be applied for more
@@ -194,29 +233,24 @@ def dsb_i_(
         )
 
     m = (poly.expr_rank - 1) * 2 + 1
+    pre_balance = [es(i) for i in np.arange(0, m)]
+    echo_if_(options, "Pre-balance was formed:", pre_balance)
 
-    print("Spectrum was formed:")
-    for i in np.arange(0, m):
-        display(es(i))
-
-    pre_balance: sp.Expr = sp.parse_expr("0")
+    integral_sum: sp.Expr = sp.parse_expr("0")
     for k in np.arange(0, m):
-        buff: sp.Expr = sp.parse_expr("0")
-        for i in np.arange(0, k):
-            buff += es(k - i) * es(i)
-        buff *= 1 / (k + 1)
-        pre_balance += buff
-    pre_balance *= H
+        part: sp.Expr = sp.parse_expr("0")
+        for i in np.arange(0, k + 1):
+            part += pre_balance[k - i] * pre_balance[i]
+            if i == k:
+                break
+        part *= 1 / (k + 1)
+        integral_sum += part
+    integral_sum = sp.collect(sp.simplify(integral_sum * H), H)
+    echo_if_(options, "Integral sum was generated:", integral_sum)
 
-    print("Pre-balance was formed:")
-    display(sp.collect(pre_balance, H))
+    integral_sum = integral_sum.subs(H, options.dsbi_h)
 
-    pre_balance = pre_balance.subs(H, h)
-
-    balance: list[sp.Expr] = []
-    for a in nonline.expr_coeffs:
-        balance.append(sp.diff(pre_balance, a))
-
+    balance: list[sp.Expr] = [sp.diff(integral_sum, a) for a in nonline.expr_coeffs]
     return balance
 
 
@@ -254,6 +288,26 @@ def find_poly_rank(data: np.ndarray, rank: int = 0, rank_range: int = 12) -> int
         r_sq_pr = r_sq
 
     return rank
+
+
+def filter_poly_coeffs(poly_c: np.ndarray) -> np.ndarray:
+    """Filters all given coefficients in the array, assuming that they belong
+    to polynomial model. Removes all coeffs that are too small to meaningfully
+    influence the results. Cutoff is power lower than `coeff rank * -3 - 1`.
+
+    Args:
+        poly_c (np.ndarray): An array of polynomial coefficients to filter.
+
+    Returns:
+        np.ndarray: Collection of filtered coeffs.
+    """
+    poly_c_filtered = np.zeros(poly_c.size)
+    for i in np.arange(poly_c.size):
+        pos = np.log10(np.abs(poly_c[i]))
+        cutoff = i * -3 - 1
+        dec = pos > cutoff
+        poly_c_filtered[i] = poly_c[i] if dec else 0
+    return poly_c_filtered
 
 
 def nonline_lsm(
