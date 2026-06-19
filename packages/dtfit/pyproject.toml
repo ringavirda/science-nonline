@@ -1,0 +1,77 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dtfit"
+version = "0.1.0"
+description = "Differential-transformation fitting: nonlinear smoothing and forecasting via differential / non-Taylor transformations"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Oleksandr Tuhanskykh", email = "ringanaro@gmail.com" }]
+keywords = ["regression", "nonlinear", "time-series", "differential-transformations", "statistical-learning"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Mathematics",
+]
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "sympy>=1.12",
+    "scikit-learn>=1.6",  # validate_data / __sklearn_tags__ (estimator API)
+]
+
+[project.optional-dependencies]
+viz = ["matplotlib>=3.7"]
+dev = ["pytest>=7", "pytest-cov>=4", "ruff>=0.4", "mypy>=1.8"]
+# The experiment / benchmark suite and the experimental adaptations (with their
+# heavier deps: matplotlib/torch/statsmodels/pandas, and the optional cupy GPU
+# backend) live in the separate `dtfit-experimental` distribution -- see
+# `experimental/pyproject.toml` and its `bench` / `gpu` extras.
+
+[project.urls]
+Homepage = "https://github.com/ringavirda/science-pylab"
+Repository = "https://github.com/ringavirda/science-pylab"
+Issues = "https://github.com/ringavirda/science-pylab/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+dtfit = [
+    "py.typed",          # ship inline type information (PEP 561)
+]
+# The optional compiled kernels live in the private numeric core
+# (dtfit._core._native); ship their source, type stub and built artifacts.
+"dtfit._core" = [
+    "_native.c",         # source of the optional compiled kernels
+    "_native.pyi",       # type stub for the compiled extension
+    "*.pyd",             # compiled kernels (Windows), if built
+    "*.so",              # compiled kernels (Linux/macOS), if built
+]
+
+[tool.ruff]
+line-length = 79
+target-version = "py310"
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401", "F403"]  # star re-exports are intentional
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.10"
+files = ["src/dtfit"]
+ignore_missing_imports = true  # scipy/sklearn/sympy/matplotlib ship partial stubs
+
+[tool.coverage.run]
+source = ["dtfit"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+fail_under = 70  # CI fails below this line-coverage percentage

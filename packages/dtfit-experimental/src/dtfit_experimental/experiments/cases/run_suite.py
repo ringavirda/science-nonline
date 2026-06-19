@@ -1,0 +1,106 @@
+"""Run the per-adaptation ``cases`` suite and refresh its report index.
+
+    python -m dtfit_experimental.experiments.cases.run_suite           # full (parallel)
+    python -m dtfit_experimental.experiments.cases.run_suite --quick   # fast smoke run
+    python -m dtfit_experimental.experiments.cases.run_suite --jobs 4  # cap workers
+    python -m dtfit_experimental.experiments.cases.run_suite --jobs 1  # serial (debug)
+
+Each case writes its own ``<name>/report.md`` + ``<name>/figures/``; the shared
+driver (:mod:`dtfit_experimental.experiments._runner`) runs them in parallel and
+regenerates ``REPORTS.md`` -- the index linking every report plus the
+adaptation-effectiveness matrix and the promotion decisions.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from dtfit_experimental.experiments._runner import Suite, Result, main
+
+HERE = Path(__file__).resolve().parent
+PACKAGE = "dtfit_experimental.experiments.cases"
+
+EXPERIMENTS = [
+    ("01_control_systems", "Control-systems system identification"),
+    ("02_big_data_streaming", "Big data / streaming (scaling law)"),
+    ("03_noise_robustness", "Noise & robustness sweep"),
+    ("04_realworld_forecasting", "Real-world forecasting (train/holdout)"),
+    ("05_gps_trajectory", "GPS positioning & trajectory forecast"),
+    ("06_benchmark_ltsf", "LTSF benchmark vs published R&D results"),
+    ("07_parallel_scaling", "Parallel scaling & architecture adaptability"),
+    ("08_gpu_batched_projection", "GEMM-batched projection throughput (CPU/GPU)"),
+    ("09_embedded_footprint", "Embedded footprint (latency, memory, MCU fit)"),
+    ("10_fused_partitioned_batched", "Fused map-reduce + GEMM-batched LSI (multi-channel big data)"),
+]
+
+# Adaptation-effectiveness matrix from the suite (win / partial / loss / n/a).
+# Promotion gate: a clear win on >= 2 distinct application domains.
+ADAPTATIONS = [
+    ("#1 map-reduce LSI/EDA (PartitionedLSI/EDA)",
+     {"big data": "win", "parallel": "win", "forecasting": "n/a"},
+     "PROMOTE — exact one-pass distributed estimator; enables the big-data "
+     "scaling law and the parallel map-reduce. Clears the gate."),
+    ("#2 pluggable orthogonal basis (fit_lsi_basis)",
+     {"control": "partial", "forecasting": "partial", "ltsf": "loss"},
+     "Keep experimental — Fourier basis expresses periodic models cleanly, but a "
+     "window-local seasonal term only helped the cleanest periodic LTSF series "
+     "(electricity) and hurt elsewhere (a 96-point period estimate drifts out of "
+     "phase over long horizons); it did not beat the tuned forecasting baselines."),
+    ("#3 overlapping-window ensemble (ensemble_fit)",
+     {"noise/outliers": "partial", "gps": "n/a"},
+     "Keep experimental — helps EDA at low outlier rates but unstable once many "
+     "windows are corrupted; LSI's built-in smoothing is the more reliable "
+     "robustness route."),
+    ("#4 joint multi-channel fit (fit_joint)",
+     {"control": "loss", "gps": "n/a"},
+     "Keep experimental — on cleanly-identifiable channels the dedicated solver "
+     "already wins; value is parameter parsimony / consistency, not accuracy."),
+    ("#5 stage-wise boosting (boosted_fit)",
+     {"forecasting": "win", "ltsf": "n/a"},
+     "Keep experimental — a clear win on CO2 (trend+season) but only one domain "
+     "demonstrated; promote if a second domain confirms."),
+    ("#6 adaptive-window EDA (fit_eda_adaptive)",
+     {"transient fit": "win"},
+     "Keep experimental — recovers localized-transient parameters well; needs "
+     "broader evaluation before promotion."),
+]
+
+
+def _extra_sections(results: list[Result]) -> list[str]:
+    lines = [
+        "\n## Architecture-adaptation effectiveness matrix\n",
+        "Each novel EDA/LSI adaptation, scored across the experiments that "
+        "exercised it (win / partial / loss / n/a). **Promotion gate**: a clear "
+        "win on ≥ 2 distinct application domains.\n",
+        "| adaptation | per-domain result | decision |",
+        "|---|---|---|"]
+    for name, scores, decision in ADAPTATIONS:
+        sc = ", ".join(f"{k}: {v}" for k, v in scores.items())
+        lines.append(f"| {name} | {sc} | {decision} |")
+    lines += [
+        "\n## Promotion outcome\n",
+        "- **Promoted to the stable API:** the map-reduce estimators "
+        "(`PartitionedLSI` / `PartitionedEDA`, adaptation #1) — re-exported from "
+        "`dtfit` and documented; they cleared the gate (big-data + parallel).\n",
+        "- **Kept experimental in `dtfit_experimental`:** #2–#6, with the honest "
+        "per-experiment findings above. They remain available and documented but "
+        "did not (yet) clear the ≥2-domain promotion gate.\n",
+        "\n*This index is regenerated on every `run_suite.py` run.*"]
+    return lines
+
+
+SUITE = Suite(
+    package=PACKAGE,
+    experiments=EXPERIMENTS,
+    index_path=HERE / "REPORTS.md",
+    index_title="dtfit experiment suite — reports index",
+    intro=["Generated by `run_suite.py`. Each experiment is a self-contained "
+           "folder with its `report.md` and `figures/`.\n"],
+    noun="experiment",
+    numbered=True,
+    extra_sections=_extra_sections,
+)
+
+
+if __name__ == "__main__":
+    main(SUITE)

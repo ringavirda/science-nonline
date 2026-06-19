@@ -1,0 +1,82 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dtfit-experimental"
+version = "0.1.0"
+description = "Experimental EDA/LSI adaptations and the dtfit experiment suite (depends on dtfit)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Oleksandr Tuhanskykh", email = "ringanaro@gmail.com" }]
+keywords = ["regression", "nonlinear", "time-series", "differential-transformations", "experiments"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Mathematics",
+]
+# The experimental adaptations build directly on dtfit's internals
+# (dtfit.core, dtfit._spectral, dtfit._backend); numpy/scipy/sympy come
+# transitively via dtfit but are listed for clarity.
+dependencies = [
+    "dtfit",
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "sympy>=1.12",
+]
+
+[project.optional-dependencies]
+# Experiment / benchmark suite (dtfit_experimental.experiments): plotting + the
+# baseline methods compared against (deep nets via torch, classical TS via
+# statsmodels). joblib (parallel fitting) ships with scikit-learn.
+bench = ["matplotlib>=3.7", "torch>=2.2", "statsmodels>=0.14", "pandas>=2.0"]
+# Optional GPU backend for the GEMM-batched projection (batched.py /
+# experiments .../cases/08_gpu_batched_projection). CuPy is a NumPy-API drop-in
+# on cuBLAS; pick the wheel matching your CUDA driver -- cupy-cuda13x for CUDA 13
+# (e.g. a Blackwell / RTX 50-series box), cupy-cuda12x for CUDA 12. Install
+# explicitly, e.g. `pip install cupy-cuda13x`; not pinned here.
+gpu = ["cupy-cuda13x>=14.0"]
+dev = ["pytest>=7", "pytest-cov>=4", "ruff>=0.4", "mypy>=1.8"]
+
+[project.urls]
+Homepage = "https://github.com/ringavirda/science-pylab"
+Repository = "https://github.com/ringavirda/science-pylab"
+Issues = "https://github.com/ringavirda/science-pylab/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+# Ship the experiment datasets with the package so the suite runs after install.
+"dtfit_experimental.experiments" = ["data/**/*.csv"]
+
+[tool.ruff]
+line-length = 79
+target-version = "py310"
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401", "F403"]  # star re-exports are intentional
+# Experiment/benchmark scripts: allow compact one-line matplotlib axis setup
+# (`ax.set_xlabel(...); ax.set_ylabel(...)`), a script convention only.
+"src/dtfit_experimental/experiments/**" = ["E702"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.10"
+files = ["src/dtfit_experimental"]
+# The experiment suite (numeric-prefixed folders like ``01_control_systems`` are
+# imported by string via the runner, not as importable package names) is a
+# research/script tree and is not type-checked; only the adaptation modules are.
+exclude = "/experiments/"
+ignore_missing_imports = true
+
+[tool.coverage.run]
+source = ["dtfit_experimental"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true

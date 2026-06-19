@@ -1,0 +1,76 @@
+"""Adaptation #5 -- stage-wise residual boosting (LSI then EDA).
+
+A single parametric form may not capture both a trend and a cycle. Boosting
+stages the two methods: fit stage 1 to the data, subtract its prediction, fit
+stage 2 to the residual, and so on. The composite model is the sum of the
+stages -- e.g. an LSI exponential/poly trend plus an EDA-fitted oscillatory
+residual -- giving more expressiveness than either method alone while keeping
+each stage a cheap, well-posed fit.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any, Callable, Sequence
+
+import numpy as np
+
+from dtfit.methods import fit_lsi, fit_eda
+from dtfit.types import FittingResult
+
+_FITTERS: dict[str, Callable[..., FittingResult]] = {"lsi": fit_lsi, "eda": fit_eda}
+
+
+@dataclass
+class BoostedModel:
+    """Additive composite of staged fits."""
+
+    stage_models: list[Callable[..., Any]]
+    stage_specs: list[dict]
+
+    def predict(self, x: np.ndarray) -> np.ndarray:
+        x = np.asarray(x, dtype=float)
+        total = np.zeros_like(x)
+        for model in self.stage_models:
+            v = model(x)
+            total = total + (np.full_like(x, float(v)) if np.ndim(v) == 0 else np.asarray(v, float))
+        return total
+
+
+def boosted_fit(
+    data_x: np.ndarray,
+    data_y: np.ndarray,
+    stages: Sequence[dict],
+) -> BoostedModel:
+    """Fit additive stages, each to the running residual.
+
+    Args:
+        data_x, data_y: Observed samples.
+        stages: Ordered list of stage specs, each a dict with keys ``expr``,
+            ``var``, ``method`` (``"lsi"``/``"eda"``), and any extra fitter
+            kwargs (e.g. ``p0``, ``bounds``).
+
+    Returns:
+        BoostedModel whose ``predict`` sums the staged contributions.
+    """
+    x = np.asarray(data_x, dtype=float)
+    residual = np.asarray(data_y, dtype=float).copy()
+    models: list[Callable[..., Any]] = []
+    specs: list[dict] = []
+
+    for stage in stages:
+        spec = dict(stage)
+        method = spec.pop("method", "lsi")
+        expr = spec.pop("expr")
+        var = spec.pop("var")
+        fitter = _FITTERS.get(method)
+        if fitter is None:
+            raise ValueError(f"stage method must be 'lsi'/'eda', got {method!r}")
+        res = fitter(x, residual, expr, var, **spec)
+        models.append(res.model)
+        specs.append({"expr": expr, "var": var, "method": method, "coeffs": res.coeffs})
+        pred = res.model(x)
+        pred = np.full_like(x, float(pred)) if np.ndim(pred) == 0 else np.asarray(pred, float)
+        residual = residual - pred
+
+    return BoostedModel(stage_models=models, stage_specs=specs)

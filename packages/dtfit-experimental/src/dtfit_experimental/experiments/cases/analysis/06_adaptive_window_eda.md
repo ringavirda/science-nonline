@@ -1,0 +1,72 @@
+# #6 — Adaptive / multi-resolution EDA windows
+
+**Verdict: EXPERIMENTAL — works on its niche, under-tested.** Recovers
+localized-transient parameters that equal-span windows smear, but only one signal
+class has been demonstrated, so the evidence base is too narrow to promote.
+
+Source: [`../../src/dtfit/adaptations/multiresolution.py`](../../src/dtfit/adaptations/multiresolution.py).
+Tested in: [Noise & robustness (3)](../03_noise_robustness/report.md) (transient class).
+
+## What it is
+
+Stock EDA splits the domain into **equal-area / equal-span** windows. This
+adaptation places windows **adaptively** — a dyadic pyramid or
+curvature-weighted placement — so resolution concentrates where the signal
+actually changes, instead of being spread uniformly.
+
+```
+fit_eda_adaptive(t, y, "K*(1-exp(-a*x))", "x", p0=[1.0, 1.0])
+```
+
+## Measured result
+
+Saturating transient `y = K·(1 − e^{−a x})`, truth `K=2.0`, `a=3.0` (Exp 3): the
+adaptive fit recovers both parameters within tolerance (`K` to <0.2, `a` to <0.5)
+where the fast initial rise dominates the information but occupies a small slice
+of the time axis.
+
+## Why it works (the mechanism)
+
+EDA infers parameters from **window areas**. The information about a transient's
+rate is concentrated in the **high-curvature region** — the fast initial bend of
+`1 − e^{−a x}`. Two consequences:
+
+1. **Equal-span windows under-sample the informative region.** A transient that
+   rises in the first 10% of the axis and then flattens puts almost all of its
+   parameter information in that first 10%. Equal-area windows allocate most of
+   their windows to the flat tail, where the area barely depends on `a` — so the
+   rate parameter is weakly constrained and noise-sensitive.
+
+2. **Curvature-weighted placement matches windows to information density.**
+   Placing more, narrower windows where `|y''|` is large means the area
+   measurements that *do* depend strongly on the rate are resolved finely, while
+   the uninformative flat region is covered cheaply. This is the EDA analogue of
+   adaptive quadrature / mesh refinement: spend resolution where the integrand
+   varies.
+
+In effect it aligns the **measurement grid with the Fisher information** of the
+problem — the windows that most constrain the parameters get the most resolution.
+
+## Why it isn't promoted
+
+Only one transient class has been tested. The mechanism is sound and the result is
+clean, but "works on one saturating exponential" is not enough evidence that
+adaptive placement generalises — it could equally be tuned to this case. A proper
+evaluation would sweep several transient/multi-scale families (step+settle,
+multi-rate decay, a localized bump on a slow background) and compare adaptive vs
+equal-span EDA *and* vs LSI across them.
+
+## When it would help / when it wouldn't
+
+- **Helps:** signals with **localized features on a slow background** — transients,
+  edges, bursts, anything where information density is spatially uneven.
+- **Won't help:** signals whose information is **uniformly distributed** (a pure
+  sinusoid, a steady exponential) — there the equal-span grid is already optimal,
+  and adaptive placement just adds machinery for no gain.
+
+## Related
+
+- Same experiment, different lesson: the [ensemble (#3)](03_overlapping_ensemble.md)
+  manipulates *which windows* are aggregated for robustness; this manipulates
+  *where windows are placed* for resolution. Both are window-geometry ideas; this
+  one targets information density, that one targets outlier independence.

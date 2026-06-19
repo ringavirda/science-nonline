@@ -1,0 +1,146 @@
+"""Compiled-kernel parity: the C backend must match the pure-Python fallback.
+
+These cover both ``dtfit._core._kernels`` directly (against ``scipy.integrate.simpson``
+/ NumPy) and the methods that consume them, with the native backend forced off
+to exercise the fallback. Results must be bit-for-bit-close regardless of which
+backend is active -- that is the whole contract of the optional extension.
+"""
+
+import numpy as np
+import pytest
+from scipy.integrate import simpson
+
+import dtfit._core._kernels as K
+from dtfit import EDAFilter, LSIFilter, fit_eda, fit_lsi
+
+
+@pytest.fixture
+def force_fallback(monkeypatch):
+    """Run the body with the compiled backend disabled (pure-Python path)."""
+    monkeypatch.setattr(K, "HAVE_NATIVE", False)
+    yield
+
+
+def test_native_is_built():
+    # The repo build (build_native.py) is expected in CI/dev; flag if missing.
+    assert K.HAVE_NATIVE, "dtfit._native not built -- run python build_native.py"
+
+
+@pytest.mark.parametrize("n", [3, 4, 5, 6, 7, 16, 17, 64, 65])
+def test_simpson_windows_matches_scipy(n):
+    rng = np.random.default_rng(n)
+    x = np.sort(rng.uniform(0.0, 5.0, n))
+    y = rng.normal(size=n)
+    got = K.simpson_windows(y, x, np.array([0]), np.array([n]))[0]
+    assert abs(got - simpson(y=y, x=x)) < 1e-12
+
+
+def test_simpson_windows_multi_and_rows_match_scipy():
+    x = np.linspace(0.0, 10.0, 101)
+    Y = np.vstack([np.sin(x), np.cos(2 * x), x**2, np.exp(-x)])
+    starts = np.array([0, 30, 60])
+    stops = np.array([30, 60, 101])
+
+    ref = np.array(
+        [[simpson(y=row[s:e], x=x[s:e]) for s, e in zip(starts, stops)] for row in Y]
+    )
+    rows = K.simpson_windows_rows(Y, x, starts, stops)
+    assert np.allclose(rows, ref, atol=1e-12)
+    # single-row path agrees with the 2-D path
+    single = K.simpson_windows(Y[0], x, starts, stops)
+    assert np.allclose(single, ref[0], atol=1e-12)
+
+
+def test_legendre_project_matches_numpy():
+    nodes, w = np.polynomial.legendre.leggauss(16)
+    V = np.polynomial.legendre.legvander(nodes, 5)
+    norm = (2.0 * np.arange(6) + 1.0) / 2.0
+    fv = np.exp(0.7 * nodes) + 0.3 * nodes**2
+    got = K.legendre_project(fv, w, V, norm)
+    assert np.allclose(got, norm * ((w * fv) @ V), atol=1e-13)
+
+
+def test_fallback_kernels_match_native():
+    """The pure-Python fallback returns the same numbers as the C backend."""
+    assert K.HAVE_NATIVE  # otherwise this test is vacuous
+    x = np.linspace(0.0, 8.0, 97)
+    Y = np.vstack([np.sin(x), x**2])
+    starts, stops = np.array([0, 40]), np.array([40, 97])
+    nodes, w = np.polynomial.legendre.leggauss(16)
+    V = np.polynomial.legendre.legvander(nodes, 5)
+    norm = (2.0 * np.arange(6) + 1.0) / 2.0
+    fv = np.cos(nodes)
+
+    native = (
+        K.simpson_windows(Y[0], x, starts, stops),
+        K.simpson_windows_rows(Y, x, starts, stops),
+        K.legendre_project(fv, w, V, norm),
+    )
+    K.HAVE_NATIVE = False
+    try:
+        fb = (
+            K.simpson_windows(Y[0], x, starts, stops),
+            K.simpson_windows_rows(Y, x, starts, stops),
+            K.legendre_project(fv, w, V, norm),
+        )
+    finally:
+        K.HAVE_NATIVE = True
+    for a, b in zip(native, fb):
+        assert np.allclose(a, b, atol=1e-12)
+
+
+def test_fit_eda_backend_agnostic(arctan_data, force_fallback):
+    """fit_eda with the fallback recovers the same fit as the native backend."""
+    x, y, _ = arctan_data
+    fb = fit_eda(x, y, "a*atan(w*x)", "x", p0=[1.0, 1.0]).coeffs
+    K.HAVE_NATIVE = True  # the fixture restores it after the test
+    nat = fit_eda(x, y, "a*atan(w*x)", "x", p0=[1.0, 1.0]).coeffs
+    assert np.allclose(fb, nat, rtol=1e-9, atol=1e-9)
+
+
+def test_fit_lsi_backend_agnostic(exp_data, force_fallback):
+    x, y, _ = exp_data
+    fb = fit_lsi(x, y, "a*exp(b*x)", "x").coeffs
+    K.HAVE_NATIVE = True
+    nat = fit_lsi(x, y, "a*exp(b*x)", "x").coeffs
+    assert np.allclose(fb, nat, rtol=1e-9, atol=1e-9)
+
+
+def test_equal_areas_filter_backend_agnostic(force_fallback):
+    rng = np.random.default_rng(0)
+    t = np.linspace(0, 40, 600)
+    y = 3.0 * np.sin(1.5 * t) + rng.normal(0, 0.3, t.size)
+
+    def run() -> np.ndarray:
+        flt = EDAFilter(
+            "A*sin(w*t)", "t", p0=[1.0, 1.0], window_size=50,
+            q_diag=[0.05, 0.001], r=20.0,
+        )
+        for ti, yi in zip(t, y):
+            flt.partial_fit(ti, yi)
+        return flt.p
+
+    fb = run()
+    K.HAVE_NATIVE = True
+    nat = run()
+    assert np.allclose(fb, nat, rtol=1e-9, atol=1e-9)
+
+
+def test_legendre_filter_backend_agnostic(force_fallback):
+    rng = np.random.default_rng(0)
+    t = np.linspace(0, 40, 600)
+    y = 3.0 * np.sin(1.5 * t) + rng.normal(0, 0.3, t.size)
+
+    def run() -> np.ndarray:
+        flt = LSIFilter(
+            "A*sin(w*t)", "t", p0=[2.0, 1.5], window_size=50, order=5,
+            q_diag=[1e-3, 5e-4], r=5.0,
+        )
+        for ti, yi in zip(t, y):
+            flt.partial_fit(ti, yi)
+        return flt.p
+
+    fb = run()
+    K.HAVE_NATIVE = True
+    nat = run()
+    assert np.allclose(fb, nat, rtol=1e-9, atol=1e-9)
