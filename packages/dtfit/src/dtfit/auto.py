@@ -186,10 +186,16 @@ def _fit_model(model: str, t: np.ndarray, y: np.ndarray, t_all: np.ndarray,
     xspan = float(t[-1] - t[0]) or 1.0
     if model == "logistic":
         ylast = float(y[-1])
+        # Growth rate scales with the time span; bracket the seed rather than
+        # using fixed (0.1, 60) bounds. The old fixed bounds excluded gentle
+        # slopes (seed 6/xspan can fall below 0.1) and let the global search
+        # latch onto a near-vertical step -- a degenerate fit that matches
+        # in-sample but extrapolates to garbage / overflow (NaN forecasts).
+        k_seed = 6.0 / xspan
         p0, bounds = _ordered(
             "L/(1 + exp(-k*(x - x0)))", "x",
             {"L": (ylast * 1.5, ylast * 0.8, ylast * 12.0),
-             "k": (6.0 / xspan, 0.1, 60.0),
+             "k": (k_seed, 0.2 * k_seed, 8.0 * k_seed),
              "x0": (t[0] + xspan, t[0], t[0] + 2.5 * xspan)})
         r = fit_lsi(t, y, "L/(1 + exp(-k*(x - x0)))", "x", p0=p0, bounds=bounds,
                     k_star=6)

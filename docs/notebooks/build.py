@@ -464,14 +464,15 @@ persistence on a near-random-walk series and drop a runaway quadratic to linear.
 from dtfit import auto_forecast
 
 t = np.arange(120)
-series = 10.0 / (1 + np.exp(-0.06 * (t - 60))) + rng.normal(0, 0.05, t.size)
+series = 10.0 / (1 + np.exp(-0.12 * (t - 45))) + rng.normal(0, 0.015, t.size)
 cut, h = 90, 30
-fc = auto_forecast(t[:cut], series[:cut], horizon=h)
+fc = auto_forecast(t[:cut], series[:cut], horizon=h)   # routes to logistic
+print("forecast end:", round(fc[-1], 2), " actual end:", round(series[cut + h - 1], 2))
 
 plt.plot(t[:cut], series[:cut], label="history")
 plt.plot(np.arange(cut, cut + h), fc, "r-", lw=2, label="forecast")
 plt.plot(np.arange(cut, 120), series[cut:120], "k--", lw=1, label="actual")
-plt.legend(); plt.title("auto_forecast (logistic growth)"); plt.show()
+plt.legend(); plt.title("auto_forecast - saturating growth routes to logistic"); plt.show()
 """
     ),
 ]
