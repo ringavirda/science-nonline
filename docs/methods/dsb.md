@@ -1,9 +1,8 @@
 # DSB — Differential Spectra Balance
 
 > Symbolic, analytical reference method. Source:
-> [`methods/dsb.py`](../../packages/dtfit/src/dtfit/methods/dsb.py),
-> [`methods/_common.py`](../../packages/dtfit/src/dtfit/methods/_common.py),
-> [`methods/dsb.py`](../../packages/dtfit/src/dtfit/methods/dsb.py).
+> [`methods/_dsb.py`](../../packages/dtfit/src/dtfit/methods/_dsb.py),
+> [`methods/_common.py`](../../packages/dtfit/src/dtfit/methods/_common.py).
 > Invoke via `fit_dsb(coeffs_poly, expr, var)` or
 > `NonlineRegressor(expr, var, method="dsb")` (which runs the polynomial
 > pre-fit for you).
@@ -65,7 +64,7 @@ reference against which the numeric methods are judged.
 When the balance has more equations than unknowns ($R+1 > m$) the system is
 overdetermined; DSB then solves the leading $m$ equations symbolically and
 **refines** against the full system by nonlinear least squares
-([`_solve_numeric`](../../packages/dtfit/src/dtfit/methods/dsb.py)).
+([`_solve_numeric`](../../packages/dtfit/src/dtfit/methods/_dsb.py)).
 
 ## Algorithm
 

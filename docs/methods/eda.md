@@ -1,7 +1,7 @@
 # EDA — Equal Differential Areas (equal areas)
 
 > Numeric batch method, successor to the symbolic DSBE. Source:
-> [`methods/eda.py`](../../packages/dtfit/src/dtfit/methods/eda.py).
+> [`methods/_eda.py`](../../packages/dtfit/src/dtfit/methods/_eda.py).
 > Invoke via `dt.fit_eda(x, y, expr, var, ...)`,
 > or `NonlineRegressor(..., method="eda")`.
 

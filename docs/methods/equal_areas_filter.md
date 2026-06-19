@@ -1,7 +1,7 @@
 # EDAFilter — recursive (streaming) EDA
 
 > Numeric **online** method — the deployable real-time path. Source:
-> [`streaming/equal_areas.py`](../../packages/dtfit/src/dtfit/streaming/equal_areas.py).
+> [`streaming/_eda.py`](../../packages/dtfit/src/dtfit/streaming/_eda.py).
 > Invoke via `dt.EDAFilter(expr, var, p0=, window_size=, ...)` then
 > `flt.partial_fit(t, y)` per sample; `flt.predict(x)`, `flt.params_`.
 

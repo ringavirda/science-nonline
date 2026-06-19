@@ -1,7 +1,7 @@
 # LSI — Least-Squares Integral
 
 > Numeric batch method, successor to the symbolic DSBI. Source:
-> [`methods/lsi.py`](../../packages/dtfit/src/dtfit/methods/lsi.py).
+> [`methods/_lsi.py`](../../packages/dtfit/src/dtfit/methods/_lsi.py).
 > Invoke via `dt.fit_lsi(x, y, expr, var, ...)`,
 > or `NonlineRegressor(..., method="lsi")`.
 
