@@ -46,9 +46,10 @@ went):
 | #6 curvature-adaptive windows | `fit_eda_adaptive` |
 | the LSI oscillatory recipe | `fit_lsi(oscillatory=…, freq_param=…)`, `fft_frequency_seed` |
 | fused multi-axis fault detection | `FusedChiSquareDetector` |
+| #3 overlapping-window ensemble | `ensemble_fit`, `EnsembleResult` |
 
-**Still experimental** (the four below): `fit_lsi_basis`, `ensemble_fit`,
-`fit_joint`, `boosted_fit`.
+**Still experimental** (the three below): `fit_lsi_basis`, `fit_joint`,
+`boosted_fit`.
 
 ---
 
@@ -75,19 +76,11 @@ conditioning.
 on the interval; nothing about it is specific to Legendre. Swap in any orthogonal
 family and the same diagonal least-squares match holds.
 
-### #3 — Overlapping-window ensemble (`ensemble_fit`)
+### #3 — Overlapping-window ensemble (`ensemble_fit`) — **promoted**
 
-**Intuition.** Fitting once to the whole record gives one estimate, with no sense
-of its spread and full exposure to any outlier. Instead, fit the model on **many
-overlapping sub-windows** and combine the per-window parameter estimates
-**robustly** — take the *median* across windows. The median ignores the windows a
-few outliers wrecked, and the spread across windows is a cheap, honest uncertainty
-band. This is *bagging over the time axis*, and it works for both EDA and LSI.
-
-**The math it rests on.** Each sub-window is itself a valid fit (the fingerprint
-match is well-posed on any interval), so the windows are independent estimates of
-the same parameters; aggregating independent estimates reduces variance, and the
-median makes the aggregation outlier-robust.
+This adaptation graduated to stable `dtfit` after the validation suite showed a
+consistent outlier-robustness win. It now lives at `from dtfit import
+ensemble_fit` — full write-up in [../methods/ensemble.md](../methods/ensemble.md).
 
 ### #4 — Joint shared-parameter fit (`fit_joint`)
 

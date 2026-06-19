@@ -9,7 +9,6 @@ import pytest
 
 from dtfit_experimental import (
     fit_lsi_basis,
-    ensemble_fit,
     fit_joint,
     boosted_fit,
 )
@@ -54,14 +53,8 @@ def test_unknown_basis_raises():
                       basis="nope")
 
 
-# --- #3 ensemble ----------------------------------------------------------- #
-def test_ensemble_fit_recovers_with_spread(exp_stream):
-    t, y, (a, b) = exp_stream
-    e = ensemble_fit(t, y, "a*exp(b*t)", "t", method="eda", n_windows=6,
-                     p0=[1.0, 1.0])
-    assert abs(e.coeffs[1] - b) < 0.2
-    assert e.spread.shape == (2,) and np.all(e.spread >= 0)
-    assert e.members.shape[1] == 2
+# --- #3 ensemble: promoted to dtfit; tested in the stable suite
+#     (tests/methods/test_ensemble.py, tests/validation/test_outlier_robustness.py)
 
 
 # --- #4 joint multi-channel ------------------------------------------------ #

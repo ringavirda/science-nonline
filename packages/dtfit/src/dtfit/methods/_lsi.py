@@ -154,6 +154,11 @@ def fit_lsi(
             y = np.asarray(savgol_filter(y, window, polyorder=3), dtype=float)
 
     order = _auto_order(x, y) if k_star == "auto" else int(k_star)
+    # The spectral residual has order+1 entries and must carry at least as many
+    # equations as parameters, or the least-squares is underdetermined and LM
+    # raises. Floor the order at n_params-1 so every catalogue model is solvable
+    # at the default k_star (e.g. an 8-parameter Fourier series needs order>=7).
+    order = max(order, len(params) - 1)
     order = max(1, min(order, y.size - 2))
     echo(f"LSI Legendre spectral order: {order}")
 
@@ -204,20 +209,41 @@ def fit_lsi(
             )
         guess[names.index(freq_param)] = fft_frequency_seed(x, y)
 
-    # 5. Solve. With bounds use a global search; otherwise weighted NLLS.
+    # 5. Solve. Without bounds: weighted NLLS from the seed. With bounds: a fast
+    #    bounded *local* solve from a supplied seed first -- the catalog seeders
+    #    and the auto/oscillatory paths give good, data-driven seeds (an FFT peak
+    #    for the frequency), so a trust-region solve from there lands on the same
+    #    optimum as the global search at ~10-50x less cost. The global
+    #    differential-evolution search is kept as the fallback for when no seed is
+    #    supplied or the local solve lands on a poor basin (large residual).
     if bounds is not None:
-        def cost(c: np.ndarray) -> float:
-            r = residual(c)
-            return float(r @ r)
+        lo = [b[0] for b in bounds]
+        hi = [b[1] for b in bounds]
+        local = None
+        if p0 is not None:
+            loc = least_squares(
+                residual, np.clip(guess, lo, hi), bounds=(lo, hi), method="trf"
+            )
+            denom = float(np.linalg.norm(sqrt_w * beta_data)) + 1e-30
+            rel = float(np.linalg.norm(loc.fun)) / denom
+            if loc.success and rel < 0.5:  # converged + explains the spectrum
+                local = loc
+        if local is not None:
+            coeffs = np.asarray(local.x, dtype=np.float64)
+            jac = local.jac
+        else:
+            def cost(c: np.ndarray) -> float:
+                r = residual(c)
+                return float(r @ r)
 
-        # cast: `seed` is the portable arg across scipy versions (newer stubs
-        # only expose its `rng` successor).
-        res_g = cast(Any, differential_evolution)(
-            cost, bounds, strategy="best1bin", popsize=15, seed=0
-        )
-        res = minimize(cost, res_g.x, method="L-BFGS-B", bounds=bounds)
-        coeffs = np.asarray(res.x, dtype=np.float64)
-        jac = _numeric_jac(residual, coeffs)
+            # cast: `seed` is the portable arg across scipy versions (newer stubs
+            # only expose its `rng` successor).
+            res_g = cast(Any, differential_evolution)(
+                cost, bounds, strategy="best1bin", popsize=15, seed=0
+            )
+            res = minimize(cost, res_g.x, method="L-BFGS-B", bounds=bounds)
+            coeffs = np.asarray(res.x, dtype=np.float64)
+            jac = _numeric_jac(residual, coeffs)
     else:
         sol = least_squares(residual, guess, method="lm")
         coeffs = np.asarray(sol.x, dtype=np.float64)

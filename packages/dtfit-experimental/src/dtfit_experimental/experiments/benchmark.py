@@ -2,8 +2,11 @@
 
 Produces, for the per-method documentation under ``docs/methods/``:
 
-  * figures (PNG) into ``docs/methods/figures/`` -- one usage plot per method,
-    plus a cross-method error bar chart, in the style of the paper figures;
+  * figures (PNG) into ``docs/methods/figures/`` -- a scenario plot per method
+    showing it on the data it is *best* at (LSI exponential + oscillatory recipe;
+    EDA saturation + adaptive-window peak; DSB additive form; the EDA/LSI streaming
+    filters; the fused multi-axis bank; the partitioned/GEMM scale backends; the
+    auto pipelines), plus a cross-method error bar chart, in the paper style;
   * comparison tables (printed as GitHub-flavoured markdown to stdout) of the
     dtfit methods against established baselines -- SciPy ``curve_fit``
     (Levenberg-Marquardt NLLS, the NLS gold standard), ``numpy.polyfit``
@@ -438,15 +441,292 @@ def fig_comparison() -> None:
     plt.close(fig)
 
 
+# --------------------------------------------------------------------------- #
+# figures for the scenario each method is *best* at (extends the basics above)
+# --------------------------------------------------------------------------- #
+def fig_lsi_oscillatory() -> None:
+    """LSI's signature scenario: recover a cycle with the oscillatory recipe,
+    where a default (smoothed, low-order) spectral fit erases it."""
+    rng = np.random.default_rng(3)
+    x = np.linspace(0, 10, 400)
+    A_t, w_t, p_t = 2.0, 1.7, 0.5
+    clean = A_t * np.sin(w_t * x + p_t)
+    y = clean + rng.normal(0, 0.15, x.size)
+
+    recipe = dt.fit_lsi(x, y, "A*sin(w*x + p)", "x", freq_param="w")
+    yhat_r = np.asarray(recipe.model(x))
+    try:  # default LSI (no recipe): smoothing + low order erases the cycle
+        naive = dt.fit_lsi(x, y, "A*sin(w*x + p)", "x")
+        yhat_n = np.asarray(naive.model(x))
+        w_n = naive.params["w"]
+    except Exception:
+        yhat_n, w_n = None, float("nan")
+
+    fig, ax = plt.subplots(1, 2, figsize=(10, 3.8))
+    ax[0].scatter(x, y, s=8, c="0.7", label="noisy samples")
+    ax[0].plot(x, clean, "k--", lw=1, label="ground truth")
+    if yhat_n is not None:
+        ax[0].plot(x, yhat_n, "tab:orange", lw=1.5, ls=":",
+                   label=f"LSI default (no recipe, w={w_n:.2f})")
+    ax[0].plot(x, yhat_r, "tab:blue", lw=2,
+               label=f"LSI oscillatory recipe (w={recipe.params['w']:.2f})")
+    ax[0].set_title("LSI oscillatory recipe — A·sin(w·x + p), truth w=1.7")
+    ax[0].set_xlabel("x"); ax[0].set_ylabel("y"); ax[0].legend(fontsize=8)
+
+    # the FFT seed the recipe uses for the frequency
+    yy = y - y.mean()
+    spec = np.abs(np.fft.rfft(yy)); spec[0] = 0.0
+    freqs = 2 * np.pi * np.fft.rfftfreq(x.size, d=float(x[1] - x[0]))
+    ax[1].plot(freqs, spec, "0.5", lw=1.2)
+    ax[1].axvline(freqs[int(np.argmax(spec))], color="tab:blue", ls="--", lw=1.2,
+                  label=f"FFT seed = {freqs[int(np.argmax(spec))]:.2f}")
+    ax[1].axvline(w_t, color="k", ls=":", lw=1, label="true w = 1.7")
+    ax[1].set_xlim(0, 6)
+    ax[1].set_title("Frequency seed (FFT peak) the recipe locks onto")
+    ax[1].set_xlabel("angular frequency ω"); ax[1].set_ylabel("|FFT|")
+    ax[1].legend(fontsize=8)
+    fig.tight_layout(); fig.savefig(FIG_DIR / "lsi_oscillatory.png"); plt.close(fig)
+
+
+def fig_eda_adaptive() -> None:
+    """Adaptive EDA's scenario: a sharp sigmoid step, where the curvature is
+    localized at the bend so curvature-placed windows cluster there (carrying the
+    parameter information) instead of spreading evenly."""
+    rng = np.random.default_rng(4)
+    x = np.linspace(0, 10, 300)
+    L_t, k_t, x0_t = 1.0, 2.5, 5.0
+    clean = L_t / (1.0 + np.exp(-k_t * (x - x0_t)))   # sharp step at x0=5
+    y = clean + rng.normal(0, 0.02, x.size)
+    res = dt.fit_eda_adaptive(x, y, "L/(1 + exp(-k*(x - x0)))", "x", p0=[1.0, 1.0, 5.0])
+    yhat = np.asarray(res.model(x))
+    m = 6
+
+    # Window edges from equal *information* (cumulative curvature of the underlying
+    # curve): the principle the placement targets. Computed on the clean curve so
+    # the mechanism is visible — on heavily noisy data the curvature estimate
+    # softens toward equal spacing.
+    d2 = np.abs(np.gradient(np.gradient(clean, x), x)) + 1e-12
+    cum = np.concatenate([[0.0], np.cumsum(d2)]); cum /= cum[-1]
+    xc = np.concatenate([[x[0]], x])
+    targets = np.linspace(0, 1, m + 1)
+    adaptive_x = np.interp(targets, cum, xc)[1:-1]
+    equal_x = np.linspace(x[0], x[-1], m + 1)[1:-1]
+
+    fig, ax = plt.subplots(1, 2, figsize=(10, 3.8))
+    ax[0].scatter(x, y, s=8, c="0.7", label="samples")
+    ax[0].plot(x, clean, "k--", lw=1, label="ground truth")
+    ax[0].plot(x, yhat, "tab:green", lw=2,
+               label=f"adaptive EDA (k={res.params['k']:.2f}, x0={res.params['x0']:.2f})")
+    for xe in adaptive_x:
+        ax[0].axvline(xe, color="tab:green", ls=":", lw=1, alpha=0.7)
+    ax[0].set_title("Adaptive EDA — sharp sigmoid step (curvature window edges)")
+    ax[0].set_xlabel("x"); ax[0].set_ylabel("y"); ax[0].legend(fontsize=8)
+
+    ax[1].plot(x, cum[1:], "tab:green", lw=1.8, label="cumulative |curvature|")
+    for fr in targets[1:-1]:
+        ax[1].axhline(fr, color="0.85", lw=0.7)
+    for xe in adaptive_x:
+        ax[1].axvline(xe, color="tab:green", ls=":", lw=1.3, alpha=0.9)
+    for xe in equal_x:
+        ax[1].axvline(xe, color="0.6", ls="--", lw=0.8)
+    ax[1].plot([], [], color="tab:green", ls=":", label="adaptive edges (cluster at bend)")
+    ax[1].plot([], [], color="0.6", ls="--", label="equal-x edges (spread evenly)")
+    ax[1].set_title("Edges at equal information, not equal x")
+    ax[1].set_xlabel("x"); ax[1].set_ylabel("normalized cumulative curvature")
+    ax[1].legend(fontsize=8, loc="upper left")
+    fig.tight_layout(); fig.savefig(FIG_DIR / "eda_adaptive.png"); plt.close(fig)
+
+
+def fig_lsi_filter() -> None:
+    """LSIFilter's scenario: track a steady oscillation. The spectrum measurement
+    locks onto the cycle's frequency; the EDAFilter's *area* measurement nearly
+    cancels over a cycle, so it cannot — the reason the LSIFilter exists."""
+    from dtfit.streaming import LSIFilter, EDAFilter
+
+    rng = np.random.default_rng(5)
+    t = np.linspace(0, 50, 1200)
+    A_t, w_t = 2.0, 1.3
+    y = A_t * np.sin(w_t * t) + rng.normal(0, 0.15, t.size)
+
+    def run(flt):
+        wh, pr = [], []
+        for i in range(t.size):
+            flt.partial_fit(t[i], y[i])
+            wh.append(flt.params_["w"])
+            pr.append(float(flt.predict(np.array([t[i]]))[0]) if len(flt._t) else np.nan)
+        return np.array(wh), np.array(pr)
+
+    w_lsi, p_lsi = run(LSIFilter("A*sin(w*t)", "t", p0=[1.0, 0.8],
+                                 window_size=120, order=6, q_diag=[1e-3, 1e-3], r=1.5))
+    w_eda, p_eda = run(EDAFilter("A*sin(w*t)", "t", p0=[1.0, 0.8],
+                                 window_size=120, q_diag=[1e-3, 1e-3], r=1.5))
+
+    fig, ax = plt.subplots(1, 2, figsize=(10, 3.8))
+    sl = slice(int(t.size * 0.62), int(t.size * 0.74))   # zoom for the overlay
+    ax[0].plot(t[sl], y[sl], "0.75", lw=1.2, label="signal")
+    ax[0].plot(t[sl], p_lsi[sl], "tab:blue", lw=1.6, label="LSIFilter (spectrum)")
+    ax[0].plot(t[sl], p_eda[sl], "tab:orange", lw=1.6, ls="--", label="EDAFilter (area)")
+    ax[0].set_title("Online 1-step prediction — A·sin(w·t)")
+    ax[0].set_xlabel("t"); ax[0].set_ylabel("y"); ax[0].legend(fontsize=8)
+
+    ax[1].axhline(w_t, color="k", ls="--", lw=1, label="true ω = 1.3")
+    ax[1].plot(t, w_lsi, "tab:blue", lw=1.6,
+               label=f"LSIFilter ω → {w_lsi[-1]:.2f} (locks on)")
+    ax[1].plot(t, w_eda, "tab:orange", lw=1.6,
+               label=f"EDAFilter ω → {w_eda[-1]:.2f} (area cancels)")
+    ax[1].set_title("Spectrum measurement tracks the cycle; area does not")
+    ax[1].set_xlabel("t"); ax[1].set_ylabel("ω estimate"); ax[1].legend(fontsize=8)
+    fig.tight_layout(); fig.savefig(FIG_DIR / "lsi_filter.png"); plt.close(fig)
+
+
+def fig_filter_bank() -> None:
+    """FilterBank + fused χ²: a fault shared across 3 channels is weak per-axis but
+    strong in the pooled statistic."""
+    from dtfit import FilterBank
+    from dtfit.streaming import LSIFilter
+
+    rng = np.random.default_rng(6)
+    t = np.linspace(0, 50, 1500)
+    half = t.size // 2
+    K = 3
+    amps = np.array([2.0, 1.5, 2.5])
+    w_t = 1.3
+    env = np.where(np.arange(t.size) < half, 1.0, 0.45)   # shared amplitude collapse
+    Y = np.column_stack([
+        amps[k] * env * np.sin(w_t * t) + rng.normal(0, 0.15, t.size) for k in range(K)
+    ])
+
+    bank = FilterBank.from_model("A*sin(w*t)", "t", K, filter_cls=LSIFilter,
+                                 p0=[2.0, 1.3], window_size=120, order=6,
+                                 q_diag=[2e-3, 5e-4], r=1.5)
+    det = bank.fused_detector(alpha=1e-3, inflate=4.0, warmup=550, cooldown=700)
+    stat, flags = [], []
+    for i in range(t.size):
+        fired = det.update(t[i], Y[i])
+        stat.append(det.statistic_)
+        if fired:
+            flags.append(i)
+    stat = np.array(stat)
+
+    fig, ax = plt.subplots(2, 1, figsize=(9, 5.6), sharex=True)
+    for k in range(K):
+        ax[0].plot(t, Y[:, k], lw=0.6, label=f"axis {k+1}")
+    ax[0].axvline(t[half], color="tab:purple", ls="--", lw=1, label="shared fault")
+    ax[0].set_title("3 oscillatory channels — a damping (amplitude) fault shared across all axes")
+    ax[0].set_ylabel("signal"); ax[0].legend(fontsize=8, ncol=2)
+
+    ax[1].plot(t, stat, "tab:red", lw=1.2, label="fused χ²(3) statistic")
+    ax[1].axhline(det.threshold_, color="k", ls=":", lw=1,
+                  label=f"α=1e-3 threshold ({det.threshold_:.1f})")
+    ax[1].axvline(t[half], color="tab:purple", ls="--", lw=1)
+    for j, fi in enumerate(flags):
+        ax[1].axvline(t[fi], color="tab:green", ls="-", lw=1.0, alpha=0.7,
+                      label="flagged" if j == 0 else None)
+    ax[1].set_ylim(0, min(np.nanmax(stat) * 1.1, 160))
+    ax[1].set_title("Pooled χ²(3) spikes at the shared fault and is flagged")
+    ax[1].set_xlabel("t"); ax[1].set_ylabel("χ² statistic"); ax[1].legend(fontsize=8)
+    fig.tight_layout(); fig.savefig(FIG_DIR / "filter_bank.png"); plt.close(fig)
+
+
+def fig_scaling() -> None:
+    """Scaling: the partitioned (chunked) reduce is *exact* — same fit as the
+    whole-batch LSI — and many channels fit in one GEMM."""
+    rng = np.random.default_rng(7)
+    x = np.linspace(0, 1.5, 4000)
+    a_t, b_t = 1.0, 1.8
+    clean = a_t * np.exp(b_t * x)
+    y = clean + rng.normal(0, 0.03 * clean.std(), x.size)
+
+    whole = dt.fit_lsi(x, y, "a*exp(b*x)", "x", filter_data=False)
+    acc = dt.PartitionedLSI("a*exp(b*x)", "x", domain=(0.0, 1.5), order=6)
+    n_chunks = 8
+    bnds = np.linspace(0, x.size, n_chunks + 1).astype(int)
+    for c in range(n_chunks):  # shared boundary sample keeps the reduce exact
+        lo = max(0, bnds[c] - 1)
+        acc.update(x[lo:bnds[c + 1]], y[lo:bnds[c + 1]])
+    part = acc.fit(p0=[1.0, 1.0])
+    dcoef = float(np.max(np.abs(whole.coeffs - part.coeffs)))
+
+    fig, ax = plt.subplots(1, 2, figsize=(10, 3.8))
+    ax[0].scatter(x[::40], y[::40], s=8, c="0.8", label="samples (4000)")
+    ax[0].plot(x, np.asarray(whole.model(x)), "tab:blue", lw=2.5,
+               label=f"whole-batch LSI (b={whole.params['b']:.4f})")
+    ax[0].plot(x, np.asarray(part.model(x)), "tab:orange", lw=1.2, ls="--",
+               label=f"PartitionedLSI, {n_chunks} chunks (b={part.params['b']:.4f})")
+    ax[0].set_title(f"Map-reduce is exact — max|Δcoef| = {dcoef:.1e}")
+    ax[0].set_xlabel("x"); ax[0].set_ylabel("y"); ax[0].legend(fontsize=8)
+
+    # many channels in one GEMM: recovered growth rate vs truth across B channels
+    B = 300
+    b_true = rng.uniform(0.8, 2.6, B)
+    Y = np.exp(np.outer(x, b_true)) * rng.uniform(0.6, 1.4, B)
+    Y = Y + rng.normal(0, 0.02 * Y.std(axis=0), Y.shape)
+    results = dt.fit_lsi_batched(x, Y, "a*exp(b*x)", "x", order=6)
+    b_rec = np.array([r.params["b"] for r in results])
+    ax[1].scatter(b_true, b_rec, s=10, c="tab:green", alpha=0.6)
+    lim = [0.7, 2.7]
+    ax[1].plot(lim, lim, "k--", lw=1, label="exact recovery")
+    ax[1].set_xlim(lim); ax[1].set_ylim(lim)
+    ax[1].set_title(f"GEMM-batched: {B} channels' growth rate in one matmul")
+    ax[1].set_xlabel("true b (per channel)"); ax[1].set_ylabel("recovered b")
+    ax[1].legend(fontsize=8)
+    fig.tight_layout(); fig.savefig(FIG_DIR / "scaling.png"); plt.close(fig)
+
+
+def fig_auto_forecast() -> None:
+    """auto_forecast: route to a linear+seasonal model and extrapolate the cycle
+    (a clear win over a random walk), and the no-structure guard persisting on a
+    structureless series."""
+    # (1) seasonal: trend + cycle -> route to linear+seasonal, extrapolate
+    rng = np.random.default_rng(2)
+    n, h, P = 160, 40, 24
+    t = np.arange(n).astype(float)
+    clean = 0.05 * t + 3.0 * np.sin(2 * np.pi * t / P + 0.5) + 10.0
+    y = clean + rng.normal(0, 0.5, n)
+    fc = dt.auto_forecast(t[: n - h], y[: n - h], h, period=P)
+    rw = np.full(h, y[n - h - 1])
+
+    # (2) structureless series: the no-structure guard falls back to persistence
+    rng2 = np.random.default_rng(1)
+    yn = 20.0 + rng2.normal(0, 3.0, n)
+    fc2 = dt.auto_forecast(t[: n - h], yn[: n - h], h)
+    poly = np.polyval(np.polyfit(t[: n - h], yn[: n - h], 2), t[n - h:])
+
+    fig, ax = plt.subplots(1, 2, figsize=(10, 3.8))
+    fut = t[n - h:]
+    ax[0].plot(t[: n - h], y[: n - h], "0.6", lw=0.8, label="train")
+    ax[0].plot(fut, y[n - h:], "k.", ms=3, label="held-out truth")
+    ax[0].plot(fut, fc, "tab:blue", lw=2, label="auto_forecast (linear+seasonal)")
+    ax[0].plot(fut, rw, "tab:orange", lw=1.2, ls=":", label="random walk")
+    ax[0].axvline(t[n - h], color="0.8", ls=":")
+    ax[0].set_title("auto_forecast — extrapolates the cycle (trend + season)")
+    ax[0].set_xlabel("t"); ax[0].set_ylabel("y"); ax[0].legend(fontsize=8)
+
+    ax[1].plot(t[: n - h], yn[: n - h], "0.6", lw=0.8, label="train")
+    ax[1].plot(fut, yn[n - h:], "k.", ms=3, label="held-out truth")
+    ax[1].plot(fut, fc2, "tab:blue", lw=2, label="auto_forecast (guard → persist)")
+    ax[1].plot(fut, poly, "tab:red", lw=1.2, ls="--", label="naïve poly extrapolation")
+    ax[1].axvline(t[n - h], color="0.8", ls=":")
+    ax[1].set_title("No-structure guard — structureless series falls back to persistence")
+    ax[1].set_xlabel("t"); ax[1].set_ylabel("y"); ax[1].legend(fontsize=8)
+    fig.tight_layout(); fig.savefig(FIG_DIR / "auto_forecast.png"); plt.close(fig)
+
+
 def main() -> None:
     if not (DATA_DIR / "covid_ukraine_confirmed.csv").exists():
         raise SystemExit("Datasets missing -- run: python -m dtfit_experimental.experiments.download_data")
 
     print("Generating figures into", FIG_DIR)
     fig_lsi()
+    fig_lsi_oscillatory()
     fig_eda()
+    fig_eda_adaptive()
     fig_filter()
+    fig_lsi_filter()
+    fig_filter_bank()
     fig_dsb()
+    fig_scaling()
+    fig_auto_forecast()
     fig_comparison()
     print("  wrote:", ", ".join(sorted(p.name for p in FIG_DIR.glob("*.png"))))
 

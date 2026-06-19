@@ -2,12 +2,13 @@
 
 The core batch fitters and their support functions. All return a
 [`FittingResult`](types.md) unless noted. Conceptual background:
-[../guide/methods-explained.md](../guide/methods-explained.md); proofs:
+[../guides/methods-explained.md](../guides/methods-explained.md); proofs:
 [../methods/](../methods/).
 
 - [`fit_lsi`](#fit_lsi) — Least-Squares Integral (accurate, general default)
 - [`fit_eda`](#fit_eda) — Equal Differential Areas (robust, fast)
 - [`fit_eda_adaptive`](#fit_eda_adaptive) — EDA with curvature-placed windows
+- [`ensemble_fit`](#ensemble_fit) — overlapping-window robust ensemble (outliers)
 - [`fit_dsb`](#fit_dsb) — Differential Spectra Balance (symbolic reference)
 - [`find_degree`](#find_degree) — polynomial degree selection (DSB support)
 - [`fft_frequency_seed`](#fft_frequency_seed) — frequency seed for oscillatory fits
@@ -95,7 +96,7 @@ transient/saturating shapes.
 - Because the robust loss is applied to *integrated windows*, it can only
   down-weight whole contaminated windows — give it **enough windows** that an
   outlier stays localized for the robustness to bite. See the worked discussion in
-  [notebook 02](../notebooks/02_fitting_methods.ipynb).
+  [notebook 02](../guides/notebooks/02_fitting_methods.ipynb).
 
 **Example**
 
@@ -131,6 +132,64 @@ The best estimator for localized transients/peaks and rational-saturating shapes
 
 Uses the full data record (no `active_ratio` clipping), which is part of why it
 suits saturating tails. Returns a `FittingResult` with covariance.
+
+---
+
+<a name="ensemble_fit"></a>
+## `ensemble_fit`
+
+```python
+ensemble_fit(data_x, data_y, expr, var, *,
+             method="eda", n_windows=8, overlap=0.5,
+             aggregate="median", p0=None, **kwargs) -> EnsembleResult
+```
+
+Fit the model on many **overlapping subwindows** and aggregate the per-window
+coefficients robustly — bagging over the time axis. The **median** of the
+per-window estimates rejects windows corrupted by outliers, and the inter-window
+spread is a cheap empirical uncertainty band.
+
+**Use it for outlier-contaminated data.** The median-of-windows aggregation
+rejects whole corrupted windows without the per-problem `f_scale` tuning that
+[`fit_eda(loss="soft_l1")`](#fit_eda) needs — and stays stable where that robust
+loss can diverge. On clean (Gaussian-noise) data prefer a single whole-record
+fit: the ensemble trades a little accuracy there for the outlier robustness, so
+it is a **specialised tool, not the default path**.
+
+**Arguments**
+
+| name | type | default | meaning |
+|---|---|---|---|
+| `data_x`, `data_y` | array | — | observed samples |
+| `expr`, `var` | str | — | model and main variable |
+| `method` | str | `"eda"` | underlying batch fitter, `"eda"` or `"lsi"` |
+| `n_windows` | int | `8` | target number of overlapping subwindows |
+| `overlap` | float | `0.5` | fractional overlap between consecutive windows (`0..0.9`) |
+| `aggregate` | str | `"median"` | `"median"` (robust) or `"mean"` |
+| `p0` | array \| None | `None` | initial guess forwarded to each window fit |
+| `**kwargs` | — | — | extra args forwarded to the underlying fitter (e.g. `bounds`) |
+
+**Returns** an [`EnsembleResult`](#ensembleresult) — a [`FittingResult`](types.md)
+(so `params`, `predict`, `stderr`, `to_dict` all work) that additionally carries
+the per-window `members` and their `spread` (which also fills the covariance).
+
+**Example**
+
+```python
+from dtfit import ensemble_fit
+
+res = ensemble_fit(x, y, "a*exp(-b*x)", "x", method="eda", p0=[1.0, 1.0])
+print(res.params, res.spread)   # robust estimate + per-parameter spread
+```
+
+<a name="ensembleresult"></a>
+### `EnsembleResult`
+
+Subclass of [`FittingResult`](types.md) returned by `ensemble_fit`. Extra
+attributes: `spread` (per-parameter inter-window standard deviation) and
+`members` (`(n_windows_fitted, n_params)` raw per-window coefficients). The spread
+populates the covariance diagonal, so `stderr()` returns it and
+`predict(return_std=True)` reports the ensemble's uncertainty.
 
 ---
 

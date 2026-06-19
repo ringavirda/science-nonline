@@ -118,7 +118,14 @@ def fit_eda(
         v = func(x_active, *c)
         if np.ndim(v) == 0:  # constant model/derivative -> broadcast
             v = np.full_like(x_active, float(v))
-        return np.ascontiguousarray(v, dtype=float)
+        v = np.ascontiguousarray(v, dtype=float)
+        # A transcendental sensitivity can be singular at an isolated sample
+        # (e.g. d/dn of x**n is x**n*log(x), which is NaN at x=0) while its
+        # integral over the window is finite -- the limit there is 0. A raw NaN
+        # would poison the whole Simpson area and silently stall LM (it returns
+        # the seed unchanged) or crash TRF; replace such measure-zero blow-ups
+        # with their finite contribution so the area equation stays well-posed.
+        return np.nan_to_num(v, nan=0.0, posinf=0.0, neginf=0.0)
 
     def residuals(c: np.ndarray) -> np.ndarray:
         mv = _eval(model_func, c)
@@ -228,7 +235,11 @@ def fit_eda_adaptive(
         v = func(x, *c)
         if np.ndim(v) == 0:
             v = np.full_like(x, float(v))
-        return np.ascontiguousarray(v, dtype=float)
+        v = np.ascontiguousarray(v, dtype=float)
+        # See fit_eda: replace a measure-zero singular sample (e.g. x**n*log(x)
+        # at x=0) with its finite integral contribution so it cannot poison the
+        # window area / Jacobian and stall the solver.
+        return np.nan_to_num(v, nan=0.0, posinf=0.0, neginf=0.0)
 
     def residual(c: np.ndarray) -> np.ndarray:
         mv = _eval(model_func, c)

@@ -12,6 +12,7 @@ Public interface:
     EDAFilter / LSIFilter: online/streaming estimators (partial_fit) for
         real-time parameter tracking (streaming twins of fit_eda / fit_lsi).
     fit_lsi() / fit_eda() / fit_dsb(): the individual batch methods.
+    ensemble_fit(): overlapping-window robust ensemble (outlier-prone data).
     find_degree(): polynomial-degree selection (DSB support).
     FittingResult: the self-describing fitted-model result type.
     enable_logging() / logger: opt-in library logging.
@@ -34,6 +35,8 @@ from dtfit.methods import (
     fit_eda,
     fit_eda_adaptive,
     fit_dsb,
+    ensemble_fit,
+    EnsembleResult,
     find_degree,
 )
 from dtfit.estimators import NonlineRegressor
@@ -79,6 +82,8 @@ __all__ = [
     "fit_eda",
     "fit_eda_adaptive",
     "fit_dsb",
+    "ensemble_fit",
+    "EnsembleResult",
     "find_degree",
     "fit_many",
     "FittingProblem",

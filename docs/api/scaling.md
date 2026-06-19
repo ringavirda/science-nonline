@@ -2,7 +2,7 @@
 
 Run the batch methods at scale. The fitting *math* is unchanged — these are
 alternative *execution backends* built on the same additive integral projection.
-Pick by your situation ([../guide/choosing-a-method.md §3](../guide/choosing-a-method.md)):
+Pick by your situation ([../guides/choosing-a-method.md §3](../guides/choosing-a-method.md)):
 
 | situation | tool |
 |---|---|

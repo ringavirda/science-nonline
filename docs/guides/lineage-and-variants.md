@@ -157,6 +157,7 @@ the complete list across the stable API.
 | **EDA, robust loss** | `fit_eda(..., loss="soft_l1", f_scale=...)` | down-weights outlier-contaminated windows |
 | **EDA, bounded** | `fit_eda(..., bounds=...)` | constrained trust-region fit |
 | **Adaptive EDA** | `fit_eda_adaptive(...)` | curvature-placed windows for peaks/saturating shapes |
+| **Ensemble** | `ensemble_fit(...)` | overlapping-window median + spread — outlier-robust, no `f_scale` tuning |
 | **DSB** | `fit_dsb(...)` | symbolic exact balance (reference only) |
 | **EDAFilter** | `EDAFilter(...)` | streaming EDA (area measurement) |
 | **LSIFilter** | `LSIFilter(...)` | streaming LSI (spectrum measurement) — for oscillatory plants |
@@ -190,13 +191,13 @@ kept experimental until it proves itself. Here is the complete list with status.
 | **#6** | curvature-adaptive windows | `fit_eda_adaptive` | place EDA's windows by cumulative curvature — narrow where the signal bends — so each window carries equal information. Best for peaks/saturating shapes. → [../api/fitting.md#fit_eda_adaptive](../api/fitting.md#fit_eda_adaptive) |
 | **—** | LSI oscillatory recipe | `fit_lsi(oscillatory=…, freq_param=…)`, `fft_frequency_seed` | smoothing off + high order + FFT-seeded frequency, so a cycle isn't erased. → [../api/fitting.md#fit_lsi](../api/fitting.md#fit_lsi) |
 | **—** | fused multi-axis detection | `FusedChiSquareDetector` | pool a filter bank's per-stream innovations into one `chi2(K)` statistic to catch a fault too weak in any single stream. → [../api/streaming.md#fused](../api/streaming.md#fused) |
+| **#3** | overlapping-window ensemble | `ensemble_fit`, `EnsembleResult` | fit on many overlapping sub-windows and take the **median** of the per-window estimates — bagging over time; rejects outlier windows and yields a spread. Outlier-robust without `f_scale` tuning. → [../methods/ensemble.md](../methods/ensemble.md) |
 
 ### Still experimental (in `dtfit-experimental`)
 
 | # | adaptation | function | what it is & how it works |
 |---|---|---|---|
 | **#2** | pluggable basis LSI | `fit_lsi_basis` | keep LSI's criterion but choose the basis — **Fourier** for periodic signals (a wiggle is 2–3 harmonics, not many polynomial orders), **Laguerre** for decays, Chebyshev/Legendre otherwise |
-| **#3** | overlapping-window ensemble | `ensemble_fit` | fit on many overlapping sub-windows and take the **median** of the per-window estimates — bagging over time; rejects outlier windows and yields a spread (uncertainty) |
 | **#4** | joint shared-parameter fit | `fit_joint` | stack several channels' area equations into one system with **shared** parameters (a common frequency/rate) plus per-channel **private** ones — more equations per shared unknown |
 | **#5** | stage-wise residual boosting | `boosted_fit` | fit stage 1 (e.g. an LSI trend), subtract it, fit stage 2 (e.g. an EDA cycle) on the residual; the sum is more expressive than either alone (the fingerprint is linear, so component fits add up) |
 
@@ -221,7 +222,7 @@ adaptation is measured against are in
 
 ```
 dtfit (stable, public)
-├── batch fitting          fit_lsi · fit_eda · fit_eda_adaptive · fit_dsb
+├── batch fitting          fit_lsi · fit_eda · fit_eda_adaptive · fit_dsb · ensemble_fit
 │   support                find_degree · fft_frequency_seed
 ├── result type            FittingResult
 ├── sklearn estimator      NonlineRegressor
@@ -233,7 +234,7 @@ dtfit (stable, public)
 └── diagnostics            fit_report · residual_diagnostics · FitDisplay · ResidualsDisplay
 
 dtfit-experimental (separate; promotes into dtfit when validated)
-├── adaptations in trial   fit_lsi_basis(#2) · ensemble_fit(#3) · fit_joint(#4) · boosted_fit(#5)
+├── adaptations in trial   fit_lsi_basis(#2) · fit_joint(#4) · boosted_fit(#5)
 ├── backend helpers        available_backends · resolve_backend · Backend
 └── experiments            cases/ (each lever) · domains/ (vs the real toolkit)
 ```

@@ -3,7 +3,7 @@
 Online estimators that ingest **one sample at a time** at bounded per-update cost,
 for control loops and live streams. Symbolic work (model + Jacobian) is done once
 at construction; each update is pure NumPy. Concept:
-[../guide/methods-explained.md#streaming](../guide/methods-explained.md#streaming);
+[../guides/methods-explained.md#streaming](../guides/methods-explained.md#streaming);
 math: [../methods/equal_areas_filter.md](../methods/equal_areas_filter.md).
 
 - [`EDAFilter`](#edafilter) — area-measurement filter (cheaper; monotone/saturating)

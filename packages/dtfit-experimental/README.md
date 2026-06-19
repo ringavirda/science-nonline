@@ -9,9 +9,10 @@ prototyped and evaluated here.
 ## What lives here
 
 - **`dtfit_experimental`** — the experimental adaptations that remain in trial
-  (`fit_lsi_basis`, `ensemble_fit`, `fit_joint`, `boosted_fit`). These build
-  directly on `dtfit`'s internals (`dtfit.methods`, `dtfit._spectral`,
-  `dtfit._backend`).
+  (`fit_lsi_basis`, `fit_joint`, `boosted_fit`). These build directly on `dtfit`'s
+  internals (`dtfit.methods`, `dtfit._spectral`, `dtfit._backend`). (The
+  overlapping-window ensemble `ensemble_fit` has been **promoted** into stable
+  `dtfit`.)
 - **`dtfit_experimental.experiments`** — the experiment suite: `cases/` (each
   adaptation in isolation), `domains/` (per-application-domain validation against
   the established baselines), shared `common/` framework, and `data/`.

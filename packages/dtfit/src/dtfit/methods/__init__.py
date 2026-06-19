@@ -10,12 +10,15 @@ from ._common import model_params, taylor_coeffs, find_degree
 from ._dsb import fit_dsb
 from ._lsi import fit_lsi, fft_frequency_seed
 from ._eda import fit_eda, fit_eda_adaptive
+from ._ensemble import ensemble_fit, EnsembleResult
 
 __all__ = [
     "fit_lsi",
     "fit_eda",
     "fit_eda_adaptive",
     "fit_dsb",
+    "ensemble_fit",
+    "EnsembleResult",
     "fft_frequency_seed",
     "find_degree",
     "model_params",

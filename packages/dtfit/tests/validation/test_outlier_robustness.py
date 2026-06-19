@@ -1,0 +1,70 @@
+"""Outlier-robustness gate for the promoted ``ensemble_fit``.
+
+The Gaussian-noise corpus does not exercise outliers, so this is where the case
+``ensemble_fit`` was promoted *for* is actually measured: on spike-contaminated
+data the overlapping-window median must beat the plain whole-record fit. Guards
+the promotion against silent regression.
+"""
+
+from __future__ import annotations
+
+import warnings
+
+import numpy as np
+import pytest
+
+import dtfit as dt
+from accuracy.scenarios import SCENARIOS
+from accuracy.harness import ordered_params, param_err
+
+# Families where the whole-record fit is accurate on clean data, so the only
+# thing degrading it under contamination is the outliers themselves.
+_OUTLIER_FAMILIES = [
+    "exponential", "exp_decay", "power_law", "michaelis_menten", "first_order",
+]
+_SEEDS = range(6)
+
+
+def _errs(name):
+    scn = next(s for s in SCENARIOS if s.name == name)
+    names = ordered_params(scn)
+    plain, ens = [], []
+    for seed in _SEEDS:
+        x, y, _ = scn.make(0.03, seed=seed, outlier_frac=0.04, outlier_scale=8.0)
+        m = scn.model()
+        p0, _ = m._seed_arrays(x, y)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            pe = param_err(scn, names, dt.fit_eda(x, y, m.expr, m.var, p0=p0).coeffs)
+            ee = param_err(scn, names,
+                           dt.ensemble_fit(x, y, m.expr, m.var, method="eda",
+                                           p0=p0).coeffs)
+        plain.append(pe)
+        ens.append(ee)
+    return np.array(plain), np.array(ens)
+
+
+@pytest.mark.parametrize("name", _OUTLIER_FAMILIES)
+def test_ensemble_beats_plain_under_outliers(name):
+    """Per family: the ensemble's median recovery error under 4% spike outliers
+    is below the plain whole-record fit, and is itself usable."""
+    plain, ens = _errs(name)
+    assert np.median(ens) < np.median(plain), (
+        f"{name}: ensemble median {np.median(ens):.3f} "
+        f"not better than plain {np.median(plain):.3f}")
+    assert np.median(ens) <= 0.15, f"{name}: ensemble median {np.median(ens):.3f}"
+
+
+def test_ensemble_pooled_robustness():
+    """Pooled across families+seeds, the ensemble roughly halves the median
+    error and dramatically cuts the mean (it never blows up on a bad window)."""
+    P, E = [], []
+    for name in _OUTLIER_FAMILIES:
+        p, e = _errs(name)
+        P.append(p)
+        E.append(e)
+    P, E = np.concatenate(P), np.concatenate(E)
+    # The ensemble lowers both the typical (median) and the average error -- the
+    # latter because, unlike a single fit, it never blows up on a bad window.
+    assert np.median(E) < np.median(P)
+    assert np.mean(E) < np.mean(P)

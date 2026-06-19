@@ -34,8 +34,8 @@ sync with the API and reproduce deterministically (fixed RNG seed):
 ```bash
 pip install nbformat nbclient ipykernel
 python -m ipykernel install --user --name dtfit-docs   # one-time kernel for execution
-python docs/notebooks/build.py                          # rebuild + execute all
-python docs/notebooks/build.py 03 05                    # only notebooks 03 and 05
+python docs/guides/notebooks/build.py                          # rebuild + execute all
+python docs/guides/notebooks/build.py 03 05                    # only notebooks 03 and 05
 ```
 
 Edit the cell definitions in [`build.py`](build.py) — not the `.ipynb` files —

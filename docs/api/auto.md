@@ -101,4 +101,4 @@ future = auto_forecast(x, y, horizon=30, model="logistic")
 ```
 
 Honest ceiling: near-random-walk series fall back to persistence — by design, not
-defect (see [../guide/README.md](../guide/README.md) §6).
+defect (see [../guides/README.md](../guides/README.md) §6).

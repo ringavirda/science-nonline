@@ -74,7 +74,7 @@ if abs(d["lag1_autocorr"]) > 0.3:
 
 Interpretation guide: `durbin_watson` near 2 and `lag1_autocorr` near 0 mean the
 residuals are unstructured (good). A high `normality_p` is consistent with
-Gaussian residuals. See [../guide/choosing-a-method.md §4](../guide/choosing-a-method.md).
+Gaussian residuals. See [../guides/choosing-a-method.md §4](../guides/choosing-a-method.md).
 
 ---
 

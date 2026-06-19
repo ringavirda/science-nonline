@@ -226,13 +226,19 @@ lowering the variance of the estimate — and it lets EDA report a parameter
   *window* level, and only "bites" when `f_scale` is set near the size of a clean
   window's area residual (the default `1.0` usually dwarfs them, silently
   behaving like plain least squares). See the worked discussion in
-  [notebook 02](../notebooks/02_fitting_methods.ipynb).
+  [notebook 02](notebooks/02_fitting_methods.ipynb).
 - `bounds` — constrained fits (switches to a trust-region solver).
 - **Adaptive windows** (`fit_eda_adaptive`): instead of equal windows, place
   window edges by **curvature** — narrow where the signal bends, wide where it's
   flat — so each window carries roughly equal information. This is the best
   estimator for localized transients and saturating (Michaelis–Menten / Hill)
   shapes. → [api/fitting.md#fit_eda_adaptive](../api/fitting.md#fit_eda_adaptive)
+- **Overlapping-window ensemble** (`ensemble_fit`): when *outliers* contaminate
+  the record, fit many overlapping sub-windows and take the **median** of the
+  per-window estimates — whole corrupted windows are simply outvoted, with no
+  `f_scale` tuning, and the inter-window spread is a free uncertainty band. More
+  reliable than the robust loss on spiky data; on clean data prefer a single fit.
+  → [../methods/ensemble.md](../methods/ensemble.md)
 
 ---
 

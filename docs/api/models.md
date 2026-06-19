@@ -128,3 +128,54 @@ models.damped_oscillation()  # oscillatory, carries a freq_param
 Each constructor accepts no required arguments and reads its parameter ranges off
 the data at `fit` time, so the typical use is a one-liner:
 `models.<family>().fit(x, y)`.
+
+---
+
+<a name="accuracy"></a>
+## Accuracy and known limits
+
+Every family above is exercised by an **accuracy corpus**
+([`packages/dtfit/tests/accuracy/`](../../packages/dtfit/tests/accuracy/)): each
+is fit on a known-ground-truth signal across a noise sweep, through the realistic
+self-seeded `models.<family>().fit(x, y)` path, and required to stay competitive
+with the `scipy.curve_fit` gold standard. A checked-in golden baseline guards
+against silent accuracy drift. So the one-liner is validated for **all** families
+— but two honest limits are worth knowing.
+
+### Parameter recovery vs. curve quality
+
+For most families the parameters are **identifiable**: the fit recovers the true
+values (relative error a few percent at 5 % noise). Three families are only weakly
+identifiable — many parameter sets reproduce the same curve, so a noisy fit lands
+on *a* curve that matches, not on the true parameters:
+
+| family | why parameters are weakly identifiable | judge by |
+|---|---|---|
+| `biexponential` | a sum of exponentials trades rate against amplitude (a classic ill-conditioned inverse problem) | curve quality (R²); recovery degrades from ~10 % noise up |
+| `double_gaussian` | overlapping peaks can swap labels / trade width for amplitude | curve quality (R²) |
+| `fourier_series` | individual harmonic amplitudes/phases are weakly constrained | curve quality (R²) |
+
+For these, trust the **fitted curve** (`R²`, prediction) rather than the
+individual coefficients, and prefer extra data / lower noise / bounds if you need
+the parameters themselves.
+
+### Cycles need the oscillatory recipe
+
+Recovering a frequency requires the **oscillatory recipe** (smoothing off, order
+raised to resolve the cycle, FFT-seeded frequency). The self-seeding path applies
+it automatically — `models.sine().fit(x, y)`, `(linear() + sine()).fit(...)`, or
+[`auto_estimate`](auto.md#auto_estimate) all route oscillatory families through
+it. The **bare** [`NonlineRegressor("…sin…", method="lsi")`](estimator.md) does
+*not* (its default smoothing + low order erase the cycle); pass `freq_param=` or
+use the model/`auto_estimate` path instead. See the
+[LSI oscillatory recipe](../methods/lsi.md#the-oscillatory-recipe).
+
+### `suggest_models` coverage
+
+The default shortlist spans the whole catalog (the shape detector is permissive:
+a strongly monotone series keeps the trend/growth/decay/sigmoid/saturating
+families, a peak keeps the peak families, and ambiguous data falls back to
+everything, so the true family is never silently dropped). `fourier_series` is the
+one exception — a parametric factory offered separately, not in the default sweep,
+so a periodic signal surfaces its fundamental `sine`; add `fourier_series()`
+explicitly to the `candidates` if you need the harmonic model.

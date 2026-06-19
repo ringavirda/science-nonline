@@ -24,8 +24,9 @@ Is the data arriving live / do the parameters change over time?
          ├─ a localized peak or sharp bend         → adaptive EDA  (fit_eda_adaptive)
          ├─ a sinusoid / clear cycle               → LSI oscillatory recipe
          │                                           (fit_lsi(..., freq_param="w"))
-         └─ outliers present                       → EDA robust loss
-                                                     (fit_eda(..., loss="soft_l1", f_scale=…))
+         └─ outliers / glitches present            → Ensemble  (ensemble_fit)
+                                                     (or EDA robust loss if you can
+                                                      tune f_scale to the window scale)
 ```
 
 **DSB** is not in this tree on purpose: it is a reference/derivation tool, not a
@@ -41,6 +42,10 @@ production fitter (see [methods-explained.md#dsb](methods-explained.md#dsb)).
   Michaelis–Menten, Hill, `arctan`) — curvature-placed windows fit the bend.
 - **Use the oscillatory recipe for anything with a cycle.** A plain smoothed fit
   erases cycles; you must pass `freq_param`/`oscillatory=True`.
+- **Use the ensemble when outliers/glitches contaminate the record.**
+  `ensemble_fit` fits overlapping windows and takes the median, rejecting whole
+  corrupted windows with no `f_scale` tuning — more reliable than the EDA robust
+  loss on spiky data. It's a specialised tool: on clean data prefer a single fit.
 
 ---
 

@@ -1,32 +1,50 @@
 # dtfit methods — mathematical reference
 
-This folder documents each fitting method shipped in `dtfit`, with its
-mathematical grounding in **differential (non-Taylor) transformations**, the
-full algorithm, the optimizations and numerical guards in the implementation,
-and where each method is best applied. Every claim is backed by a figure and a
-comparison table generated from real code on model *and* real data — see
+This folder is the **rigorous mathematical reference** for everything `dtfit`
+ships: each method's grounding in **differential (non-Taylor) transformations**,
+the full algorithm, the numerical optimizations and guards in the implementation,
+and where it is best applied. It is the deepest of the three doc layers — for
+plain-language intuition see [../guides/](../guides/), and for exact call signatures
+see [../api/](../api/).
+
+Every batch method is backed by a figure and a comparison table generated from
+real code on model *and* real data — see
 [reproducing the figures](#reproducing-the-figures-and-tables).
 
-| method | doc | tier | runtime path | role |
-|--------|-----|------|--------------|------|
-| **DSB** — Differential Spectra Balance | [dsb.md](dsb.md) | reference | symbolic (offline) | analytical ground truth / derivation |
-| **LSI** — Least-Squares Integral | [lsi.md](lsi.md) | batch | numeric (offline) | accurate batch fit & model selection |
-| **EDA** — Equal Differential Areas | [eda.md](eda.md) | batch | numeric (offline) | noise-robust batch fit |
-| **EDAFilter** — recursive EDA | [equal_areas_filter.md](equal_areas_filter.md) | streaming | numeric (online) | real-time tracking + drift detection |
+## The method catalog
 
-The three production methods (LSI, EDA, EDAFilter) are numeric successors
-to the symbolic methods. DSB is kept as the analytical reference. The split
-follows the dissertation's hard requirement that the **runtime path carry no
-unbounded symbolic solve** — SymPy is allowed only once, offline, at
-derivation/init time.
+`dtfit` is organized as **one principle** (match a signal's differential
+spectrum) realized across **four execution tiers** — symbolic reference, batch,
+streaming, and batch-at-scale — plus a **high-level composition** layer that
+routes to the right variant automatically.
+
+| tier | method | doc | runtime path | role |
+|------|--------|-----|--------------|------|
+| **reference** | **DSB** — Differential Spectra Balance | [dsb.md](dsb.md) | symbolic (offline) | analytical ground truth / derivation |
+| **batch** | **LSI** — Least-Squares Integral | [lsi.md](lsi.md) | numeric (offline) | accurate batch fit, model selection, pluggable basis, oscillatory recipe |
+| **batch** | **EDA** — Equal Differential Areas | [eda.md](eda.md) | numeric (offline) | noise-robust / fast batch fit; overdetermined & curvature-adaptive variants |
+| **batch** | **Ensemble** — overlapping-window aggregation | [ensemble.md](ensemble.md) | numeric (offline) | **outlier-robust** bagging over EDA/LSI window fits (median + spread) |
+| **streaming** | **EDAFilter** — recursive EDA | [equal_areas_filter.md](equal_areas_filter.md) | numeric (online) | real-time tracking via an **area** measurement + drift detection |
+| **streaming** | **LSIFilter** — recursive LSI | [legendre_filter.md](legendre_filter.md) | numeric (online) | real-time tracking via a **spectrum** measurement (oscillatory plants) |
+| **streaming** | **FilterBank / Fusedχ²** — multi-stream | [filter_bank.md](filter_bank.md) | numeric (online) | many streams in lockstep + pooled multi-axis fault detection |
+| **scale** | **Partitioned / Batched** — map-reduce & GEMM | [scaling.md](scaling.md) | numeric (offline) | one-pass / distributed / many-channel batch fitting |
+| **compose** | **auto_estimate / auto_forecast** | [auto.md](auto.md) | numeric (offline) | shape-routed estimation and structured forecasting |
+
+The production methods (LSI, EDA, the filters, the scale backends) are **numeric
+successors** to the symbolic originals (DSBI → LSI, DSBE → EDA). DSB is kept as
+the analytical reference. The split follows the dissertation's hard requirement
+that the **runtime path carry no unbounded symbolic solve** — SymPy is allowed
+only once, offline, at derivation/initialization time. (For the full lineage —
+which method came from which, and what changed between versions — see
+[../guides/lineage-and-variants.md](../guides/lineage-and-variants.md).)
 
 ---
 
 ## The common foundation: differential transformations
 
-All four methods operate on the **differential spectrum** of a signal rather
-than on its samples directly. For an analytic function $x(t)$ the (scaled)
-differential transform about $t_0=0$ is the sequence of *discretes*
+All methods operate on the **differential spectrum** of a signal rather than on
+its samples directly. For an analytic function $x(t)$ the (scaled) differential
+transform about $t_0=0$ is the sequence of *discretes*
 
 $$
 X(k) \;=\; \frac{H^{k}}{k!}\,\left.\frac{d^{k}x}{dt^{k}}\right|_{t=0},
@@ -41,17 +59,17 @@ x(t) \;=\; \sum_{k=0}^{\infty} X(k)\,\Big(\tfrac{t}{H}\Big)^{k}.
 $$
 
 So $X(k)$ is the $k$-th Maclaurin coefficient of $x$, rescaled by $H^k$. The
-transform is a **linear bijection** between an analytic function and its
-spectrum on the radius of convergence: two analytic functions are equal **iff**
-their spectra agree discrete-by-discrete. This is the identity every method
-below leans on — matching spectra (DSB, LSI), matching integrals of spectra
-(EDA, the filter), recovers the function and hence its parameters.
+transform is a **linear bijection** between an analytic function and its spectrum
+on the radius of convergence: two analytic functions are equal **iff** their
+spectra agree discrete-by-discrete. This is the identity every method below leans
+on — matching spectra (DSB, LSI), matching integrals of spectra (EDA, the
+filters), or accumulating spectra additively (the scale backends) all recover the
+function and hence its parameters.
 
 ### The non-Taylor base (and why a table is no longer needed)
 
-The classical motivation of the scheme is that elementary functions have
-**closed-form discretes** — you never truncate an infinite Taylor series for
-them:
+The classical motivation is that elementary functions have **closed-form
+discretes** — you never truncate an infinite Taylor series for them:
 
 | term | discrete $X(k)$ |
 |------|------------------|
@@ -67,55 +85,64 @@ analytically in the spectrum and can be solved for or fitted.
 
 **Implementation note.** `dtfit` no longer maintains this table in code. In a
 *spectra balance* every equation matches model and data discretes at the same
-order $k$, so the $H^{k}$ factor cancels on both sides (see [DSB](dsb.md)) and
-the balance reduces to matching plain Maclaurin coefficients $g^{(k)}(0)/k!$.
-Those are produced for any expression by generic SymPy differentiation
-([`methods/_common.py`](../../packages/dtfit/src/dtfit/methods/_common.py)), which both
-reproduces the table above and extends the scheme to *any* differentiable model
-(rational, logarithmic, mixed) without a per-function rule. The numeric methods
-go further and replace the monomial spectrum with a better-conditioned
-orthogonal-polynomial (Legendre) spectrum ([LSI](lsi.md)).
+order $k$, so the $H^{k}$ factor cancels on both sides (see [DSB](dsb.md)) and the
+balance reduces to matching plain Maclaurin coefficients $g^{(k)}(0)/k!$. Those
+are produced for any expression by generic SymPy differentiation
+([`methods/_common.py`](../../packages/dtfit/src/dtfit/methods/_common.py)), which
+both reproduces the table above and extends the scheme to *any* differentiable
+model (rational, logarithmic, mixed) without a per-function rule. The numeric
+methods go further and replace the monomial spectrum with a better-conditioned
+**orthogonal-polynomial** spectrum ([LSI](lsi.md)).
 
 ---
 
-## How the four methods relate
+## How the tiers relate
 
 ```
-                differential spectrum  X(k) = (H^k/k!) x^(k)(0)
-                                 │
-        ┌────────────────────────┼─────────────────────────────┐
-        │                        │                              │
-   exact balance          weighted integral             integral / area
-   F(k;θ)=Z(k)            L2 of spectra                  matching
-        │                        │                              │
-      DSB                       LSI                            EDA
-  (symbolic solve)      (∫ reconstruction error)       (∫ over windows)
-                                                               │
-                                                       recursive / online
-                                                               │
-                                                      EDAFilter
+                 differential spectrum  X(k) = (H^k/k!) x^(k)(0)
+                                  │
+   ┌──────────────┬───────────────┼────────────────┬──────────────────┐
+   │              │               │                │                  │
+ exact balance  weighted-L2    integral / area   additive over       compose /
+ F(k;θ)=Z(k)    of spectra     matching          domain & channels   route
+   │              │               │                │                  │
+  DSB            LSI             EDA            Partitioned* /        auto_estimate
+ (symbolic     (∫ recon.      (∫ over          fit_lsi_batched       auto_forecast
+  solve)        error)         windows)         (map-reduce, GEMM)    (shape routing)
+                  │               │
+          run recursively, one sample at a time
+                  │               │
+              LSIFilter        EDAFilter ── FilterBank ── FusedChiSquareDetector
+           (spectrum meas.)  (area meas.)   (K streams)   (pooled fault test)
 ```
 
 - **DSB** sets the empirical spectrum (from a polynomial pre-fit) equal to the
   symbolic model spectrum, discrete by discrete, and *solves* the algebraic
   system — exact when well-posed, but symbolic and noise-sensitive.
 - **LSI** relaxes the exact balance to a **weighted integral least-squares**
-  discrepancy of the two spectra — numeric, noise-tolerant, accurate.
-- **EDA** matches **integrals (areas)** of model and data over windows rather
-  than spectra — integration smooths noise, so it is the most robust.
-- **EDAFilter** runs EDA **recursively**, one sample at a time, with a
-  Kalman-style update and drift detection — the real-time path.
+  discrepancy of the two spectra on an orthogonal basis — numeric, noise-tolerant,
+  accurate; with a pluggable basis and an oscillatory recipe.
+- **EDA** matches **integrals (areas)** of model and data over windows rather than
+  spectra — integration smooths noise, so it is the most robust; overdetermined by
+  default and curvature-adaptive on demand.
+- **EDAFilter / LSIFilter** run EDA / LSI **recursively**, one sample at a time,
+  with a Kalman-style update and drift detection — the real-time path; a
+  **FilterBank** runs many in lockstep and the **FusedChiSquareDetector** pools
+  their innovations.
+- **Partitioned\* / batched** estimators exploit that the empirical spectrum is an
+  **additive integral** (so a stream reduces chunk-by-chunk) and **linear across
+  channels** (so many channels project in one GEMM) — exact batch fitting at scale.
+- **auto_estimate / auto_forecast** route a signal to the variant its shape calls
+  for, composing only the validated levers.
 
 ---
 
 ## Reproducing the figures and tables
 
-All figures in the `figures/` subfolder and every comparison table in these
-docs are produced by one script against real downloaded data plus clearly
-labelled model (synthetic) data:
-
-The script lives in the separate `dtfit-experimental` package (install with
-`pip install -e './experimental[bench]'`):
+All figures in `figures/` and every comparison table in these docs are produced by
+one script against real downloaded data plus clearly labelled model (synthetic)
+data. The script lives in the separate `dtfit-experimental` package (install with
+`pip install -e "packages/dtfit-experimental[bench]"`):
 
 ```bash
 python -m dtfit_experimental.experiments.download_data   # fetch COVID-19 + USD/UAH (once)
@@ -123,7 +150,10 @@ python -m dtfit_experimental.experiments.benchmark        # write figures/*.png 
 ```
 
 Real datasets and the dissertation-domain rationale are documented in
-[../../packages/dtfit-experimental/src/dtfit_experimental/experiments/README.md](../../packages/dtfit-experimental/src/dtfit_experimental/experiments/README.md). Baselines compared
-against are SciPy `curve_fit` (Levenberg–Marquardt nonlinear least squares, the
-NLS gold standard), `numpy.polyfit` (a linear-in-parameters surrogate), and the
-naive random walk (the standard FX one-step benchmark).
+[the experiments README](../../packages/dtfit-experimental/src/dtfit_experimental/experiments/README.md);
+the full validation suites (per-adaptation `cases/` and per-domain `domains/`) and
+the established **baselines** each method is measured against are documented in
+[../experimental/](../experimental/). Baselines include SciPy `curve_fit`
+(Levenberg–Marquardt NLS, the gold standard), robust NLLS, `numpy.polyfit`, a
+Gaussian process, ARIMA/ETS/Theta, MLP/LSTM nets, an EKF, RLS and a
+constant-acceleration Kalman filter.

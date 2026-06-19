@@ -1,15 +1,19 @@
 # API: experimental adaptations
 
-Full signatures and usage for the four structural adaptations still in trial in
+Full signatures and usage for the structural adaptations still in trial in
 `dtfit-experimental`, plus the array-backend helpers. These are **experimental
 APIs and may change** until promoted. For the *ideas* behind them see
 [README.md](README.md); for where they sit in the lineage see
-[../guide/lineage-and-variants.md](../guide/lineage-and-variants.md).
+[../guides/lineage-and-variants.md](../guides/lineage-and-variants.md).
+
+> **#3 the overlapping-window ensemble has been promoted** to stable `dtfit` —
+> `from dtfit import ensemble_fit, EnsembleResult`. See
+> [../methods/ensemble.md](../methods/ensemble.md) and
+> [../api/fitting.md#ensemble_fit](../api/fitting.md#ensemble_fit).
 
 ```python
 from dtfit_experimental import (
     fit_lsi_basis,                 # #2 pluggable orthogonal basis
-    ensemble_fit, EnsembleResult,  # #3 overlapping-window robust ensemble
     fit_joint, JointResult,        # #4 joint shared-parameter multi-channel fit
     boosted_fit, BoostedModel,     # #5 stage-wise residual boosting
     available_backends, resolve_backend, Backend,   # array backends
@@ -17,7 +21,6 @@ from dtfit_experimental import (
 ```
 
 - [`fit_lsi_basis`](#fit_lsi_basis) — #2 pluggable basis
-- [`ensemble_fit`](#ensemble_fit) / [`EnsembleResult`](#ensembleresult) — #3 ensemble
 - [`fit_joint`](#fit_joint) / [`JointResult`](#jointresult) — #4 joint fit
 - [`boosted_fit`](#boosted_fit) / [`BoostedModel`](#boostedmodel) — #5 boosting
 - [array backends](#backends) — `available_backends`, `resolve_backend`, `Backend`
@@ -57,50 +60,6 @@ covariance).
 ```python
 from dtfit_experimental import fit_lsi_basis
 res = fit_lsi_basis(x, y, "A*sin(w*x + p)", "x", basis="fourier", order=4)
-```
-
----
-
-<a name="ensemble_fit"></a>
-## `ensemble_fit` — #3 overlapping-window ensemble
-
-**What it is.** Fitting once to the whole record gives one estimate, no spread,
-full exposure to outliers. `ensemble_fit` instead fits the model on many
-**overlapping sub-windows** and aggregates the per-window coefficients **robustly**
-(the median rejects windows an outlier wrecked); the spread across windows is a
-cheap, empirical uncertainty band. This is *bagging over the time axis*, and works
-for both EDA and LSI.
-
-```python
-ensemble_fit(data_x, data_y, expr, var, *,
-             method="eda", n_windows=8, overlap=0.5,
-             aggregate="median", p0=None, **kwargs) -> EnsembleResult
-```
-
-| arg | default | meaning |
-|---|---|---|
-| `method` | `"eda"` | base fitter, `"eda"` or `"lsi"` |
-| `n_windows` | `8` | number of overlapping sub-windows |
-| `overlap` | `0.5` | fractional overlap between consecutive windows (0–0.9) |
-| `aggregate` | `"median"` | `"median"` (robust) or `"wmean"` (mean) |
-| `p0` | `None` | initial guess forwarded to each window fit |
-| `**kwargs` | — | extra args forwarded to the underlying fitter |
-
-<a name="ensembleresult"></a>
-### `EnsembleResult`
-
-| attribute | meaning |
-|---|---|
-| `coeffs` | the aggregated parameter estimate |
-| `spread` | per-parameter inter-window standard deviation (an uncertainty band) |
-| `members` | `(n_windows_fitted, n_params)` raw per-window fits |
-| `expr`, `var` | the model |
-| `predict(x)` | evaluate the aggregated model |
-
-```python
-from dtfit_experimental import ensemble_fit
-ens = ensemble_fit(x, y, "a*exp(b*x)", "x", method="eda", n_windows=10)
-print(ens.coeffs, "±", ens.spread)
 ```
 
 ---

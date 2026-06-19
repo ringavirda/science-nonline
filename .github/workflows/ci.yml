@@ -37,6 +37,15 @@ jobs:
       - name: Lint (ruff)
         run: ruff check packages
 
+      # Explicit, fast-failing accuracy gate over the whole model catalogue:
+      # recovery matrix + every-method-runs guard (Phase 1), default-config
+      # robustness (Phase 2), seed/noise stability (Phase 3) and the golden
+      # regression snapshot (Phase 4). Surfaces a method-quality regression with
+      # a legible step name before the full suite runs. See tests/accuracy/.
+      - name: Accuracy gate — dtfit (full model catalogue)
+        run: pytest -q tests/validation
+        working-directory: packages/dtfit
+
       - name: Type check + test — dtfit
         run: |
           mypy

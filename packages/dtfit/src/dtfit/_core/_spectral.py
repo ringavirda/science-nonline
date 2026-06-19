@@ -371,16 +371,34 @@ def solve_spectral(
 
     guess = np.ones(len(params)) if p0 is None else np.asarray(p0, float)
     if bounds is not None:
-        def cost(c: np.ndarray) -> float:
-            r = residual(c)
-            return float(r @ r)
+        # A supplied seed is usually good enough for a fast bounded local solve;
+        # fall back to the (10-50x slower) global differential-evolution search
+        # only when no seed is given or the local solve lands on a poor basin.
+        # (Mirrors fit_lsi; keeps the multimodal-safe DE as the safety net.)
+        lo = [b[0] for b in bounds]
+        hi = [b[1] for b in bounds]
+        local = None
+        if p0 is not None:
+            loc = least_squares(
+                residual, np.clip(guess, lo, hi), bounds=(lo, hi), method="trf"
+            )
+            denom = float(np.linalg.norm(sqrt_w * beta_data)) + 1e-30
+            if loc.success and float(np.linalg.norm(loc.fun)) / denom < 0.5:
+                local = loc
+        if local is not None:
+            coeffs = np.asarray(local.x, dtype=np.float64)
+            jac = local.jac
+        else:
+            def cost(c: np.ndarray) -> float:
+                r = residual(c)
+                return float(r @ r)
 
-        res_g = cast(Any, differential_evolution)(
-            cost, bounds, strategy="best1bin", popsize=15, seed=0
-        )
-        res = minimize(cost, res_g.x, method="L-BFGS-B", bounds=bounds)
-        coeffs = np.asarray(res.x, dtype=np.float64)
-        jac = _numeric_jac(residual, coeffs)
+            res_g = cast(Any, differential_evolution)(
+                cost, bounds, strategy="best1bin", popsize=15, seed=0
+            )
+            res = minimize(cost, res_g.x, method="L-BFGS-B", bounds=bounds)
+            coeffs = np.asarray(res.x, dtype=np.float64)
+            jac = _numeric_jac(residual, coeffs)
     else:
         sol = least_squares(residual, guess, method="lm")
         coeffs = np.asarray(sol.x, dtype=np.float64)

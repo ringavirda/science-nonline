@@ -17,8 +17,7 @@ from __future__ import annotations
 import numpy as np
 
 import dtfit as dt
-from dtfit import FittingProblem, fit_many
-from dtfit_experimental import ensemble_fit
+from dtfit import FittingProblem, fit_many, ensemble_fit  # ensemble_fit promoted
 
 from dtfit_experimental.experiments.common import ReportWriter, metrics, fmt
 from dtfit_experimental.experiments.common.plotting import plt

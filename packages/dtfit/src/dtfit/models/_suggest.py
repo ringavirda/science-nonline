@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
+from scipy.stats import spearmanr
 
 from dtfit.types import FittingResult
 from dtfit.diagnostics import fit_report
@@ -33,6 +34,7 @@ def _detect_categories(x: np.ndarray, y: np.ndarray) -> set[str]:
     Deliberately permissive: when the shape is ambiguous it returns every
     category, so the recommender never silently drops the true family.
     """
+    x = np.asarray(x, dtype=float)
     y = np.asarray(y, dtype=float)
     n = y.size
     cats: set[str] = set()
@@ -43,16 +45,29 @@ def _detect_categories(x: np.ndarray, y: np.ndarray) -> set[str]:
     t = np.arange(n)
     resid = y - np.polyval(np.polyfit(t, y, 1), t)
     crossings = int(np.count_nonzero(np.diff(np.sign(resid)) != 0))
-    oscillatory = strength > 0.12 and crossings >= 4
+    # Robust monotonicity via Spearman rank correlation. A per-sample diff-sign
+    # test is noise-dominated where the true slope is small -- a noisy sigmoid's
+    # flat tails fail it, dropping the sigmoid/saturating families for exactly
+    # the S-curves they describe. Spearman tolerates that (a logistic scores
+    # ~0.98; a sine ~0). A strongly monotone series is *never* oscillatory,
+    # however many times a line-detrended S-curve jitters across zero under
+    # noise -- so monotonicity vetoes the (crossing-based) oscillatory tag.
+    rho = (spearmanr(x, y).statistic
+           if n > 2 and float(np.std(y)) > 0 else 0.0)
+    monotone = abs(float(np.nan_to_num(rho))) > 0.85
+    oscillatory = (not monotone) and strength > 0.12 and crossings >= 4
     if oscillatory:
         cats |= _SHAPE_CATEGORIES["oscillatory"]
-    # an interior extremum that the series rises to and falls from -> a peak
+    # an interior extremum that the series rises to and falls from -> a peak.
+    # Kept independent of the oscillatory tag: a few separated peaks (e.g. a
+    # double Gaussian) read as a low-frequency cycle to the crossing test, so we
+    # shortlist the peak families alongside the oscillatory ones rather than drop
+    # them -- the AIC ranking sorts out which structure actually fits.
     i = int(np.argmax(np.abs(y - np.median(y))))
-    if not oscillatory and n > 10 and 0.1 * n < i < 0.9 * n:
+    if not monotone and n > 10 and 0.1 * n < i < 0.9 * n:
         cats |= _SHAPE_CATEGORIES["peak"]
     # mostly-monotone -> trend/growth/decay/sigmoid/saturating
-    d = np.diff(y)
-    if d.size and np.mean(np.sign(d) == np.sign(np.mean(d) or 1.0)) > 0.75:
+    if monotone:
         cats |= _SHAPE_CATEGORIES["monotone"]
     if not cats:  # ambiguous -> try everything
         cats = set().union(*_SHAPE_CATEGORIES.values())

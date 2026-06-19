@@ -3,8 +3,8 @@
 Regenerates every ``*.ipynb`` in this folder from the cell definitions below,
 executing each so figures and outputs are embedded. Run from anywhere:
 
-    python docs/notebooks/build.py            # build + execute all
-    python docs/notebooks/build.py 01 05      # only notebooks whose name starts 01/05
+    python docs/guides/notebooks/build.py            # build + execute all
+    python docs/guides/notebooks/build.py 01 05      # only notebooks whose name starts 01/05
 
 Requires the doc-build extras: ``pip install nbformat nbclient ipykernel``
 plus ``dtfit[viz]`` (matplotlib). Execution uses whichever kernel is passed via

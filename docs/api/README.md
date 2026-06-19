@@ -4,14 +4,15 @@ Complete reference for the **public** `dtfit` API — every name exported from t
 top-level package and the `dtfit.diagnostics` submodule. Internals (anything
 under a `_`-prefixed module) are not part of the public contract.
 
-For the *ideas* behind these functions read [../guide/](../guide/); for the
+For the *ideas* behind these functions read [../guides/](../guides/); for the
 *math* read [../methods/](../methods/). This reference is for looking up exact
 signatures, arguments, return types, and behavior.
 
-> **Looking for the experimental adaptations** (`fit_lsi_basis`, `ensemble_fit`,
-> `fit_joint`, `boosted_fit`)? Those live in the separate `dtfit-experimental`
-> package — see [../experimental/adaptations-api.md](../experimental/adaptations-api.md).
-> This page covers only the **stable** `dtfit` API.
+> **Looking for the experimental adaptations** (`fit_lsi_basis`, `fit_joint`,
+> `boosted_fit`)? Those live in the separate `dtfit-experimental` package — see
+> [../experimental/adaptations-api.md](../experimental/adaptations-api.md).
+> (The overlapping-window ensemble `ensemble_fit` has been promoted — it's in
+> [fitting.md](fitting.md#ensemble_fit).) This page covers the **stable** `dtfit` API.
 
 ## Conventions
 

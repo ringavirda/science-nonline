@@ -49,8 +49,8 @@ from __future__ import annotations
 import numpy as np
 
 import dtfit as dt
-from dtfit import fit_eda_adaptive
-from dtfit_experimental import fit_joint, ensemble_fit
+from dtfit import fit_eda_adaptive, ensemble_fit  # ensemble_fit promoted to dtfit
+from dtfit_experimental import fit_joint
 
 from dtfit_experimental.experiments.common import ReportWriter, fmt, metrics
 from dtfit_experimental.experiments.common.plotting import plt

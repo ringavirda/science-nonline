@@ -12,6 +12,12 @@ two-sided **concept-drift detector**. This is the tier that satisfies the
 dissertation's hard requirement — bounded per-sample latency, no symbolic solve
 on the hot path.
 
+It is the **area-measurement** streaming filter — the online twin of batch
+[EDA](eda.md). Its sibling, the [LSIFilter](legendre_filter.md), is the same
+recursion with a **spectrum** measurement (use it for oscillatory plants, whose
+cycle an area criterion partly cancels). Many streams run in lockstep via a
+[FilterBank](filter_bank.md), with a pooled multi-axis fault detector.
+
 ## Mathematical grounding
 
 The state is the parameter vector $\theta$, modelled as a random walk
@@ -177,12 +183,13 @@ random walk cannot do.
 **Use the EDAFilter for:** real-time / streaming control loops
 (unmanned/motion control), sensor and economic/currency streams where the model
 parameters drift over time, and any setting that needs **bounded per-sample
-latency** with **automatic regime-change detection**. It is the only
-deployable-runtime tier of the four methods.
+latency** with **automatic regime-change detection**, on **monotone / saturating**
+signals where the cheap area measurement suffices.
 
 **Caveats.** It tracks parameters at a one-sample lag; it is not a point
-forecaster that will beat a random walk on near-RW series. For an accurate
-*static* batch fit use [LSI](lsi.md) or [EDA](eda.md). Tune `window_size`
-(smoothing vs responsiveness), `q_diag` (drift speed), `r` (measurement trust)
-and the CUSUM `cusum_k`/`cusum_h` (detection sensitivity vs false alarms) to the
-stream.
+forecaster that will beat a random walk on near-RW series. For **oscillatory**
+plants use the [LSIFilter](legendre_filter.md) (the area measurement partly cancels
+a cycle). For an accurate *static* batch fit use [LSI](lsi.md) or [EDA](eda.md).
+Tune `window_size` (smoothing vs responsiveness), `q_diag` (drift speed), `r`
+(measurement trust) and the CUSUM `cusum_k`/`cusum_h` (detection sensitivity vs
+false alarms) to the stream.
