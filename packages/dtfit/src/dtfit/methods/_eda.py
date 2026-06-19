@@ -41,6 +41,7 @@ def fit_eda(
     n_windows: int | None = None,
     bounds: tuple | None = None,
     loss: str = "linear",
+    f_scale: float = 1.0,
     p0: InitialGuess = None,
 ) -> FittingResult:
     """Fit ``expr`` to ``(data_x, data_y)`` with the equal-areas criterion.
@@ -58,7 +59,16 @@ def fit_eda(
             ``scipy.optimize.least_squares``); switches the solver to
             trust-region.
         loss: Least-squares loss (e.g. ``"linear"`` or ``"soft_l1"`` for outlier
-            robustness).
+            robustness). The loss acts on the *window-area* residuals, so it can
+            only down-weight whole contaminated windows -- give it enough windows
+            (``n_windows``) that outliers stay localized for it to bite.
+        f_scale: Soft margin of the robust ``loss`` (``scipy``'s ``f_scale``):
+            residuals below it stay quadratic, above it are down-weighted. The
+            default of ``1.0`` is far larger than typical small window-area
+            residuals, which would leave a robust ``loss`` in its quadratic
+            (i.e. ``"linear"``) regime; lower it to the scale of a clean window's
+            area residual to actually engage the robustness. Ignored when
+            ``loss="linear"``.
         p0: Optional initial guess (defaults to ones).
 
     Returns:
@@ -121,7 +131,7 @@ def fit_eda(
     guess = np.ones(n) if p0 is None else np.asarray(p0, float)
     if bounds is not None or loss != "linear":
         method = "trf"
-        kwargs: dict[str, Any] = {"loss": loss}
+        kwargs: dict[str, Any] = {"loss": loss, "f_scale": f_scale}
         if bounds is not None:
             kwargs["bounds"] = bounds
         # cast: scipy's stub types `jac` as a str literal, omitting the
