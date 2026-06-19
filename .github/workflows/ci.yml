@@ -27,6 +27,13 @@ jobs:
           pip install -e "packages/dtfit[viz,dev]"
           pip install -e "packages/dtfit-experimental[dev]"
 
+      - name: Build native extension (dtfit)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq clang
+          python build_native.py
+        working-directory: packages/dtfit
+
       - name: Lint (ruff)
         run: ruff check packages
 
