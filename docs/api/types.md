@@ -1,16 +1,31 @@
 # API: `FittingResult`
 
-The self-describing result returned by every batch fitter. It carries the fitted
-parameters, their uncertainty, the model expression, and a callable — enough to
-predict, quantify uncertainty, serialize, and redeploy.
+## What it is
+
+`FittingResult` is the object every batch fitter hands back. It is deliberately
+**self-describing**: instead of returning a bare array of numbers, it bundles the
+fitted **coefficients** together with everything needed to *interpret* them — the
+parameter **names**, the model **expression** and **variable**, an estimate of the
+parameters' **uncertainty** (a covariance matrix), and a ready-to-call **model
+function**. That bundle is enough to do four things without any extra context:
+
+1. **Read the parameters by name** — `res.params` → `{'a': 3.0, 'w': 1.5}`.
+2. **Predict** — `res.predict(x)`, optionally with an error band.
+3. **Quantify uncertainty** — standard errors and confidence intervals.
+4. **Serialize & redeploy** — round-trip to a plain dict (JSON) and back.
+
+The design goal is that a fit you computed today can be saved, shipped, reloaded
+elsewhere, and still know what it represents — no separate metadata to carry
+around.
 
 ```python
 FittingResult(coeffs, cov=None, expr=None, var=None, names=(), model=None)
 ```
 
-You rarely construct one yourself; the fitters return it. (`scale` fitters return
-the lighter [`BatchFittingResult`](scaling.md#batchfittingresult), which has the
-same `model`/`predict` but no uncertainty methods.)
+You rarely construct one yourself; the fitters return it. (The `scale` fitters
+return the lighter [`BatchFittingResult`](scaling.md#batchfittingresult), which has
+the same `model`/`predict` but drops the uncertainty methods so it stays
+picklable across a process pool.)
 
 ## Attributes
 
@@ -33,13 +48,19 @@ res.params          # {'a': 3.001, 'w': 1.498}
 ```
 
 ### `predict(x, *, return_std=False)`
-Evaluate the fitted model at `x`. With `return_std=True` also returns the 1-sigma
-prediction standard deviation propagated from the parameter covariance (delta
-method) — needs `cov` and `expr`.
+Evaluate the fitted model at `x`. With `return_std=True` it also returns a 1-sigma
+prediction band.
+
+**How the band is computed.** The uncertainty in the *parameters* (the covariance
+`cov`) propagates into uncertainty in the *prediction* via the **delta method**:
+the model is locally linearized at each `x` (numerically, by perturbing each
+parameter), and the parameter covariance is pushed through that linearization to
+give a per-point variance. So the band is wide where the model is sensitive to the
+uncertain parameters and narrow where it isn't. This needs both `cov` and `expr`.
 
 ```python
 y_hat = res.predict(x)
-y_hat, sigma = res.predict(x, return_std=True)   # with uncertainty band
+y_hat, sigma = res.predict(x, return_std=True)   # 1σ band from parameter covariance
 ```
 
 ### `stderr() -> dict[str, float]`
@@ -61,9 +82,14 @@ print(res.summary())
 ```
 
 ### `to_dict() -> dict` / `from_dict(d) -> FittingResult`
-JSON-friendly round-trip for storage/deployment — captures `expr`, `var`,
-`names`, `coeffs`, `cov`. Requires `expr`/`var` (a result holding only a
-precomputed callable cannot be serialized).
+JSON-friendly round-trip for storage/deployment. `to_dict()` captures everything
+needed to rebuild the model — `expr`, `var`, `names`, `coeffs`, `cov` — as plain
+Python types, so it serializes cleanly to JSON; `from_dict()` reconstructs a fully
+functional `FittingResult` (the callable model is re-lambdified lazily on first
+use). This is the recommended way to **persist a fit** or **ship it to another
+process/service**. Requires `expr`/`var` — a result holding only a precomputed
+callable (no expression) cannot be serialized, since there'd be nothing to rebuild
+from.
 
 ```python
 import json

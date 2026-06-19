@@ -245,7 +245,10 @@ class FusedChiSquareDetector:
         w = int(getattr(bank.filters[0], "W", 1))
         self._warmup = 3 * w if warmup is None else int(warmup)
         self._cooldown_len = w if cooldown is None else int(cooldown)
-        self._scale2 = np.zeros(self.k)
+        # Annotated shape-agnostic: the running update at ``update`` rebuilds it
+        # from ``np.array([...])`` (general shape), which newer numpy stubs would
+        # otherwise reject against the 1-D shape inferred from ``np.zeros``.
+        self._scale2: np.ndarray = np.zeros(self.k)
         self._step = -1   # raw stream index of the current sample
         self._seen = 0    # number of steps with a full (finite-residual) window
         self._cool = 0

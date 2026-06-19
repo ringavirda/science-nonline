@@ -10,6 +10,9 @@ each section links to the matching file in [../methods/](../methods/).
 - [methods-explained.md](methods-explained.md) — each fitting method (LSI, EDA,
   DSB, the streaming filters): intuition → how it works → the proof → the tuning
   knobs and adaptations.
+- [lineage-and-variants.md](lineage-and-variants.md) — the **complete atlas**:
+  where each method came from, how it was improved (its *versions*), and every
+  variant and adaptation (#1–#6 and the rest) in one map.
 - [choosing-a-method.md](choosing-a-method.md) — a decision guide: which method,
   which model, which knob, for your data.
 

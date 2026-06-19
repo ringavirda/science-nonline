@@ -8,6 +8,11 @@ For the *ideas* behind these functions read [../guide/](../guide/); for the
 *math* read [../methods/](../methods/). This reference is for looking up exact
 signatures, arguments, return types, and behavior.
 
+> **Looking for the experimental adaptations** (`fit_lsi_basis`, `ensemble_fit`,
+> `fit_joint`, `boosted_fit`)? Those live in the separate `dtfit-experimental`
+> package — see [../experimental/adaptations-api.md](../experimental/adaptations-api.md).
+> This page covers only the **stable** `dtfit` API.
+
 ## Conventions
 
 - All fitters take 1-D NumPy arrays `x`, `y` and a model as a **sympy-style

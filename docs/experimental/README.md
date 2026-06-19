@@ -119,10 +119,10 @@ components one at a time and adding them is consistent with matching the whole
 signal's fingerprint. (This is the additive, gradient-boosting idea applied to
 parametric curve components.)
 
-Full API and return types: [../api/](../api/) (the promoted ones) and the
-docstrings in
-[`packages/dtfit-experimental/src/dtfit_experimental/`](../../packages/dtfit-experimental/src/dtfit_experimental/)
-(the four above).
+**Full signatures, arguments and return types** for the four experimental
+adaptations (plus the array-backend helpers) are in
+[adaptations-api.md](adaptations-api.md); the promoted ones are in
+[../api/](../api/).
 
 ---
 
