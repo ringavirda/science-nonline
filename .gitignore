@@ -181,3 +181,10 @@ archive/**/*
 # Small canonical sets: `python -m dtfit_experimental.experiments.download_data`
 # LTSF benchmark CSVs: standard Informer/Autoformer public data.
 **/experiments/data/
+
+# Confidential: research-paper drafts and their generators. This covers both the
+# .docx files AND the scripts, because the scripts embed the full draft prose and
+# author contact details. (scripts/build_wiki.py is wiki tooling and stays tracked.)
+docs/papers/
+scripts/paperkit.py
+scripts/build_paper_*.py

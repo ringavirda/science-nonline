@@ -1,0 +1,127 @@
+# Choosing a method, a model, and the knobs
+
+A practical decision guide. If you just want *something that works*, the very
+short answer is: **call `auto_estimate` (to recover parameters) or `auto_forecast`
+(to forecast)** and let dtfit route for you
+([api/auto.md](API-Auto)). The rest of this page is for when you want to
+choose deliberately.
+
+---
+
+## 1. Which fitting method?
+
+```
+Is the data arriving live / do the parameters change over time?
+|
++- YES > use a STREAMING filter
+|        +- signal oscillates (a cycle)         > LSIFilter   (spectrum measurement)
+|        +- signal is monotone / saturating      > EDAFilter   (area measurement, cheaper)
+|
++- NO (you have the whole batch) > use a BATCH method
+         +- you want one reliable default        > LSI            (fit_lsi)
+         +- data is very noisy / few parameters
+         |   / a transient or saturating shape    > EDA           (fit_eda)
+         +- a localized peak or sharp bend         > adaptive EDA  (fit_eda_adaptive)
+         +- a sinusoid / clear cycle               > LSI oscillatory recipe
+         |                                           (fit_lsi(..., freq_param="w"))
+         +- outliers / glitches present            > Ensemble  (ensemble_fit)
+                                                     (or EDA robust loss if you can
+                                                      tune f_scale to the window scale)
+```
+
+**DSB** is not in this tree on purpose: it is a reference/derivation tool, not a
+production fitter (see [methods-explained.md#dsb](Guides-Methods-Explained#dsb)).
+
+### Rules of thumb
+
+- **Start with LSI.** It's the accurate general default and handles most smooth,
+  nonlinear-in-parameters models.
+- **Switch to EDA when noise is high or you need speed**, and the model has few
+  (2-4) parameters. EDA is ~5x faster than LSI and the most noise-robust.
+- **Use the adaptive EDA for peaks and saturating rises** (Gaussian, Lorentzian,
+  Michaelis-Menten, Hill, `arctan`) -- curvature-placed windows fit the bend.
+- **Use the oscillatory recipe for anything with a cycle.** A plain smoothed fit
+  erases cycles; you must pass `freq_param`/`oscillatory=True`.
+- **Use the ensemble when outliers/glitches contaminate the record.**
+  `ensemble_fit` fits overlapping windows and takes the median, rejecting whole
+  corrupted windows with no `f_scale` tuning -- more reliable than the EDA robust
+  loss on spiky data. It's a specialised tool: on clean data prefer a single fit.
+
+---
+
+## 2. Do I even need to write a model string?
+
+No, if a catalog family fits -- use [`dtfit.models`](API-Models):
+
+```python
+from dtfit import models
+
+fit = models.logistic().fit(x, y)          # self-seeds p0/bounds from the data
+fit = (models.linear() + models.sine()).fit(x, y)   # compose trend + cycle
+```
+
+And if you don't know which family:
+
+```python
+from dtfit import suggest_models
+for s in suggest_models(x, y)[:3]:
+    print(s.name, round(s.r2, 4), round(s.aic, 1))   # ranked best-first by AIC
+```
+
+The catalog is grouped by shape -- trend, growth, decay, sigmoid, saturating,
+peak, oscillatory -- so you pick *structure*, not a formula. Full list in
+[api/models.md](API-Models).
+
+---
+
+## 3. Which scaling backend?
+
+Only relevant for large or many-channel data ([api/scaling.md](API-Scaling)):
+
+| Situation | Tool |
+|---|---|
+| Many **independent** fits (different series/models) | `fit_many` (process/thread fan-out) |
+| Many **channels on a shared x-grid**, fit at once | `fit_lsi_batched` / `project_spectra` (one GEMM) |
+| A dataset **too big for memory**, one pass | `PartitionedLSI` / `PartitionedEDA` (streaming map-reduce) |
+| **Distributed** workers, then combine | the same `Partitioned*` accumulators via `.merge()` |
+| Many channels **and** streaming | `PartitionedBatchLSI` |
+
+---
+
+## 4. Is my fit any good?
+
+Always check ([api/diagnostics.md](API-Diagnostics)):
+
+```python
+from dtfit.diagnostics import fit_report, residual_diagnostics
+rep = fit_report(fit, x, y)              # r2, rmse, aic, bic, durbin_watson
+diag = residual_diagnostics(fit, x, y)   # leftover autocorrelation / normality
+```
+
+- **`r2` near 1, low `rmse`** -> the curve fits.
+- **`durbin_watson` ~= 2** -> residuals are white noise (good). Far from 2 ->
+  leftover structure, meaning the *model class is wrong* (e.g. you fit a trend to
+  a seasonal series). Try adding a cycle (`+ models.sine()`) or `suggest_models`.
+- **`fit.stderr()` / `fit.confidence_intervals()`** -> parameter uncertainty,
+  when the method produced a covariance.
+
+---
+
+## 5. The pre-flight checklist
+
+Before trusting any fit:
+
+1. **Normalize the domain and scale.** dtfit's fingerprint assumes a modest
+   dynamic range; map a wide `x` into roughly `[0, 1.5]` and scale `y` to O(1)
+   first (invertible, doesn't change R^2). This is the single most common cause of
+   a bad dtfit fit.
+2. **Pick `active_ratio` to match where the information is** (EDA): `1.0` for
+   saturating tails, the default `0.8` for early transients.
+3. **Seed oscillations.** Always pass `freq_param` for sinusoids.
+4. **Give bounds for hard models.** Bounds turn on LSI's global search and keep it
+   out of wrong local minima.
+5. **Read `residual_diagnostics`.** If the residuals aren't white, the parameters
+   you recovered are answering the wrong question.
+
+For the why behind each of these, see [methods-explained.md](Guides-Methods-Explained)
+and the per-method [../methods/](Methods) references.

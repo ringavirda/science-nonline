@@ -1,8 +1,8 @@
 """Benchmark + figure generation for the dtfit method docs.
 
-Produces, for the per-method documentation under ``docs/methods/``:
+Produces, for the per-method documentation (the wiki ``Methods`` pages):
 
-  * figures (PNG) into ``docs/methods/figures/`` -- a scenario plot per method
+  * figures (PNG) into ``wiki/figures/`` -- a scenario plot per method
     showing it on the data it is *best* at (LSI exponential + oscillatory recipe;
     EDA saturation + adaptive-window peak; DSB additive form; the EDA/LSI streaming
     filters; the fused multi-axis bank; the partitioned/GEMM scale backends; the
@@ -44,19 +44,19 @@ DATA_DIR = Path(__file__).resolve().parent / "data"
 
 
 def _repo_root() -> Path:
-    """Locate the repo root (the dir holding ``docs/methods``) by walking up.
+    """Locate the repo root (the dir holding ``packages/dtfit``) by walking up.
 
     This script is run from the source checkout (editable install); searching for
     the marker dir is robust to the monorepo layout instead of a fixed depth.
     """
     here = Path(__file__).resolve()
     for p in here.parents:
-        if (p / "docs" / "methods").is_dir():
+        if (p / "packages" / "dtfit").is_dir():
             return p
     return here.parents[5]  # packages/dtfit-experimental/src/.../experiments/
 
 
-FIG_DIR = _repo_root() / "docs" / "methods" / "figures"
+FIG_DIR = _repo_root() / "wiki" / "figures"
 FIG_DIR.mkdir(parents=True, exist_ok=True)
 
 plt.rcParams.update({"figure.dpi": 110, "font.size": 10, "axes.grid": True})

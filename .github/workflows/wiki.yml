@@ -1,0 +1,61 @@
+name: Publish Wiki
+
+# Mirrors the generated wiki/ pages into the GitHub wiki repo
+# (https://github.com/ringavirda/science-nonline.wiki.git) on every push to main.
+# The pages are produced from docs/ by scripts/build_wiki.py and committed under
+# wiki/; this job just publishes them. Run that script and commit before pushing:
+#   python scripts/build_wiki.py
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "wiki/**"
+      - ".github/workflows/wiki.yml"
+  workflow_dispatch:
+
+# Allow the default token to push to the wiki repo.
+permissions:
+  contents: write
+
+# Never run two publishes at once against the same wiki.
+concurrency:
+  group: publish-wiki
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Sync wiki/ into the GitHub wiki
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          repo="${{ github.repository }}"
+          wiki_url="https://x-access-token:${GITHUB_TOKEN}@github.com/${repo}.wiki.git"
+          tmp="$(mktemp -d)"
+
+          # Clone the existing wiki (created via the GitHub UI). Bail loudly if
+          # the wiki has never been initialised -- create its first page in the
+          # web UI once, then re-run.
+          git clone "$wiki_url" "$tmp"
+
+          # Mirror the generated pages in, deleting wiki pages that no longer
+          # exist in the repo. Keep the wiki's .git directory.
+          rsync -a --delete --exclude '.git' wiki/ "$tmp"/
+
+          cd "$tmp"
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Wiki already up to date."
+          else
+            git commit -m "Publish wiki from ${GITHUB_SHA::7}"
+            git push origin HEAD
+            echo "Wiki updated."
+          fi

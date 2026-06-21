@@ -35,7 +35,8 @@ being tested on a hand-picked, method-favourable dataset.
   ground truth (relative error).
 - `metric="r2"` — the family is only weakly identifiable (sums of exponentials,
   overlapping peaks, harmonic phases); score *curve quality* (R²). See the
-  "Accuracy and known limits" section of [`docs/api/models.md`](../../../../docs/api/models.md).
+  "Accuracy and known limits" section of the
+  [API: Models](https://github.com/ringavirda/science-nonline/wiki/API-Models) wiki page.
 
 ## Regenerating the golden baseline
 

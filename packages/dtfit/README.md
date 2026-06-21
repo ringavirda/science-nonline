@@ -165,8 +165,8 @@ suite ([../dtfit-experimental/src/dtfit_experimental/experiments/cases/REPORTS.m
 
 Each method's mathematical grounding (in differential / non-Taylor
 transformations), full algorithm, optimizations, guards, applicability, usage
-figures and comparison tables are documented under
-[../../docs/methods/](../../docs/methods/README.md).
+figures and comparison tables are documented in the
+[project wiki](https://github.com/ringavirda/science-nonline/wiki/Methods).
 
 Core dependencies: numpy, scipy, sympy, scikit-learn. Plotting helpers require
 the optional `viz` extra (matplotlib).
