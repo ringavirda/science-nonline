@@ -31,6 +31,28 @@ from dtfit.types import FittingResult, InitialGuess
 from ._common import model_params, _covariance
 
 
+def _dominant_cycles(x: np.ndarray, y: np.ndarray) -> float:
+    """Estimate how many full periods of the dominant tone the record spans.
+
+    Uses the FFT peak above DC. Non-oscillatory shapes (a trend, a single peak,
+    a sigmoid) concentrate their energy at/near DC and return ~0-1; a genuine
+    oscillation returns roughly its cycle count. Used to auto-scale the window
+    count so windows stay sub-period (see ``fit_eda``).
+    """
+    if x.size < 8:
+        return 0.0
+    yd = np.asarray(y, dtype=float) - float(np.mean(y))
+    duration = float(x[-1] - x[0])
+    if duration <= 0.0 or not np.any(yd):
+        return 0.0
+    freqs = np.fft.rfftfreq(x.size, d=duration / (x.size - 1))
+    ps = np.abs(np.fft.rfft(yd))
+    if ps.size < 2:
+        return 0.0
+    k_peak = 1 + int(np.argmax(ps[1:]))  # skip the DC bin
+    return float(freqs[k_peak] * duration)
+
+
 def fit_eda(
     data_x: np.ndarray,
     data_y: np.ndarray,
@@ -98,6 +120,15 @@ def fit_eda(
     # default 2n for redundancy), each with at least 3 samples for Simpson.
     idx_max = max(int(x.size * active_ratio), n + 1)
     requested = 2 * n if n_windows is None else int(n_windows)
+    if n_windows is None:
+        # Oscillatory data: a window spanning whole periods integrates to ~0, so
+        # its area is blind to amplitude/phase and the criterion loses
+        # conditioning as the cycle count grows. Auto-scale to keep windows
+        # sub-period (~3 per dominant cycle). Non-oscillatory shapes have their
+        # FFT peak at/near DC (cycles ~ 0-1) and are left at the 2n default.
+        cycles = _dominant_cycles(x[:idx_max], y[:idx_max])
+        if cycles >= 2.0:
+            requested = max(requested, int(np.ceil(3.0 * cycles)))
     m = max(n, min(requested, idx_max // 3))
     window = max(idx_max // m, 2)
 
