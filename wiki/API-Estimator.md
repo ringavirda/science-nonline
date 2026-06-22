@@ -1,6 +1,6 @@
 # API: `NonlineRegressor`
 
-A scikit-learn-compatible estimator wrapping the LSI / EDA / DSB batch methods.
+A scikit-learn-compatible estimator wrapping the LSI / EAC / DSB batch methods.
 It exposes the standard `fit` / `predict` / `score` API (plus
 `get_params`/`set_params` from `BaseEstimator`), so it composes with
 `sklearn.pipeline.Pipeline`, `GridSearchCV`, and `cross_val_score`.
@@ -17,12 +17,12 @@ NonlineRegressor(expr, var="x", method="lsi", k_star=5, alpha=0.2,
 |---|---|---|---|
 | `expr` | all | -- | model expression, e.g. `"a0 + a1*x + a2*exp(a3*x)"` |
 | `var` | all | `"x"` | main variable name (the single input feature) |
-| `method` | -- | `"lsi"` | `"lsi"`, `"eda"`, or `"dsb"` |
+| `method` | -- | `"lsi"` | `"lsi"`, `"eac"`, or `"dsb"` |
 | `k_star` | LSI | `5` | number of spectral discretes to match |
 | `alpha` | LSI | `0.2` | discrete weight decay `exp(-alpha*i)` |
 | `filter_data` | LSI | `True` | Savitzky-Golay pre-filter |
 | `bounds` | LSI | `None` | per-parameter `(min, max)` bounds; enables a global search |
-| `active_ratio` | EDA | `0.8` | leading fraction of data used for window placement |
+| `active_ratio` | EAC | `0.8` | leading fraction of data used for window placement |
 | `poly_degree` | DSB | `None` | polynomial degree for the required pre-fit; `None` selects it by BIC |
 | `p0` | all | `None` | initial guess for the parameters |
 
@@ -76,7 +76,7 @@ cross_val_score(NonlineRegressor("a*exp(b*x)", "x"), x, y, cv=4)
 
 GridSearchCV(
     NonlineRegressor("a*exp(b*x)", "x"),
-    {"method": ["lsi", "eda"], "k_star": [4, 6, 8]},
+    {"method": ["lsi", "eac"], "k_star": [4, 6, 8]},
 ).fit(x.reshape(-1, 1), y)
 ```
 
@@ -93,6 +93,6 @@ make_pipeline(StandardScaler(), NonlineRegressor("a*exp(b*x)", "x")).fit(x.resha
 - `get_params` / `set_params` expose every constructor argument, so all of them
   are tunable by `GridSearchCV` (`method`, `k_star`, `active_ratio`, ...).
 - For uncertainty (`stderr`, confidence intervals, prediction bands), call the
-  underlying [`fit_lsi`](API-Fitting#fit_lsi) / [`fit_eda`](API-Fitting#fit_eda)
+  underlying [`fit_lsi`](API-Fitting#fit_lsi) / [`fit_eac`](API-Fitting#fit_eac)
   directly and use the returned [`FittingResult`](API-Types); the sklearn estimator
   surfaces only `coef_`/`model_` to stay API-compatible.

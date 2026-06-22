@@ -9,11 +9,11 @@ Recover physical parameters from noisy responses of systems with a known nonline
 ## Methods under test (dtfit)
 
 - **LSI** (`fit_lsi`) — integral least-squares matching the model's Legendre spectrum to the data's; spectral projection smooths noise, with a global differential-evolution search before local refinement. **Oscillatory families** are fitted with `filter_data=False`, a high `k_star` and an FFT frequency seed (else the smoothing/low-order default erases the cycle).
-- **EDA** (`fit_eda`) — equal areas over `2·n_params` windows (overdetermined, noise-averaging); supports a `soft_l1` robust loss.
-- **#6 adaptive-window EDA** (`fit_eda_adaptive`) — curvature-placed windows concentrate resolution on the informative bend (a peak / transient).
+- **EAC** (`fit_eac`) — equal areas over `2·n_params` windows (overdetermined, noise-averaging); supports a `soft_l1` robust loss.
+- **#6 adaptive-window EAC** (`fit_eac_adaptive`) — curvature-placed windows concentrate resolution on the informative bend (a peak / transient).
 - **#3 overlapping-window ensemble** (`ensemble_fit`) — median of per-window fits; rejects outlier-corrupted windows.
 - **#4 joint multi-channel fit** (`fit_joint`) — one shared parameter estimated from all channels at once.
-- **merged selector** (`merged_estimate`) — routes by shape: shared→#4, transient→#6, outliers→#3, else the better of LSI / EDA by in-sample fit.
+- **merged selector** (`merged_estimate`) — routes by shape: shared→#4, transient→#6, outliers→#3, else the better of LSI / EAC by in-sample fit.
 
 ## Baseline methods (established estimation toolkit)
 
@@ -49,7 +49,7 @@ Sixteen nonlinear-in-parameters families across engineering and science domains,
 
 Mean relative **parameter-recovery error %** (vs the true parameters; lower is better). The black-box MLP / Gaussian-process baselines are omitted here because they recover **no** parameters at all -- they are compared on *curve* accuracy in Part B.
 
-| model (params, shape) | dtfit LSI | dtfit EDA | dtfit adaptive-EDA (#6) | dtfit merged | SciPy NLLS (gold) |
+| model (params, shape) | dtfit LSI | dtfit EAC | dtfit adaptive-EAC (#6) | dtfit merged | SciPy NLLS (gold) |
 |---|---|---|---|---|---|
 | damped (3p, oscillatory) | 0.19 | 0.45 | 0.60 | 0.19 | 0.20 |
 | sine (4p, oscillatory) | 0.64 | 1.47 | 1.48 | 0.64 | 0.66 |
@@ -72,43 +72,43 @@ Mean relative **parameter-recovery error %** (vs the true parameters; lower is b
 
 The table maps each family to the **best dtfit estimator and why**, with the NLLS error alongside. The central result: with the **shape-matched variant**, dtfit's integral estimators **tie the NLLS gold standard across all sixteen families** (every error < ~2%, almost all < 0.5%). The variant follows the shape — the estimation-domain twin of the forecasting 'pick the right model' lesson:
 - **oscillatory** (damped, sine) → **LSI** with the *oscillatory recipe* (smoothing off, high spectral order, an FFT frequency seed); the default smoothed low-order fit erases the cycle (sine 50% → <1%);
-- **peaks / overlapping peaks** (gauss, lorentz, double-gauss) → **EDA / adaptive-EDA**; the *area / curvature* criteria localise the bend, whereas the LSI *spectrum* blurs overlapping peaks (use EDA there);
-- **rational-saturating** (Michaelis–Menten, Hill) → **EDA / adaptive-EDA**; the curvature windows sit on the early rise that sets the scale. **NB:** the old report's headline 'Michaelis–Menten exception' (151% error) was a *parameter-ordering bug*, not a real limitation — fixed, MM recovers to ~0.3%;
-- **smooth bulk** (first-order, bi-exp, growth, power, sigmoids) → **LSI / EDA** directly.
+- **peaks / overlapping peaks** (gauss, lorentz, double-gauss) → **EAC / adaptive-EAC**; the *area / curvature* criteria localise the bend, whereas the LSI *spectrum* blurs overlapping peaks (use EAC there);
+- **rational-saturating** (Michaelis–Menten, Hill) → **EAC / adaptive-EAC**; the curvature windows sit on the early rise that sets the scale. **NB:** the old report's headline 'Michaelis–Menten exception' (151% error) was a *parameter-ordering bug*, not a real limitation — fixed, MM recovers to ~0.3%;
+- **smooth bulk** (first-order, bi-exp, growth, power, sigmoids) → **LSI / EAC** directly.
 The only family where pointwise NLLS keeps a (slight) edge is the heavy-tailed **Lorentzian**, where the tails dominate any global integral — and even there dtfit is within ~0.1%.
 
 | family | best dtfit method | best dtfit err % | NLLS err % | verdict | why |
 |---|---|---|---|---|---|
-| damped | EDA / LSI | 0.19 | 0.20 | dtfit ties/beats NLLS | Oscillation — the frequency lives in the spectrum/area; fitted with smoothing off, high order and an FFT seed (the forecasting recipe), it ties NLLS. |
+| damped | EAC / LSI | 0.19 | 0.20 | dtfit ties/beats NLLS | Oscillation — the frequency lives in the spectrum/area; fitted with smoothing off, high order and an FFT seed (the forecasting recipe), it ties NLLS. |
 | sine | LSI | 0.64 | 0.66 | dtfit ties/beats NLLS | Pure harmonic — LSI's home turf once the cycle is not smoothed away; a default-smoothed low-order fit gives ~50% error, the osc recipe gives <1%. |
-| firstorder | EDA / LSI | 0.04 | 0.05 | dtfit ties/beats NLLS | A smooth saturating-exponential bulk; the area criterion pins K and τ; ties NLLS. |
-| biexp | EDA | 0.34 | 0.63 | dtfit ties/beats NLLS | Two decay rates read from the integrated curve; ties NLLS (the rate pair is mildly ill-conditioned for everyone). |
-| decay_offset | LSI / EDA | 0.58 | 0.58 | dtfit ties/beats NLLS | Exponential decay to a non-zero baseline (Newton cooling / RC discharge to a floor); a smooth bulk shape — the rate and the offset come straight out of the integral; ties NLLS. |
-| expgrow | LSI / EDA | 0.39 | 0.39 | dtfit ties/beats NLLS | A monotone bulk shape; the rate sets the whole spectrum; ties NLLS. |
+| firstorder | EAC / LSI | 0.04 | 0.05 | dtfit ties/beats NLLS | A smooth saturating-exponential bulk; the area criterion pins K and τ; ties NLLS. |
+| biexp | EAC | 0.34 | 0.63 | dtfit ties/beats NLLS | Two decay rates read from the integrated curve; ties NLLS (the rate pair is mildly ill-conditioned for everyone). |
+| decay_offset | LSI / EAC | 0.58 | 0.58 | dtfit ties/beats NLLS | Exponential decay to a non-zero baseline (Newton cooling / RC discharge to a floor); a smooth bulk shape — the rate and the offset come straight out of the integral; ties NLLS. |
+| expgrow | LSI / EAC | 0.39 | 0.39 | dtfit ties/beats NLLS | A monotone bulk shape; the rate sets the whole spectrum; ties NLLS. |
 | power | LSI | 1.16 | 1.15 | dtfit ties/beats NLLS | A monotone scaling law; the exponent shapes the bulk; ties NLLS. |
 | stretched | LSI | 0.50 | 0.38 | dtfit ties/beats NLLS | KWW relaxation; LSI recovers it moderately — the stretch exponent β trades off with τ for every method, so error is larger than a plain exponential. |
-| gauss | EDA / adaptive-EDA (#6) | 0.19 | 0.24 | dtfit ties/beats NLLS | A single peak — the area / curvature criteria concentrate on the bend where μ and σ are determined; ties NLLS. |
-| lorentz | EDA | 0.06 | 0.24 | dtfit ties/beats NLLS | A heavy-tailed resonance — the one family where NLLS keeps a slight edge: the tails dominate any global integral, so the width γ is a touch harder for the area criterion. Even so dtfit is within ~0.1% of NLLS (both well under 0.5%). |
-| double_gauss | EDA / adaptive-EDA (#6) | 0.24 | 0.28 | dtfit ties/beats NLLS | Two overlapping peaks: the **area / curvature** criteria separate the components and tie NLLS, but the **LSI spectrum** struggles (overlapping peaks blur the spectral signature, ~2–3% error) — use EDA, not LSI, for multi-peak shapes. |
-| logistic | LSI / EDA | 0.47 | 0.63 | dtfit ties/beats NLLS | Sigmoid — the inflection shapes the integral; ties NLLS. |
-| gompertz | EDA / LSI | 0.11 | 0.14 | dtfit ties/beats NLLS | Asymmetric sigmoid (growth); the bulk determines all three parameters; ties NLLS. |
+| gauss | EAC / adaptive-EAC (#6) | 0.19 | 0.24 | dtfit ties/beats NLLS | A single peak — the area / curvature criteria concentrate on the bend where μ and σ are determined; ties NLLS. |
+| lorentz | EAC | 0.06 | 0.24 | dtfit ties/beats NLLS | A heavy-tailed resonance — the one family where NLLS keeps a slight edge: the tails dominate any global integral, so the width γ is a touch harder for the area criterion. Even so dtfit is within ~0.1% of NLLS (both well under 0.5%). |
+| double_gauss | EAC / adaptive-EAC (#6) | 0.24 | 0.28 | dtfit ties/beats NLLS | Two overlapping peaks: the **area / curvature** criteria separate the components and tie NLLS, but the **LSI spectrum** struggles (overlapping peaks blur the spectral signature, ~2–3% error) — use EAC, not LSI, for multi-peak shapes. |
+| logistic | LSI / EAC | 0.47 | 0.63 | dtfit ties/beats NLLS | Sigmoid — the inflection shapes the integral; ties NLLS. |
+| gompertz | EAC / LSI | 0.11 | 0.14 | dtfit ties/beats NLLS | Asymmetric sigmoid (growth); the bulk determines all three parameters; ties NLLS. |
 | weibull | LSI | 0.64 | 0.63 | dtfit ties/beats NLLS | Reliability CDF (sigmoid); ties NLLS (slightly looser than the logistic — the shape exponent k and scale λ partly trade off). |
-| mm | EDA / adaptive-EDA (#6) | 0.15 | 0.36 | dtfit ties/beats NLLS | Rational saturation. **The old report's 151% 'Michaelis–Menten exception' was a parameter-ordering bug** (the spectral coefficients were zipped to the names in the wrong order); with the order fixed the rational saturation is recovered to ~0.3% — adaptive/curvature windows put resolution on the early rise where Km is set. It is *not* a boundary family. |
-| hill | adaptive-EDA (#6) / LSI | 0.14 | 0.10 | dtfit ties/beats NLLS | Rational saturation with a cooperativity exponent; the curvature windows concentrate on the rise that sets K and nh — ties NLLS (~0.3%), not a failure. |
+| mm | EAC / adaptive-EAC (#6) | 0.15 | 0.36 | dtfit ties/beats NLLS | Rational saturation. **The old report's 151% 'Michaelis–Menten exception' was a parameter-ordering bug** (the spectral coefficients were zipped to the names in the wrong order); with the order fixed the rational saturation is recovered to ~0.3% — adaptive/curvature windows put resolution on the early rise where Km is set. It is *not* a boundary family. |
+| hill | adaptive-EAC (#6) / LSI | 0.14 | 0.10 | dtfit ties/beats NLLS | Rational saturation with a cooperativity exponent; the curvature windows concentrate on the rise that sets K and nh — ties NLLS (~0.3%), not a failure. |
 
 ![Recovered curves per family: best dtfit estimator (blue dashed) and NLLS (orange) vs the true curve (black) over noisy data.](figures/family_fits.png)
 
 *Recovered curves per family: best dtfit estimator (blue dashed) and NLLS (orange) vs the true curve (black) over noisy data.*
 
-![Parameter-recovery error % per family and method (green = good, scale clipped at 3%). With the shape-matched variant dtfit ties NLLS across families; the amber cells are LSI on the overlapping-peak double-Gaussian and the noisier monotone fits, which EDA / adaptive-EDA bring back to green.](figures/error_heatmap.png)
+![Parameter-recovery error % per family and method (green = good, scale clipped at 3%). With the shape-matched variant dtfit ties NLLS across families; the amber cells are LSI on the overlapping-peak double-Gaussian and the noisier monotone fits, which EAC / adaptive-EAC bring back to green.](figures/error_heatmap.png)
 
-*Parameter-recovery error % per family and method (green = good, scale clipped at 3%). With the shape-matched variant dtfit ties NLLS across families; the amber cells are LSI on the overlapping-peak double-Gaussian and the noisier monotone fits, which EDA / adaptive-EDA bring back to green.*
+*Parameter-recovery error % per family and method (green = good, scale clipped at 3%). With the shape-matched variant dtfit ties NLLS across families; the amber cells are LSI on the overlapping-peak double-Gaussian and the noisier monotone fits, which EAC / adaptive-EAC bring back to green.*
 
 ## B. Robustness -- noise and outlier sweeps
 
 ### B1. Parameter error vs noise level
 
-Mean parameter-recovery error (over seeds) as the Gaussian noise grows to 40%. EDA's area-averaging and LSI's spectral smoothing degrade gracefully and track -- often beat -- NLLS as noise rises.
+Mean parameter-recovery error (over seeds) as the Gaussian noise grows to 40%. EAC's area-averaging and LSI's spectral smoothing degrade gracefully and track -- often beat -- NLLS as noise rises.
 
 ![Parameter error vs noise level (log scale) for three families.](figures/noise_sweep.png)
 
@@ -116,7 +116,7 @@ Mean parameter-recovery error (over seeds) as the Gaussian noise grows to 40%. E
 
 ### B2. Parameter error vs outlier fraction
 
-With gross outliers, plain EDA's integral averaging is already far more robust than a pointwise LSI/NLLS, but the dedicated **robust NLLS (soft-L1) is the clear winner** -- the honest verdict that outliers want a robust loss, not window ensembling (the #3 ensemble does not reliably separate from plain EDA).
+With gross outliers, plain EAC's integral averaging is already far more robust than a pointwise LSI/NLLS, but the dedicated **robust NLLS (soft-L1) is the clear winner** -- the honest verdict that outliers want a robust loss, not window ensembling (the #3 ensemble does not reliably separate from plain EAC).
 
 ![Parameter error vs outlier fraction (log scale), damped oscillator.](figures/outlier_sweep.png)
 
@@ -128,7 +128,7 @@ On *curve* accuracy the flexible learners are competitive, but they return no in
 
 | method | R² vs clean | RMSE |
 |---|---|---|
-| dtfit EDA | 0.9997 | 0.01037 |
+| dtfit EAC | 0.9997 | 0.01037 |
 | SciPy NLLS | 0.9996 | 0.01192 |
 | sklearn MLP (no params) | 0.9630 | 0.1135 |
 | Gaussian process (no params) | 0.9959 | 0.03769 |
@@ -137,10 +137,10 @@ On *curve* accuracy the flexible learners are competitive, but they return no in
 
 ### C1-C3. Single-channel regimes (param err %)
 
-| regime | adaptive-EDA (#6) | EDA | SciPy NLLS | note |
+| regime | adaptive-EAC (#6) | EAC | SciPy NLLS | note |
 |---|---|---|---|---|
-| concentrated transient (fast τ, long tail) | 0.28 | 0.36 | 0.18 | adaptive-EDA (#6) -- curvature windows on the transient |
-| sparse sampling (37 pts) | 7.83 | 9.34 | 0.36 | EDA -- area criterion tolerant of irregular spacing |
+| concentrated transient (fast τ, long tail) | 0.28 | 0.36 | 0.18 | adaptive-EAC (#6) -- curvature windows on the transient |
+| sparse sampling (37 pts) | 7.83 | 9.34 | 0.36 | EAC -- area criterion tolerant of irregular spacing |
 | short record (18 pts, gaussian) | 1.67 | 1.17 | 1.08 | all comparable -- few points, no clear edge |
 
 ### C4. Multi-channel shared decay rate (short, noisy channels)
@@ -148,9 +148,9 @@ On *curve* accuracy the flexible learners are competitive, but they return no in
 | estimator | shared τ err % |
 |---|---|
 | dtfit joint (#4) | 6.70 |
-| independent per-channel EDA (mean, scatter ±0.20) | 16.21 |
+| independent per-channel EAC (mean, scatter ±0.20) | 16.21 |
 
-With only 30 noisy points per channel each per-channel τ scatters badly (±0.20); the joint fit pools the shared rate across all four channels into one substantially more accurate estimate — the regime #4 is built for. (Adaptive-EDA #6 owns the concentrated transient in C1.) These are the shapes the merged selector routes to #4 and #6.
+With only 30 noisy points per channel each per-channel τ scatters badly (±0.20); the joint fit pools the shared rate across all four channels into one substantially more accurate estimate — the regime #4 is built for. (Adaptive-EAC #6 owns the concentrated transient in C1.) These are the shapes the merged selector routes to #4 and #6.
 
 ## D. Real-data recovery (no ground truth → agreement + fit)
 
@@ -161,7 +161,7 @@ Recovered growth rate `b` of `a·exp(b·t)` and the implied **doubling time** ln
 | method | growth rate b | doubling time (days) | in-sample R² |
 |---|---|---|---|
 | dtfit LSI | 0.0969 | 7.16 | 0.9893 |
-| dtfit EDA | 0.1118 | 6.20 | 0.9326 |
+| dtfit EAC | 0.1118 | 6.20 | 0.9326 |
 | SciPy NLLS | 0.0956 | 7.25 | 0.9896 |
 
 ### D2. USD/UAH 2014–15 — exponential depreciation rate
@@ -169,7 +169,7 @@ Recovered growth rate `b` of `a·exp(b·t)` and the implied **doubling time** ln
 | method | rate b | R² | MAPE % |
 |---|---|---|---|
 | dtfit LSI | 0.2974 | 0.7822 | 5.70 |
-| dtfit EDA | 0.4206 | 0.5476 | 6.56 |
+| dtfit EAC | 0.4206 | 0.5476 | 6.56 |
 | SciPy NLLS | 0.2963 | 0.7822 | 5.71 |
 
 ![dtfit recovers interpretable rates on real economic/epidemic data.](figures/realdata_recovery.png)
@@ -179,9 +179,9 @@ Recovered growth rate `b` of `a·exp(b·t)` and the implied **doubling time** ln
 ## Reading it
 
 - **dtfit ties the NLLS gold standard across all sixteen families** — oscillatory, exponential / multi-exponential, peak, sigmoidal, rational-saturating and power-law — *provided the shape-matched variant is used* (see the applicability map and heat-map: nearly all green). The methods are general over functional form, not tuned to one. The only family where pointwise NLLS keeps a slight edge is the heavy-tailed **Lorentzian** (tails dominate a global integral), and even there dtfit is within ~0.1%.
-- **A fixed bug, not a boundary.** The previous report's headline 'honest exception: Michaelis–Menten' (151% error) was a **parameter-ordering bug** — the LSI spectral coefficients (returned in name-sorted order) were zipped to an unsorted name list, silently swapping Vmax and Km. With the order fixed, the rational saturation is recovered to ~0.3% by EDA/adaptive-EDA. The estimators carry no intrinsic weakness on rational shapes.
-- **Variant selection follows shape.** Oscillatory → LSI with the *oscillatory recipe* (smoothing off, high order, FFT seed: a sinusoid is 50% error without it, <1% with it — the forecasting lesson); peaks and overlapping peaks → EDA / adaptive-EDA (the spectrum blurs overlapping peaks, so LSI alone is the wrong choice for the double-Gaussian); rational / peaked rises → adaptive-EDA, whose curvature windows sit on the informative bend.
-- **Robustness.** Across the noise sweep EDA's area-averaging and LSI's spectral smoothing degrade gracefully and often beat NLLS as noise rises. Under gross outliers plain EDA is already far more robust than a pointwise fit, but the dedicated **robust NLLS (soft-L1) wins** and the #3 window ensemble does not reliably separate from plain EDA — outliers want a robust loss, not ensembling.
-- **Regime routing.** Adaptive-window EDA (#6) wins the concentrated transient; the joint fit (#4) pools weak multi-channel evidence into one consistent shared ω where independent fits scatter — what the merged selector routes to.
+- **A fixed bug, not a boundary.** The previous report's headline 'honest exception: Michaelis–Menten' (151% error) was a **parameter-ordering bug** — the LSI spectral coefficients (returned in name-sorted order) were zipped to an unsorted name list, silently swapping Vmax and Km. With the order fixed, the rational saturation is recovered to ~0.3% by EAC/adaptive-EAC. The estimators carry no intrinsic weakness on rational shapes.
+- **Variant selection follows shape.** Oscillatory → LSI with the *oscillatory recipe* (smoothing off, high order, FFT seed: a sinusoid is 50% error without it, <1% with it — the forecasting lesson); peaks and overlapping peaks → EAC / adaptive-EAC (the spectrum blurs overlapping peaks, so LSI alone is the wrong choice for the double-Gaussian); rational / peaked rises → adaptive-EAC, whose curvature windows sit on the informative bend.
+- **Robustness.** Across the noise sweep EAC's area-averaging and LSI's spectral smoothing degrade gracefully and often beat NLLS as noise rises. Under gross outliers plain EAC is already far more robust than a pointwise fit, but the dedicated **robust NLLS (soft-L1) wins** and the #3 window ensemble does not reliably separate from plain EAC — outliers want a robust loss, not ensembling.
+- **Regime routing.** Adaptive-window EAC (#6) wins the concentrated transient; the joint fit (#4) pools weak multi-channel evidence into one consistent shared ω where independent fits scatter — what the merged selector routes to.
 - **Real data & interpretability.** On the COVID take-off and the UAH depreciation the dtfit methods and NLLS agree on the recovered rate and fit well, so the doubling time / depreciation rate is trustworthy — the interpretable output the MLP and Gaussian-process learners cannot provide despite matching the curve.
 - **Honest ceiling.** dtfit matches but does not *beat* a well-initialised NLLS on clean, well-excited, bulk-shape data; its advantages are generality over functional form, the integral robustness to noise/outliers, the regime-specific variants, and (in the streaming/embedded domain) doing this online.

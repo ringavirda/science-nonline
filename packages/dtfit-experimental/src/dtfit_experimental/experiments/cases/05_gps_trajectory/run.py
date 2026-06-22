@@ -34,7 +34,7 @@ from __future__ import annotations
 import numpy as np
 from scipy.optimize import least_squares
 
-from dtfit.streaming import EDAFilter, FilterBank, LSIFilter
+from dtfit.streaming import EACFilter, FilterBank, LSIFilter
 
 from dtfit_experimental.experiments.common import ReportWriter, fmt
 from dtfit_experimental.experiments.common.plotting import plt
@@ -131,7 +131,7 @@ def build_scenario(n, seed=0):
 
 
 def per_satellite_smoothing(t, rho, seed=0):
-    """Adaptation: a FilterBank of per-satellite EDA windows smooths pseudoranges
+    """Adaptation: a FilterBank of per-satellite EAC windows smooths pseudoranges
     before multilateration -> cleaner fixes."""
     nsat = rho.shape[1]
     bank = FilterBank.from_model(
@@ -214,7 +214,7 @@ class FusedManeuverDetector:
 def _make_axis_filters(kind, fixes, off):
     """Build the 3 per-axis dtfit filters for the generic CA quadratic model.
 
-    ``kind="eda"`` -> EDAFilter (area measurement, the default tracker);
+    ``kind="eac"`` -> EACFilter (area measurement, the default tracker);
     ``kind="lsi"`` -> LSIFilter (orthogonal-spectrum measurement --
     the streaming LSI sibling, which projects each window onto the first
     ``order+1`` Legendre moments). Both share the same model, window and p0 so the
@@ -226,13 +226,13 @@ def _make_axis_filters(kind, fixes, off):
             model, "t", p0=[float(fixes[0, ax]), 0.0, 0.0], window_size=15,
             order=3, q_diag=[1e-2, 1e-2, 1e-2], r=0.5, adapt_r=True,
             drift_reset="inflate", **off) for ax in range(3)]
-    return [EDAFilter(
+    return [EACFilter(
         model, "t", p0=[float(fixes[0, ax]), 0.0, 0.0], window_size=15,
         q_diag=[1e-2, 1e-2, 1e-2], r=0.5, n_sub=2, adapt_r=True,
         drift_reset="inflate", **off) for ax in range(3)]
 
 
-def dtfit_eval(t, fixes, horizons, *, kind="eda", fused=False, inflate=INFLATE,
+def dtfit_eval(t, fixes, horizons, *, kind="eac", fused=False, inflate=INFLATE,
                det_h=10.0):
     """Online per-axis tracking with a GENERIC model + rolling h-step forecasts.
 
@@ -241,7 +241,7 @@ def dtfit_eval(t, fixes, horizons, *, kind="eda", fused=False, inflate=INFLATE,
     window. This is the same information class as the constant-acceleration Kalman
     baseline, so the comparison is on equal footing.
 
-    ``kind`` selects the measurement: ``"eda"`` (area) or ``"lsi"`` (Legendre
+    ``kind`` selects the measurement: ``"eac"`` (area) or ``"lsi"`` (Legendre
     spectrum). ``fused=False`` uses each filter's built-in per-axis detector;
     ``fused=True`` disables it and drives re-adaptation from a
     :class:`FusedManeuverDetector` over the three axes' forecast residuals -- the
@@ -352,7 +352,7 @@ def main(quick: bool = False) -> str:
         "- **dtfit (generic):** each axis is tracked online by a local "
         "**constant-acceleration quadratic** `c0 + c1·t + c2·t²` over a short "
         "(15-sample) sliding window. Tested with **both** streaming measurements: "
-        "**EDA** (`EDAFilter`, area) and **LSI** (`LSIFilter`, "
+        "**EAC** (`EACFilter`, area) and **LSI** (`LSIFilter`, "
         "orthogonal Legendre spectrum, order 3). *Plain* uses each filter's "
         "built-in per-axis detector; *fused* (the improvement below) instead "
         "detects maneuvers from the **joint** innovation of all three axes and "
@@ -390,7 +390,7 @@ def main(quick: bool = False) -> str:
         "Front end — multilateration fixes & per-satellite smoothing (adaptation)",
         f"{SATS.shape[0]} satellites, pseudorange noise σ=0.6 km. The raw "
         "per-epoch multilateration fix has position RMSE "
-        f"**{raw_fix_rmse:.2f} km**. The natural-looking 'EDA per satellite "
+        f"**{raw_fix_rmse:.2f} km**. The natural-looking 'EAC per satellite "
         "stream' architecture — a `FilterBank` smoothing each pseudorange "
         "stream independently *before* multilateration — instead **degrades** "
         f"the fix to **{sat_fix_rmse:.1f} km**. This is an instructive negative "
@@ -402,13 +402,13 @@ def main(quick: bool = False) -> str:
         "raw per-satellite ranges.")
 
     # --- metrics averaged over n_seeds realizations ---------------------- #
-    labels = ["raw fixes", "dtfit (EDA, plain)", "dtfit (EDA, fused)",
+    labels = ["raw fixes", "dtfit (EAC, plain)", "dtfit (EAC, fused)",
               "dtfit (LSI, fused)", "Kalman (fixed)", "Kalman (adaptive)"]
     sm: dict[str, list[float]] = {lb: [] for lb in labels}
     fcr: dict[str, dict[int, list[float]]] = {
         lb: {h: [] for h in HZ} for lb in labels if lb != "raw fixes"}
     det_c: dict[str, list[int]] = {lb: [] for lb in
-                                   ["dtfit (EDA, plain)", "dtfit (EDA, fused)",
+                                   ["dtfit (EAC, plain)", "dtfit (EAC, fused)",
                                     "dtfit (LSI, fused)", "Kalman (adaptive)"]}
     det_f: dict[str, list[int]] = {lb: [] for lb in det_c}
     rw_fc: dict[int, list[float]] = {h: [] for h in HZ}
@@ -416,8 +416,8 @@ def main(quick: bool = False) -> str:
         ts, trs, _, fxs = build_scenario(n, seed=seed)
         slc = slice(WARMUP, n)
         runs = {
-            "dtfit (EDA, plain)": dtfit_eval(ts, fxs, HZ, kind="eda", fused=False),
-            "dtfit (EDA, fused)": dtfit_eval(ts, fxs, HZ, kind="eda", fused=True),
+            "dtfit (EAC, plain)": dtfit_eval(ts, fxs, HZ, kind="eac", fused=False),
+            "dtfit (EAC, fused)": dtfit_eval(ts, fxs, HZ, kind="eac", fused=True),
             "dtfit (LSI, fused)": dtfit_eval(ts, fxs, HZ, kind="lsi", fused=True),
             "Kalman (fixed)": (*kalman_eval(ts, fxs, HZ, q=5e-2, adaptive=False)[:2], []),
             "Kalman (adaptive)": kalman_eval(ts, fxs, HZ, q=5e-2, adaptive=True),
@@ -451,15 +451,15 @@ def main(quick: bool = False) -> str:
         "over the whole flight and over realizations. A single long extrapolation "
         "is *not* used — no constant-acceleration model can forecast through an "
         "unobserved future turn.")
-    fc_methods = ["dtfit (EDA, plain)", "dtfit (EDA, fused)", "dtfit (LSI, fused)",
+    fc_methods = ["dtfit (EAC, plain)", "dtfit (EAC, fused)", "dtfit (LSI, fused)",
                   "Kalman (fixed)", "Kalman (adaptive)"]
     rep.table(["method"] + [f"h={h}" for h in H_TABLE],
               [[lb] + [fmt(fcm[lb][h], "{:.3f}") for h in H_TABLE]
                for lb in fc_methods])
 
     # maneuver-onset detection: the fused detector vs the original per-axis one
-    cp, cf = np.mean(det_c["dtfit (EDA, plain)"]), np.mean(det_f["dtfit (EDA, plain)"])
-    cF, cFf = np.mean(det_c["dtfit (EDA, fused)"]), np.mean(det_f["dtfit (EDA, fused)"])
+    cp, cf = np.mean(det_c["dtfit (EAC, plain)"]), np.mean(det_f["dtfit (EAC, plain)"])
+    cF, cFf = np.mean(det_c["dtfit (EAC, fused)"]), np.mean(det_f["dtfit (EAC, fused)"])
     cL = np.mean(det_c["dtfit (LSI, fused)"])
     rep.section(
         "Maneuver-onset detection — the fused detector (improvement)",
@@ -477,7 +477,7 @@ def main(quick: bool = False) -> str:
         "the brief onset transient away; the per-sample forecast residual does "
         "not. **The first onset (t=3) stays hard** — it sits on the filter's own "
         f"convergence transient, an honest startup/SNR limit. The **LSI** filter "
-        f"with the same fused detector catches **{cL:.1f}/3** — on par with EDA "
+        f"with the same fused detector catches **{cL:.1f}/3** — on par with EAC "
         "(its richer spectral innovation has no extra maneuver signature to offer "
         "on this low-order trend).")
 
@@ -486,13 +486,13 @@ def main(quick: bool = False) -> str:
     ax = fig.add_subplot(1, 2, 1, projection="3d")
     ax.plot(*truth.T, "k", lw=1.5, label="true trajectory")
     ax.scatter(*fixes[sl].T, s=3, c="0.7", label="raw fixes")
-    ax.plot(*dt_smooth[sl].T, "tab:blue", lw=1.0, label="dtfit (EDA, fused)")
+    ax.plot(*dt_smooth[sl].T, "tab:blue", lw=1.0, label="dtfit (EAC, fused)")
     ax.set_title("3D maneuvering trajectory")
     ax.legend(fontsize=7)
     ax2 = fig.add_subplot(1, 2, 2)
     ax2.plot(truth[:, 0], truth[:, 1], "k", lw=1.4, label="truth")
     ax2.scatter(fixes[sl, 0], fixes[sl, 1], s=3, c="0.7", label="raw fixes")
-    ax2.plot(dt_smooth[sl, 0], dt_smooth[sl, 1], "tab:blue", lw=1.0, label="dtfit (EDA, fused)")
+    ax2.plot(dt_smooth[sl, 0], dt_smooth[sl, 1], "tab:blue", lw=1.0, label="dtfit (EAC, fused)")
     ax2.plot(kf_smooth[sl, 0], kf_smooth[sl, 1], "tab:green", lw=1.0, label="Kalman")
     for d in dt_drifts:  # mark detected maneuvers on the ground track
         k = int(np.argmin(np.abs(t - d)))
@@ -500,12 +500,12 @@ def main(quick: bool = False) -> str:
     ax2.set_title("Horizontal ground track (× = detected maneuver)")
     ax2.set_xlabel("x (km)"); ax2.set_ylabel("y (km)"); ax2.legend(fontsize=7)
     rep.figure(fig, "trajectory", "Maneuvering trajectory: truth vs raw fixes vs "
-               "dtfit (EDA, fused) vs Kalman; red × mark fused-detector maneuver flags.")
+               "dtfit (EAC, fused) vs Kalman; red × mark fused-detector maneuver flags.")
 
     # rolling RMSE vs horizon (mean over realizations)
     fig, ax = plt.subplots(figsize=(7.5, 4))
-    ax.plot(HZ, [fcm["dtfit (EDA, fused)"][h] for h in HZ], "o-", color="tab:blue",
-            label="dtfit (EDA, fused)")
+    ax.plot(HZ, [fcm["dtfit (EAC, fused)"][h] for h in HZ], "o-", color="tab:blue",
+            label="dtfit (EAC, fused)")
     ax.plot(HZ, [fcm["dtfit (LSI, fused)"][h] for h in HZ], "o--", color="tab:cyan",
             label="dtfit (LSI, fused)")
     ax.plot(HZ, [fcm["Kalman (fixed)"][h] for h in HZ], "s-", color="tab:green",
@@ -522,12 +522,12 @@ def main(quick: bool = False) -> str:
     rep.text(
         f"- **In-track smoothing.** Best is **{best_sm}** ({smm['Kalman (fixed)']:.3f} "
         f"km); both estimators roughly halve the {smm['raw fixes']:.2f} km raw-fix "
-        f"error. dtfit's fused-adaptive EDA filter ({smm['dtfit (EDA, fused)']:.3f} "
-        f"km) **improves on plain EDA** ({smm['dtfit (EDA, plain)']:.3f} km) and "
+        f"error. dtfit's fused-adaptive EAC filter ({smm['dtfit (EAC, fused)']:.3f} "
+        f"km) **improves on plain EAC** ({smm['dtfit (EAC, plain)']:.3f} km) and "
         "narrows the gap to the Kalman, but does not overtake it.\n"
-        f"- **EDA vs LSI — the two streaming measurements are essentially tied here** "
-        f"({smm['dtfit (EDA, fused)']:.3f} vs {smm['dtfit (LSI, fused)']:.3f} km "
-        f"smoothing; h=5 forecast {fcm['dtfit (EDA, fused)'][5]:.2f} vs "
+        f"- **EAC vs LSI — the two streaming measurements are essentially tied here** "
+        f"({smm['dtfit (EAC, fused)']:.3f} vs {smm['dtfit (LSI, fused)']:.3f} km "
+        f"smoothing; h=5 forecast {fcm['dtfit (EAC, fused)'][5]:.2f} vs "
         f"{fcm['dtfit (LSI, fused)'][5]:.2f}). The Legendre spectrum's advantage is "
         "resolving *frequency / phase / shape* (coupled, oscillatory models); a "
         "constant-acceleration **quadratic over a short window has no such "
@@ -535,9 +535,9 @@ def main(quick: bool = False) -> str:
         "spectral measurement buys nothing — it would shine on an oscillatory "
         "target (cf. the control-ID and seasonal experiments), not a smooth "
         "trajectory.\n"
-        f"- **Short-horizon forecast.** Same ordering: dtfit (EDA, fused) "
-        f"{fcm['dtfit (EDA, fused)'][5]:.2f} km at h=5 beats plain EDA "
-        f"{fcm['dtfit (EDA, plain)'][5]:.2f} but trails Kalman (fixed) "
+        f"- **Short-horizon forecast.** Same ordering: dtfit (EAC, fused) "
+        f"{fcm['dtfit (EAC, fused)'][5]:.2f} km at h=5 beats plain EAC "
+        f"{fcm['dtfit (EAC, plain)'][5]:.2f} but trails Kalman (fixed) "
         f"{fcm['Kalman (fixed)'][5]:.2f}; the gap stays small across horizons.\n"
         f"- **The fused detector is a real improvement (the headline).** It "
         f"roughly doubles maneuver detection ({cF:.1f}/3 vs {cp:.1f}/3) by "
@@ -565,7 +565,7 @@ def main(quick: bool = False) -> str:
         "- Architecture notes: the per-satellite `FilterBank` above is a documented "
         "negative (it breaks multilateration consistency); the joint fit (#4) is "
         "*not* exercised here. The fused detector is built on two new library "
-        "primitives (`EDAFilter.last_residual_` and `.inflate()`); the "
+        "primitives (`EACFilter.last_residual_` and `.inflate()`); the "
         "multilateration front end is standard `scipy.least_squares`.")
 
     path = rep.write()

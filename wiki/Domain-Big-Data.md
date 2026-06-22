@@ -11,7 +11,7 @@ Test dtfit's map-reduce estimators (resident GEMM, fused streaming, distributed 
 - **whole-array GEMM** (`fit_lsi_batched` / `project_spectra`) -- all B channels' empirical spectra in one BLAS matmul `S = Dᵀ.(w⊙Y)`; maximal throughput, O(N*B) memory.
 - **fused streaming map-reduce** (`PartitionedBatchLSI`) -- folds each chunk's partial integrals into a `(B, n_coef)` accumulator: one pass, **flat O(B*order) memory**, exact, handles streams larger than RAM.
 - **distributed reduce** (`PartitionedBatchLSI.merge`, on the promoted `PartitionedLSI` #1) -- per-partition accumulators combined by an associative, order-independent `merge`.
-- **streaming filter** (`EDAFilter`) -- the online twin: an O(1)/sample recursive update tracking a model's parameters in bounded memory.
+- **streaming filter** (`EACFilter`) -- the online twin: an O(1)/sample recursive update tracking a model's parameters in bounded memory.
 All the reduce routes are the identical additive projection -> identical result.
 
 ## Baseline methods (established big-data toolkit)
@@ -129,11 +129,11 @@ The `merge` is **associative and order-independent** (combining partitions in an
 
 ## 6. Online filter vs the established online estimators
 
-The streaming *filter* is the real-time twin of the reduce: an O(1)/sample recursive update. We track a sinusoid with a **mid-stream frequency jump** one sample at a time, comparing dtfit's `EDAFilter` against the established online toolkit -- recursive least squares (RLS) and an incremental SGD net -- on per-sample cost, memory, one-step prediction error, and whether the **physical frequency** is recovered.
+The streaming *filter* is the real-time twin of the reduce: an O(1)/sample recursive update. We track a sinusoid with a **mid-stream frequency jump** one sample at a time, comparing dtfit's `EACFilter` against the established online toolkit -- recursive least squares (RLS) and an incremental SGD net -- on per-sample cost, memory, one-step prediction error, and whether the **physical frequency** is recovered.
 
 | online method | us / sample | memory | one-step RMSE (post-jump) | recovers physics |
 |---|---|---|---|---|
-| dtfit EDAFilter | 139.0 | bounded (7.8 MB) | 0.311 | **yes** (omega err 9.2%) |
+| dtfit EACFilter | 139.0 | bounded (7.8 MB) | 0.311 | **yes** (omega err 9.2%) |
 | recursive least squares (AR6) | 6.6 | bounded | 0.324 | no (black-box AR) |
 | sklearn SGD partial_fit (lag-8) | 109.3 | bounded | 0.320 | no (black-box) |
 

@@ -4,7 +4,7 @@ from typing import Any
 
 import numpy as np
 
-from dtfit.streaming import EDAFilter, FilterBank
+from dtfit.streaming import EACFilter, FilterBank
 
 
 def _streams(K=5, n=400, seed=0):
@@ -46,7 +46,7 @@ def test_filter_bank_matches_standalone_filters():
     bank = FilterBank.from_model("a*exp(b*t)", "t", 3, **kw)
     bank.run(t, Y, n_jobs=1)
     for k in range(3):
-        flt = EDAFilter("a*exp(b*t)", "t", **kw)
+        flt = EACFilter("a*exp(b*t)", "t", **kw)
         for s in range(t.size):
             flt.partial_fit(t[s], Y[s, k])
         np.testing.assert_allclose(bank[k].p, flt.p, rtol=1e-9, atol=1e-9)

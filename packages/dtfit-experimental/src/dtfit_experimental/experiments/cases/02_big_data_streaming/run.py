@@ -11,7 +11,7 @@ Two tracks:
     chunks via the map-reduce adaptation (`PartitionedLSI`, #1), which keeps only
     O(order) accumulator state. We measure throughput and peak memory across
     increasing volumes and extrapolate.
-  * **Online cost** -- the per-sample budget of `EDAFilter` vs a
+  * **Online cost** -- the per-sample budget of `EACFilter` vs a
     sliding-window `curve_fit` refit and an incremental NN (`MLPRegressor.
     partial_fit`).
 """
@@ -25,7 +25,7 @@ import numpy as np
 
 import dtfit as dt
 from dtfit import PartitionedLSI
-from dtfit.streaming import EDAFilter
+from dtfit.streaming import EACFilter
 
 from dtfit_experimental.experiments.common import ReportWriter, fmt
 from dtfit_experimental.experiments.common.plotting import plt
@@ -79,7 +79,7 @@ def online_track(n, *, seed=0):
     phase = np.cumsum(w * dt_)
     y = 3.0 * np.sin(phase) + rng.normal(0, 0.3, n)
 
-    flt = EDAFilter("A*sin(w*t)", "t", p0=[2.0, 1.0], window_size=50,
+    flt = EACFilter("A*sin(w*t)", "t", p0=[2.0, 1.0], window_size=50,
                            q_diag=[1e-3, 5e-4], r=5.0, n_sub=2, adapt_r=True)
     tracemalloc.start()
     costs, track, w_hist, drift = [], [], [], []
@@ -97,17 +97,17 @@ def online_track(n, *, seed=0):
 
     # Contrast: the cost of a *batch* re-fit grows with the history length, so
     # tracking a stream by re-fitting all data seen so far is O(N) per step =
-    # O(N^2) overall. Measure fit_eda at increasing sizes to show the growth.
+    # O(N^2) overall. Measure fit_eac at increasing sizes to show the growth.
     # warm up the SymPy lambdify / solver caches so the first timed size is
     # not inflated by one-off compilation overhead.
-    dt.fit_eda(np.linspace(0, 40, 500), np.sin(np.linspace(0, 40, 500)),
+    dt.fit_eac(np.linspace(0, 40, 500), np.sin(np.linspace(0, 40, 500)),
                "A*sin(w*t)", "t", p0=[2.0, 1.0])
     batch_costs = []
     for m in (10_000, 50_000, 250_000):
         tm = np.linspace(0, 40, m)
         ym = 3.0 * np.sin(1.0 * tm) + rng.normal(0, 0.3, m)
         t0 = time.perf_counter()
-        dt.fit_eda(tm, ym, "A*sin(w*t)", "t", p0=[2.0, 1.0])
+        dt.fit_eac(tm, ym, "A*sin(w*t)", "t", p0=[2.0, 1.0])
         batch_costs.append((m, (time.perf_counter() - t0) * 1e3))
 
     return {"us_step": us_step, "peak_mb": peak_mb, "batch_costs": batch_costs,
@@ -134,7 +134,7 @@ def main(quick: bool = False) -> str:
         "measures throughput and memory, so the model only needs to exercise the "
         "real projection/solve path (not a degenerate constant).\n"
         "- **Track 2 (online):** `y = A·sin(w·t)` with a mid-stream frequency "
-        "jump, tracked by `EDAFilter`. A sine with drifting frequency is "
+        "jump, tracked by `EACFilter`. A sine with drifting frequency is "
         "chosen because tracking a time-varying oscillation online — and "
         "detecting the regime change — is a demanding real-time case.")
 
@@ -194,7 +194,7 @@ def main(quick: bool = False) -> str:
     bc = ot["batch_costs"]
     rep.table(
         ["updater", "cost", "scaling", "memory"],
-        [["EDAFilter (online)", f"{ot['us_step']:.1f} µs / sample",
+        [["EACFilter (online)", f"{ot['us_step']:.1f} µs / sample",
           "O(1) / sample", f"{ot['peak_mb']:.1f} MB (bounded)"]]
         + [[f"batch re-fit on {m:,} samples", f"{ms:.1f} ms / refit",
             "O(N) / refit", "O(N) in RAM"] for m, ms in bc]

@@ -6,11 +6,11 @@ Run experiments/download_data.py first, then:
 
 What it does:
   * COVID-19 (Ukraine), early exponential growth phase
-      -> batch fit  y = a*exp(b*t)  with LSI and EDA, plus a SciPy
+      -> batch fit  y = a*exp(b*t)  with LSI and EAC, plus a SciPy
          curve_fit baseline; train on the first 80%, forecast the last 20%.
   * USD/UAH (2014-2015 hryvnia crisis)
-      -> batch fit of the exponential depreciation trend (LSI / EDA);
-      -> EDAFilter streaming: one-step-ahead online forecasting
+      -> batch fit of the exponential depreciation trend (LSI / EAC);
+      -> EACFilter streaming: one-step-ahead online forecasting
          compared with a naive "tomorrow = today" baseline.
 
 Everything is real, downloaded data -- no synthetic signals.
@@ -26,7 +26,7 @@ from scipy.optimize import curve_fit
 from sklearn.model_selection import KFold, cross_val_score
 
 import dtfit as dt
-from dtfit.streaming import EDAFilter
+from dtfit.streaming import EACFilter
 
 DATA_DIR = Path(__file__).resolve().parent / "data"
 
@@ -68,7 +68,7 @@ def experiment_covid() -> None:
     dates, cum = load_csv("covid_ukraine_confirmed.csv")
 
     # Take the clean early-growth window: a 4-week stretch of the take-off with
-    # a ~16x range. A pure exponential is well-conditioned here; LSI/EDA lose
+    # a ~16x range. A pure exponential is well-conditioned here; LSI/EAC lose
     # accuracy when the dynamic range is much larger than this (the empirical
     # spectrum is a Maclaurin fit, so an extreme range is ill-conditioned).
     length = 28
@@ -91,9 +91,9 @@ def experiment_covid() -> None:
     bounds = [(0.2, 5.0), (0.5, 4.0)]  # a, b  (growth)
     results = {}
     res_lsi = dt.fit_lsi(t_tr, ys_tr, "a*exp(b*x)", "x", bounds=bounds)
-    res_eda = dt.fit_eda(t_tr, ys_tr, "a*exp(b*x)", "x", p0=[ys_tr[0], 1.0])
+    res_eac = dt.fit_eac(t_tr, ys_tr, "a*exp(b*x)", "x", p0=[ys_tr[0], 1.0])
     results["LSI"] = res_lsi.coeffs
-    results["EDA"] = res_eda.coeffs
+    results["EAC"] = res_eac.coeffs
 
     # SciPy baseline (Levenberg-Marquardt style nonlinear least squares).
     p_sci, _ = curve_fit(
@@ -122,7 +122,7 @@ def experiment_covid_sklearn() -> None:
     t = np.linspace(0, 1.5, y.size)
     ys = y / y[0]
 
-    reg = dt.NonlineRegressor("a*exp(b*x)", "x", method="eda", p0=[1.0, 1.0])
+    reg = dt.NonlineRegressor("a*exp(b*x)", "x", method="eac", p0=[1.0, 1.0])
     reg.fit(t, ys)
     print(f"  fitted coef_ (a, b): {reg.coef_}")
     print(f"  in-sample R^2      : {reg.score(t, ys):.4f}")
@@ -144,10 +144,10 @@ def experiment_currency_batch() -> None:
 
     bounds = [(0.5, 3.0), (0.1, 4.0)]
     res_lsi = dt.fit_lsi(t, rs, "a*exp(b*x)", "x", bounds=bounds)
-    res_eda = dt.fit_eda(t, rs, "a*exp(b*x)", "x", p0=[1.0, 1.0])
+    res_eac = dt.fit_eac(t, rs, "a*exp(b*x)", "x", p0=[1.0, 1.0])
 
     print(f"\n{'method':18s} {'a':>10s} {'b':>10s}   {'fit over full window':^34s}")
-    for name, coeffs in [("LSI", res_lsi.coeffs), ("EDA", res_eda.coeffs)]:
+    for name, coeffs in [("LSI", res_lsi.coeffs), ("EAC", res_eac.coeffs)]:
         a, b = coeffs
         pred = a * np.exp(b * t) * r0
         print(f"{name:18s} {a:10.4f} {b:10.4f}   {fmt(metrics(rate, pred)):^34s}")
@@ -157,7 +157,7 @@ def experiment_currency_batch() -> None:
 # 2b. USD/UAH  --  streaming one-step-ahead forecasting
 # --------------------------------------------------------------------------- #
 def experiment_currency_streaming() -> None:
-    rule("USD/UAH 2014-2015 -- EDAFilter online tracking (bounded cost)")
+    rule("USD/UAH 2014-2015 -- EACFilter online tracking (bounded cost)")
     dates, rate = load_csv("usd_uah_2014_2015.csv")
     n = rate.size
     window = 30
@@ -168,7 +168,7 @@ def experiment_currency_streaming() -> None:
     r0 = rate[0]
     rs = rate / r0  # scale to O(1)
 
-    flt = EDAFilter(
+    flt = EACFilter(
         "a*exp(b*x)", "x", p0=[1.0, 0.0],
         window_size=window, q_diag=[5e-3, 5e-3], r=0.5,
     )

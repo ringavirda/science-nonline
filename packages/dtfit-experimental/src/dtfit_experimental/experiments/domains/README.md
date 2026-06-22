@@ -1,6 +1,6 @@
 # experiments/domains — per-domain validation of the merged dtfit methods
 
-`experiments/cases/` answers *"does each EDA/LSI adaptation work in isolation?"*
+`experiments/cases/` answers *"does each EAC/LSI adaptation work in isolation?"*
 (one optimization or structural idea per folder, scored on the promotion matrix).
 This suite answers the next question a practitioner asks:
 
@@ -22,10 +22,10 @@ domain-standard methods compared against, and includes **real-data** tests.
 
 | domain | dtfit methods tested | compared against | data |
 |--------|----------------------|------------------|------|
-| [`forecasting/`](forecasting/report.md) | LSI, EDA, #2 Fourier-LSI, #5 boosting, auto-merged pipeline | random walk, seasonal-naïve, drift, poly-extrap, Holt-Winters ETS, Theta, (S)ARIMA, MLP, LSTM | 12 series × 2 horizons (structurally-correct model per series): 8 measured (COVID, USD/UAH, sunspots, CO₂, El Niño, Nile, ETTh1, weather) + **4 physics/signal waveforms** (RLC ring-down transient, AC + harmonics, AM carrier, linear chirp) |
-| [`parameter_estimation/`](parameter_estimation/report.md) | LSI, EDA, #6 adaptive-EDA, #3 ensemble, #4 joint, merged selector | SciPy NLLS (LM), robust NLLS (soft-L1), MLP, Gaussian process | 16 nonlinear model families + applicability map; noise & outlier sweeps; sparse/transient/short-record/multi-channel; real COVID & USD/UAH rate recovery |
-| [`big_data/`](big_data/report.md) | GEMM batch (`fit_lsi_batched`), fused streaming `PartitionedBatchLSI`, distributed `merge` (#1), streaming `EDAFilter` | per-channel SciPy NLLS, vectorised polynomial `lstsq`, sklearn `SGDRegressor.partial_fit`, recursive least squares | 4 multi-channel panels + **real 321-channel** electricity; GB-scale memory wall, numerical stability, mergeability, online cost |
-| [`embedded_control/`](embedded_control/report.md) | `EDAFilter`, `LSIFilter`, `FilterBank` + fused χ² detector, `inflate` | Extended Kalman Filter, Recursive Least Squares, constant-accel Kalman, sliding-window refit | 4 plant shapes + applicability map; robustness (noise/outliers/dropout); multi-axis fault detection; deployable footprint; **real USD/UAH** streaming |
+| [`forecasting/`](forecasting/report.md) | LSI, EAC, #2 Fourier-LSI, #5 boosting, auto-merged pipeline | random walk, seasonal-naïve, drift, poly-extrap, Holt-Winters ETS, Theta, (S)ARIMA, MLP, LSTM | 12 series × 2 horizons (structurally-correct model per series): 8 measured (COVID, USD/UAH, sunspots, CO₂, El Niño, Nile, ETTh1, weather) + **4 physics/signal waveforms** (RLC ring-down transient, AC + harmonics, AM carrier, linear chirp) |
+| [`parameter_estimation/`](parameter_estimation/report.md) | LSI, EAC, #6 adaptive-EAC, #3 ensemble, #4 joint, merged selector | SciPy NLLS (LM), robust NLLS (soft-L1), MLP, Gaussian process | 16 nonlinear model families + applicability map; noise & outlier sweeps; sparse/transient/short-record/multi-channel; real COVID & USD/UAH rate recovery |
+| [`big_data/`](big_data/report.md) | GEMM batch (`fit_lsi_batched`), fused streaming `PartitionedBatchLSI`, distributed `merge` (#1), streaming `EACFilter` | per-channel SciPy NLLS, vectorised polynomial `lstsq`, sklearn `SGDRegressor.partial_fit`, recursive least squares | 4 multi-channel panels + **real 321-channel** electricity; GB-scale memory wall, numerical stability, mergeability, online cost |
+| [`embedded_control/`](embedded_control/report.md) | `EACFilter`, `LSIFilter`, `FilterBank` + fused χ² detector, `inflate` | Extended Kalman Filter, Recursive Least Squares, constant-accel Kalman, sliding-window refit | 4 plant shapes + applicability map; robustness (noise/outliers/dropout); multi-axis fault detection; deployable footprint; **real USD/UAH** streaming |
 
 ## Run
 

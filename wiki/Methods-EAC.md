@@ -1,15 +1,15 @@
-# EDA -- Equal Differential Areas (equal areas)
+# EAC -- Equal-Areas Criterion
 
 > Numeric batch method, successor to the symbolic DSBE. Source:
-> [`methods/_eda.py`](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit/src/dtfit/methods/_eda.py).
-> Invoke via `fit_eda(x, y, expr, var, ...)`, the curvature variant
-> `fit_eda_adaptive(...)`, or `NonlineRegressor(..., method="eda")`.
+> [`methods/_eac.py`](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit/src/dtfit/methods/_eac.py).
+> Invoke via `fit_eac(x, y, expr, var, ...)`, the curvature variant
+> `fit_eac_adaptive(...)`, or `NonlineRegressor(..., method="eac")`.
 
-EDA identifies parameters by matching **integral areas** of the model and the
+EAC identifies parameters by matching **integral areas** of the model and the
 data over a set of windows, rather than matching spectra pointwise. Because
-integration is a smoothing (low-pass) operator, EDA never differentiates the data
+integration is a smoothing (low-pass) operator, EAC never differentiates the data
 and is the **most noise-robust** of the batch methods. It is also the fastest, and
-is the basis of the streaming [EDAFilter](Methods-Equal-Areas-Filter).
+is the basis of the streaming [EACFilter](Methods-Equal-Areas-Filter).
 
 ## Mathematical grounding
 
@@ -45,16 +45,16 @@ analytic functions sharing $m$ such independent moments agree where the model ha
 $m$ degrees of freedom, so the parameters are recovered.
 
 **Why it is robust.** Zero-mean observation noise integrates toward zero:
-$\int_{W} \varepsilon(t)\,dt \to 0$ as the window grows. The data enter EDA only
+$\int_{W} \varepsilon(t)\,dt \to 0$ as the window grows. The data enter EAC only
 through their integrals $A_i$, never through a derivative or a high-order
-polynomial fit -- so EDA has none of LSI's ill-conditioned high-order discretes and
+polynomial fit -- so EAC has none of LSI's ill-conditioned high-order discretes and
 degrades gracefully as noise rises. The figure below shows the cumulative integral
 of model and data lying on top of each other even though the raw samples are
 visibly noisy.
 
 ### Overdetermined by default
 
-The original EDA used exactly $M=m$ windows -- a determined system with no
+The original EAC used exactly $M=m$ windows -- a determined system with no
 redundancy, which discards the very noise averaging that integration buys. The
 current method makes $M$ default to **$2m$** (configurable via `n_windows`), an
 **overdetermined** least-squares system. The benefits are concrete:
@@ -73,10 +73,10 @@ three points), and to be $\ge m$ for solvability.
 
 Two placement strategies are shipped:
 
-- **Equal windows** (`fit_eda`): the active region is split into $M$ **equal**
+- **Equal windows** (`fit_eac`): the active region is split into $M$ **equal**
   spans. Simple and well-conditioned for signals whose information is spread
   fairly evenly.
-- **Curvature-adaptive windows** (`fit_eda_adaptive`): window edges are placed so
+- **Curvature-adaptive windows** (`fit_eac_adaptive`): window edges are placed so
   each window carries roughly **equal information**, measured as cumulative
   absolute curvature $|x''(t)|$. Concretely, with $c(t)=\int_0^t |x''|\,ds$
   (a flat floor added so smooth stretches are still covered), the edges are the
@@ -89,13 +89,13 @@ Two placement strategies are shipped:
   variant uses the **full** record (no `active_ratio` clipping), which is part of
   why it captures a saturating asymptote in the tail.
 
-**Left:** `fit_eda_adaptive` recovers a sharp sigmoid step (`k=2.45, x0=4.99`),
+**Left:** `fit_eac_adaptive` recovers a sharp sigmoid step (`k=2.45, x0=4.99`),
 its window edges (dotted) clustering on the bend. **Right:** the placement
 principle -- edges sit at equal *cumulative curvature*, so they bunch where the
 curve bends (green) instead of spreading evenly in `x` (grey). Under heavy noise
 the curvature estimate softens toward equal spacing.
 
-![Adaptive EDA on a sharp sigmoid step](figures/eda_adaptive.png)
+![Adaptive EAC on a sharp sigmoid step](figures/eac_adaptive.png)
 
 ## Algorithm
 
@@ -103,9 +103,9 @@ the curvature estimate softens toward equal spacing.
 2. **Compile once**: `lambdify` the model and each analytic partial derivative
    $\partial f/\partial\theta_j$ (used for the Jacobian).
 3. **Window placement**:
-   - `fit_eda` takes the leading `active_ratio` (default 0.8) of the data and
+   - `fit_eac` takes the leading `active_ratio` (default 0.8) of the data and
      splits it into $M$ equal windows ($M=$ `n_windows`, default $2m$);
-   - `fit_eda_adaptive` places $M$ curvature-weighted edges over the full record.
+   - `fit_eac_adaptive` places $M$ curvature-weighted edges over the full record.
 4. **Data areas**: $A_i = \int_{W_i} y\,dx$ by Simpson's rule
    ([`simpson_windows`](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit/src/dtfit/_core/_kernels.py), the
    compiled kernel).
@@ -118,7 +118,7 @@ the curvature estimate softens toward equal spacing.
 
 ## Robustness to outliers -- the robust loss and `f_scale`
 
-EDA accepts a robust least-squares `loss` (`"soft_l1"`, `"cauchy"`, `"huber"`) for
+EAC accepts a robust least-squares `loss` (`"soft_l1"`, `"cauchy"`, `"huber"`) for
 outlier-contaminated data, with a soft margin `f_scale`. Two facts matter for
 using it correctly:
 
@@ -171,13 +171,13 @@ using it correctly:
 ## Worked example
 
 `y = a.arctan(w.x)` (truth `a=2.0, w=3.0`), a transcendental **non-Taylor**
-saturation curve, with 8 % noise. **Left:** EDA recovers `a≈2.00, w≈2.99` from the
+saturation curve, with 8 % noise. **Left:** EAC recovers `a≈2.00, w≈2.99` from the
 noisy cloud; the shaded bands are the per-parameter integration windows. **Right:**
 the equal-areas criterion -- the cumulative integral of the fitted model (dashed)
-tracks the cumulative integral of the data, which is the quantity EDA actually
+tracks the cumulative integral of the data, which is the quantity EAC actually
 matches.
 
-![EDA fit and the equal-areas criterion](figures/eda_fit.png)
+![EAC fit and the equal-areas criterion](figures/eac_fit.png)
 
 ## Comparison
 
@@ -187,15 +187,15 @@ Error is against the *clean* signal.
 | method | recovered params | R^2 | RMSE | MAPE % | fit (ms) |
 |---|---|---|---|---|---|
 | LSI | a=1.000, b=1.203 | 0.9999 | 0.01133 | 0.24 | 15.3 |
-| **EDA** | a=1.002, b=1.203 | 0.9999 | 0.01641 | 0.41 | 3.4 |
+| **EAC** | a=1.002, b=1.203 | 0.9999 | 0.01641 | 0.41 | 3.4 |
 | SciPy `curve_fit` | a=1.000, b=1.204 | 0.9999 | 0.01305 | 0.25 | 0.1 |
 | numpy.polyfit (deg 5) | -- | 0.9997 | 0.02302 | 0.85 | 0.1 |
 
-EDA recovers the parameters essentially as well as LSI and the NLS gold standard
+EAC recovers the parameters essentially as well as LSI and the NLS gold standard
 while being the **fastest** of the dtfit methods (~=3 ms here -- roughly 5x LSI),
 because it solves a small area-matching system instead of a spectral least-squares
-problem. That speed and its derivative-free robustness are why EDA is the basis of
-the streaming [EDAFilter](Methods-Equal-Areas-Filter).
+problem. That speed and its derivative-free robustness are why EAC is the basis of
+the streaming [EACFilter](Methods-Equal-Areas-Filter).
 
 **Real data -- COVID-19 Ukraine** (28-day take-off, 548->8617 cases),
 `y = a.exp(b.t)`:
@@ -203,20 +203,20 @@ the streaming [EDAFilter](Methods-Equal-Areas-Filter).
 | method | R^2 | RMSE | MAPE % |
 |---|---|---|---|
 | LSI | 0.9877 | 275.1 | 13.00 |
-| **EDA** | 0.8506 | 960.1 | 9.39 |
+| **EAC** | 0.8506 | 960.1 | 9.39 |
 | SciPy `curve_fit` | 0.9879 | 273.5 | 13.34 |
 
 ## Where it is best applied
 
-**Use EDA for:** noise-robust batch fitting of models with **few parameters**
+**Use EAC for:** noise-robust batch fitting of models with **few parameters**
 (2-4); transient signals where the early dynamics carry the information; outlier-
 prone data (with a robust `loss`/`f_scale` and enough windows); and as a fast,
 stable initializer. Prefer it to LSI when the data are noisy enough that a
 polynomial spectrum would be unreliable, or when speed matters. Prefer
-**`fit_eda_adaptive`** for peaks and rational-saturating rises.
+**`fit_eac_adaptive`** for peaks and rational-saturating rises.
 
-**Caveats.** EDA's area criterion partly cancels **oscillations** -- for a cycle
+**Caveats.** EAC's area criterion partly cancels **oscillations** -- for a cycle
 use [LSI](Methods-LSI)'s oscillatory recipe or the streaming
 [LSIFilter](Methods-Legendre-Filter). Like all the spectral/area methods it assumes a
 modest dynamic range -- normalize wide domains first. For real-time tracking of
-*time-varying* parameters, use the recursive [EDAFilter](Methods-Equal-Areas-Filter).
+*time-varying* parameters, use the recursive [EACFilter](Methods-Equal-Areas-Filter).

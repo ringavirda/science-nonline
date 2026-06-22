@@ -10,16 +10,16 @@ This complements [`../REPORTS.md`](Cases-Reports): REPORTS.md is the per-experim
 index + the promotion matrix; this folder is organised **per feature**, tracing
 each one across all the experiments that exercised it.
 
-## Structural adaptations (new ways to compose LSI / EDA)
+## Structural adaptations (new ways to compose LSI / EAC)
 
 | file | adaptation | verdict |
 |---|---|---|
-| [01_map_reduce_partitioned.md](Cases-Analysis-01-Map-Reduce-Partitioned) | #1 map-reduce / partitioned LSI*EDA | **Promoted** |
+| [01_map_reduce_partitioned.md](Cases-Analysis-01-Map-Reduce-Partitioned) | #1 map-reduce / partitioned LSI*EAC | **Promoted** |
 | [02_pluggable_basis.md](Cases-Analysis-02-Pluggable-Basis) | #2 pluggable orthogonal basis | Experimental -- vocabulary, not power |
 | [03_overlapping_ensemble.md](Cases-Analysis-03-Overlapping-Ensemble) | #3 overlapping-window ensemble | Experimental -- partial |
 | [04_joint_multichannel.md](Cases-Analysis-04-Joint-Multichannel) | #4 joint shared-parameter fit | Experimental -- loss where tested |
 | [05_stagewise_boosting.md](Cases-Analysis-05-Stagewise-Boosting) | #5 stage-wise boosting | Experimental -- win, 1 domain |
-| [06_adaptive_window_eda.md](Cases-Analysis-06-Adaptive-Window-EDA) | #6 adaptive-window EDA | **Promoted** (`dtfit.fit_eda_adaptive`) -- domain-validated on transients/peaks |
+| [06_adaptive_window_eac.md](Cases-Analysis-06-Adaptive-Window-EAC) | #6 adaptive-window EAC | **Promoted** (`dtfit.fit_eac_adaptive`) -- domain-validated on transients/peaks |
 
 ## Performance & parallelization optimizations
 

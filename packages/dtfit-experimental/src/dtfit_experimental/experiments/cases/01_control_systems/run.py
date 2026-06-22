@@ -3,7 +3,7 @@
 Recovering the physical parameters of a dynamic system from its noisy response
 is a core control-engineering task. The dtfit methods target exactly the
 transcendental, parameter-nonlinear forms these responses take (a damped
-sinusoid, an exponential approach), so this experiment asks: do LSI/EDA recover
+sinusoid, an exponential approach), so this experiment asks: do LSI/EAC recover
 the true parameters as well as the NLLS gold standard (SciPy ``curve_fit``) and
 better than a black-box neural net, and can the streaming filters track a plant
 whose dynamics change mid-run?
@@ -19,7 +19,7 @@ import numpy as np
 
 import dtfit as dt
 from dtfit_experimental import fit_joint
-from dtfit.streaming import EDAFilter
+from dtfit.streaming import EACFilter
 
 from dtfit_experimental.experiments.common import ReportWriter, metrics, fmt
 from dtfit_experimental.experiments.common.plotting import plt, fit_overlay, residuals, error_bars
@@ -72,8 +72,8 @@ def damped_table(t, y, clean, true):
         preds[label] = pred
 
     from dtfit_experimental.experiments.common import timed
-    r, ms = timed(lambda: dt.fit_eda(t, y, DAMP_EXPR, "t", p0=p0, bounds=(lo, hi)))
-    add("EDA", r.coeffs, np.asarray(r.model(t)), ms)
+    r, ms = timed(lambda: dt.fit_eac(t, y, DAMP_EXPR, "t", p0=p0, bounds=(lo, hi)))
+    add("EAC", r.coeffs, np.asarray(r.model(t)), ms)
     r, ms = timed(lambda: dt.fit_lsi(t, y, DAMP_EXPR, "t", p0=p0,
                                      bounds=list(zip(lo, hi))))
     add("LSI", r.coeffs, np.asarray(r.model(t)), ms)
@@ -97,8 +97,8 @@ def first_order_table(t, y, clean, true):
                      fmt(ms, "{:.0f}")])
         preds[label] = pred
 
-    r, ms = timed(lambda: dt.fit_eda(t, y, FO_EXPR, "t", p0=[1.0, 1.0]))
-    add("EDA", r.coeffs, np.asarray(r.model(t)), ms)
+    r, ms = timed(lambda: dt.fit_eac(t, y, FO_EXPR, "t", p0=[1.0, 1.0]))
+    add("EAC", r.coeffs, np.asarray(r.model(t)), ms)
     r, ms = timed(lambda: dt.fit_lsi(t, y, FO_EXPR, "t", p0=[1.0, 1.0]))
     add("LSI", r.coeffs, np.asarray(r.model(t)), ms)
     def f(tt, K, tau):
@@ -122,7 +122,7 @@ def regime_change(rng, n=900):
     phase = np.cumsum(wd * dtt)
     clean = A * np.exp(-z_arr * w * t) * np.sin(phase)
     y = clean + rng.normal(0, 0.05, n)
-    flt = EDAFilter(DAMP_EXPR, "t", p0=[2.0, 2.5, 0.1],
+    flt = EACFilter(DAMP_EXPR, "t", p0=[2.0, 2.5, 0.1],
                            window_size=60, q_diag=[1e-3, 1e-3, 1e-3], r=0.5,
                            n_sub=2, adapt_r=True)
     track, z_hist, drift_idx = [], [], []
@@ -144,10 +144,10 @@ def mimo_joint(rng, n=200):
              for A in amps]
     j = fit_joint(chans, DAMP_EXPR, "t", shared=["w"], n_windows=6,
                   p0_shared=[2.5], p0_private=[1.0, 0.1])
-    # independent per-channel EDA for contrast
+    # independent per-channel EAC for contrast
     indep_w = []
     for (tx, yx) in chans:
-        r = dt.fit_eda(tx, yx, DAMP_EXPR, "t", p0=[1.0, 2.5, 0.1],
+        r = dt.fit_eac(tx, yx, DAMP_EXPR, "t", p0=[1.0, 2.5, 0.1],
                        bounds=([0.1, 1, 0.01], [5, 6, 0.9]))
         indep_w.append(dict(zip(["A", "w", "z"], r.coeffs))["w"])
     return w_true, amps, j, indep_w, chans, t
@@ -160,7 +160,7 @@ def main(quick: bool = False) -> str:
         intent=(
             "Recover the physical parameters of dynamic systems from noisy "
             "responses and track a plant whose dynamics change online. dtfit's "
-            "LSI/EDA target the transcendental, parameter-nonlinear forms these "
+            "LSI/EAC target the transcendental, parameter-nonlinear forms these "
             "responses take, so we compare parameter-recovery accuracy against "
             "the NLLS gold standard (SciPy `curve_fit`) and a black-box neural "
             "net, and exercise the streaming filter under a regime change."),
@@ -172,7 +172,7 @@ def main(quick: bool = False) -> str:
         "free response of an underdamped second-order linear system. Chosen "
         "because its parameters *are* the physical quantities an engineer wants "
         "(amplitude A, damping ratio ζ, natural frequency ω), and a damped "
-        "sinusoid is exactly the transcendental, non-Taylor form LSI/EDA target.\n"
+        "sinusoid is exactly the transcendental, non-Taylor form LSI/EAC target.\n"
         "- **B (first-order):** `y = K·(1 − e^(−t/τ))` — the textbook step "
         "response of a first-order plant / RC circuit / DC motor; chosen to "
         "recover the DC gain K and time constant τ.\n"
@@ -194,11 +194,11 @@ def main(quick: bool = False) -> str:
     rep.table(["method", "param err %", "R²", "RMSE", "fit (ms)"], rows)
 
     fig, ax = plt.subplots(1, 2, figsize=(11, 3.8))
-    fit_overlay(ax[0], t, y, preds["EDA"], truth=clean,
-                title="EDA fit — damped oscillation", label="EDA fit",
+    fit_overlay(ax[0], t, y, preds["EAC"], truth=clean,
+                title="EAC fit — damped oscillation", label="EAC fit",
                 color="tab:green")
-    residuals(ax[1], t, y, preds["EDA"], title="EDA residuals", color="tab:green")
-    rep.figure(fig, "damped_fit", "EDA recovers the underdamped free response.")
+    residuals(ax[1], t, y, preds["EAC"], title="EAC residuals", color="tab:green")
+    rep.figure(fig, "damped_fit", "EAC recovers the underdamped free response.")
 
     # param-recovery bar chart across methods
     pe = {r[0]: float(r[1]) if r[1] != "--" else np.nan for r in rows}
@@ -228,7 +228,7 @@ def main(quick: bool = False) -> str:
     rep.section(
         "C. Regime change — online tracking + drift detection",
         f"The damping ζ jumps (0.08→0.30) at the midpoint. The "
-        "`EDAFilter` tracks the parameters online with bounded per-sample "
+        "`EACFilter` tracks the parameters online with bounded per-sample "
         f"cost and flagged **{len(drift_idx)}** structural break(s) — a "
         "sliding-window `curve_fit` refit or a batch NN cannot do this in a "
         "real-time loop.")
@@ -264,17 +264,17 @@ def main(quick: bool = False) -> str:
         [["joint (fit_joint)", fmt(j.shared["w"], "{:.3f}"),
           fmt(joint_err, "{:.2f}"),
           ", ".join(f"{p['A']:.2f}" for p in j.private)],
-         ["independent EDA (mean)", fmt(float(np.mean(indep_w)), "{:.3f}"),
+         ["independent EAC (mean)", fmt(float(np.mean(indep_w)), "{:.3f}"),
           fmt(indep_err, "{:.2f}"), ", ".join("--" for _ in amps)]])
 
     rep.section("Reading it", level=2)
     rep.text(
-        "- dtfit's LSI/EDA recover the control parameters within tolerance of "
+        "- dtfit's LSI/EAC recover the control parameters within tolerance of "
         "the NLLS gold standard, while the black-box MLP fits the curve but "
         "yields no physical parameters.\n"
         "- The streaming filter tracks a mid-run dynamics change and flags it — "
         "the real-time capability batch methods lack.\n"
-        f"- Adaptation #4 (joint MIMO): the dedicated bounded EDA solver already "
+        f"- Adaptation #4 (joint MIMO): the dedicated bounded EAC solver already "
         f"recovers ω almost exactly per channel ({indep_err:.2f}% mean error), so "
         f"the coarser joint area-matching ({joint_err:.2f}%) does **not** improve "
         "accuracy on these cleanly-identifiable outputs — its value here is "

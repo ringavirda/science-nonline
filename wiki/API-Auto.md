@@ -39,9 +39,9 @@ signal's *shape* (the parameter-estimation study's merged selector).
 |---|---|
 | `"auto"` | detect a cycle (FFT power share > 0.10) -> oscillatory; else `"bulk"`. `freq_param` given => oscillatory |
 | `"oscillatory"` | [`fit_lsi`](API-Fitting#fit_lsi) with the oscillatory recipe |
-| `"transient"` / `"peak"` | [`fit_eda_adaptive`](API-Fitting#fit_eda_adaptive) (curvature windows) |
-| `"robust"` | [`fit_eda`](API-Fitting#fit_eda) with `loss="soft_l1"` |
-| `"bulk"` | fit both LSI and EDA, keep the lower in-sample RMSE |
+| `"transient"` / `"peak"` | [`fit_eac_adaptive`](API-Fitting#fit_eac_adaptive) (curvature windows) |
+| `"robust"` | [`fit_eac`](API-Fitting#fit_eac) with `loss="soft_l1"` |
+| `"bulk"` | fit both LSI and EAC, keep the lower in-sample RMSE |
 
 **Returns** the `FittingResult` from the selected estimator.
 

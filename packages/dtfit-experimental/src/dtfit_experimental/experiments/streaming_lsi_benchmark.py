@@ -1,8 +1,8 @@
-"""Streaming LSI vs streaming EDA -- head-to-head filter benchmark.
+"""Streaming LSI vs streaming EAC -- head-to-head filter benchmark.
 
 Compares :class:`dtfit.streaming.LSIFilter` (online integral
 least-squares, the streaming counterpart of ``fit_lsi``) against the existing
-:class:`dtfit.streaming.EDAFilter` (online equal-areas) on two synthetic
+:class:`dtfit.streaming.EACFilter` (online equal-areas) on two synthetic
 streams with a known ground truth and a mid-stream parameter drift:
 
   * Scenario A -- exponential growth ``y = a·exp(b·t)`` with a jump in the growth
@@ -36,7 +36,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from dtfit.streaming import EDAFilter, LSIFilter
+from dtfit.streaming import EACFilter, LSIFilter
 
 
 # --------------------------------------------------------------------------- #
@@ -189,9 +189,9 @@ def evaluate(res: dict, sc: Scenario) -> dict:
     }
 
 
-def make_eda(sc: Scenario) -> EDAFilter:
+def make_eac(sc: Scenario) -> EACFilter:
     # n_sub=2 gives the area filter a vector measurement -- its fairest config.
-    return EDAFilter(
+    return EACFilter(
         sc.expr, sc.var, p0=sc.p0, window_size=50,
         q_diag=sc.q_diag, r=sc.r, n_sub=2, adapt_r=True,
     )
@@ -217,7 +217,7 @@ def md_table(headers, rows) -> str:
 
 def main() -> None:
     scenarios = [scenario_exponential(), scenario_sine()]
-    filters = [("EDA (areas, n_sub=2)", make_eda),
+    filters = [("EAC (areas, n_sub=2)", make_eac),
                ("LSI (Legendre, order=5)", make_lsi)]
 
     headers = ["scenario", "filter", "param RMSE", "1-step RMSE",
@@ -236,7 +236,7 @@ def main() -> None:
                 fmt(ev["step_us"], "{:.0f}"),
             ])
 
-    print("\nStreaming LSI vs EDA -- online parameter tracking under drift")
+    print("\nStreaming LSI vs EAC -- online parameter tracking under drift")
     print("(param RMSE is relative, scale-free; lower is better everywhere "
           "except where noted)\n")
     print(md_table(headers, rows))

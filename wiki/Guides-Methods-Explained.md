@@ -16,7 +16,7 @@ Quick map:
 
 - [DSB -- the exact, symbolic reference](#dsb)
 - [LSI -- the accurate batch fitter](#lsi)
-- [EDA -- the robust, fast batch fitter](#eda)
+- [EAC -- the robust, fast batch fitter](#eac)
 - [The streaming filters -- real-time tracking](#streaming)
 
 ---
@@ -74,7 +74,7 @@ model you can differentiate, not just a hand-coded list of exp/sin/cos.
 - **Why it's not for production:** the symbolic solve has unpredictable runtime,
   and it leans on the polynomial's *high-order* coefficients, which are exactly
   the ones noise corrupts most. On noisy data DSB becomes an unreliable curve fit.
-  Use it to derive and validate; use LSI/EDA to actually fit.
+  Use it to derive and validate; use LSI/EAC to actually fit.
 
 ---
 
@@ -161,21 +161,21 @@ isn't, is in [../methods/lsi.md](Methods-LSI).
 
 ---
 
-<a name="eda"></a>
-## EDA -- Equal Differential Areas (the robust, fast one)
+<a name="eac"></a>
+## EAC -- Equal-Areas Criterion (the robust, fast one)
 
-Full math: [../methods/eda.md](Methods-EDA).
+Full math: [../methods/eac.md](Methods-EAC).
 
 ### The intuition
 
-EDA matches the **simplest** fingerprint of all: the **area under the curve**.
+EAC matches the **simplest** fingerprint of all: the **area under the curve**.
 
 Split the data into a handful of consecutive windows. For each window, measure
 the area under the data, and the area under the model. Tune the parameters until
 every window's model-area equals its data-area. That's it -- "equal areas."
 
 Why does so crude a quantity work? Because area is an *integral*, and (from the
-guide) integrals average out noise. EDA never differentiates the data and never
+guide) integrals average out noise. EAC never differentiates the data and never
 builds a wobbly high-order polynomial; it only ever sums the data up. That makes
 it the **most noise-robust** of the batch methods and, because each window is one
 cheap equation, the **fastest**.
@@ -201,15 +201,15 @@ particular weighted combination of its fingerprint numbers. So matching areas
 over $M$ well-placed windows is matching $M$ independent summaries of the
 fingerprint, and once you've matched as many independent summaries as the model
 has free parameters, the model is pinned down (this is a *weak-form*, or Galerkin,
-identification -- the formal statement is in [../methods/eda.md](Methods-EDA)).
+identification -- the formal statement is in [../methods/eac.md](Methods-EAC)).
 
 The robustness has a one-line proof: zero-mean noise integrates toward zero,
-$\int_W \varepsilon(t)\,dt \to 0$ as the window grows. The data enters EDA *only*
+$\int_W \varepsilon(t)\,dt \to 0$ as the window grows. The data enters EAC *only*
 through these integrals, so the noise is gone before the fit even starts.
 
 **Why overdetermine it?** Using more windows than parameters ($2m$ by default)
 means the random per-window integration errors partly cancel across windows,
-lowering the variance of the estimate -- and it lets EDA report a parameter
+lowering the variance of the estimate -- and it lets EAC report a parameter
 **covariance** (uncertainty) from the leftover residuals.
 
 ### Knobs & adaptations
@@ -228,11 +228,11 @@ lowering the variance of the estimate -- and it lets EDA report a parameter
   behaving like plain least squares). See the worked discussion in
   [notebook 02](Notebook-02-Fitting-Methods).
 - `bounds` -- constrained fits (switches to a trust-region solver).
-- **Adaptive windows** (`fit_eda_adaptive`): instead of equal windows, place
+- **Adaptive windows** (`fit_eac_adaptive`): instead of equal windows, place
   window edges by **curvature** -- narrow where the signal bends, wide where it's
   flat -- so each window carries roughly equal information. This is the best
   estimator for localized transients and saturating (Michaelis-Menten / Hill)
-  shapes. -> [api/fitting.md#fit_eda_adaptive](API-Fitting#fit_eda_adaptive)
+  shapes. -> [api/fitting.md#fit_eac_adaptive](API-Fitting#fit_eac_adaptive)
 - **Overlapping-window ensemble** (`ensemble_fit`): when *outliers* contaminate
   the record, fit many overlapping sub-windows and take the **median** of the
   per-window estimates -- whole corrupted windows are simply outvoted, with no
@@ -265,9 +265,9 @@ loop used in GPS and control systems:
   more and the confident ones less -- and update your uncertainty.
 
 The dtfit twist: the "surprise" is **not** a single-point error (which would be
-noisy). It's the **area mismatch over a sliding window** (for `EDAFilter`) or the
+noisy). It's the **area mismatch over a sliding window** (for `EACFilter`) or the
 **spectrum mismatch over the window** (for `LSIFilter`). So even the streaming
-filters inherit EDA/LSI's integrate-don't-differentiate robustness.
+filters inherit EAC/LSI's integrate-don't-differentiate robustness.
 
 ### How it works (per sample)
 
@@ -300,11 +300,11 @@ are detailed in [../methods/equal_areas_filter.md](Methods-Equal-Areas-Filter).
 - `q_diag` -- how fast you allow each parameter to drift.
 - `r` -- how much you trust each measurement.
 - `cusum_k` / `cusum_h` -- drift-detector sensitivity vs false-alarm rate.
-- `n_sub` (EDAFilter) / `order` (LSIFilter) -- split the window into more
+- `n_sub` (EACFilter) / `order` (LSIFilter) -- split the window into more
   sub-measurements for better observability of coupled multi-parameter models.
-- **`LSIFilter` vs `EDAFilter`:** use `LSIFilter` (spectrum measurement) for
+- **`LSIFilter` vs `EACFilter`:** use `LSIFilter` (spectrum measurement) for
   **oscillatory** plants -- the area criterion partly cancels oscillations, so the
-  spectrum is the right fingerprint there; use the cheaper `EDAFilter` for
+  spectrum is the right fingerprint there; use the cheaper `EACFilter` for
   monotone/saturating signals.
 - **`FilterBank` + `FusedChiSquareDetector`** -- run many streams in lockstep and
   pool their surprises to catch a fault that's too weak in any single stream but
@@ -314,7 +314,7 @@ are detailed in [../methods/equal_areas_filter.md](Methods-Equal-Areas-Filter).
 
 ## Side-by-side summary
 
-| | DSB | LSI | EDA | EDAFilter / LSIFilter |
+| | DSB | LSI | EAC | EACFilter / LSIFilter |
 |---|---|---|---|---|
 | **Matches** | exact fingerprint | fingerprint (least-squares, Legendre) | integrated areas / windows | area / spectrum, one sample at a time |
 | **Mode** | symbolic, offline | batch, offline | batch, offline | streaming, online |

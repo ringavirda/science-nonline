@@ -1,6 +1,6 @@
 """Experiment 8 -- GEMM-batched projection throughput (CPU/GPU, resident vs streamed).
 
-The data side of LSI/EDA is an integral ``β_j = ∫ y·φ_j dx`` that factors into a
+The data side of LSI/EAC is an integral ``β_j = ∫ y·φ_j dx`` that factors into a
 single matrix product ``β = Dᵀ·(w⊙y)`` (design matrix ``D``, trapezoid weights
 ``w``). Stacking ``B`` channels that share a grid into the columns of ``Y`` makes
 the whole batch one GEMM ``S = Dᵀ·(w⊙Y)`` -- the recommendation-#2 reframe. This
@@ -155,7 +155,7 @@ def main(quick: bool = False) -> str:
     rep = ReportWriter(
         EXP_DIR, "Experiment 8 — GEMM-batched projection throughput",
         intent=(
-            "Measure the recommendation-#2 reframe: expressing the LSI/EDA "
+            "Measure the recommendation-#2 reframe: expressing the LSI/EAC "
             "projection ∫y·φ_j as a single GEMM `S = Dᵀ·(w⊙Y)` over many channels. "
             "We quantify (1) the batched-GEMM speedup over a per-channel loop on "
             "CPU, (2) the fp32 vs fp64 throughput (the kernel is "
@@ -171,7 +171,7 @@ def main(quick: bool = False) -> str:
         "the workload is deliberately simple and representative:\n"
         "- **Projection benchmark (model-free):** the raw GEMM `S = Dᵀ·(w⊙Y)` on "
         "a Legendre basis (order 6, k=7 coefficients) — chosen because it is the "
-        "exact hot loop shared by LSI, EDA and the promoted `PartitionedLSI`, so "
+        "exact hot loop shared by LSI, EAC and the promoted `PartitionedLSI`, so "
         "its throughput is the thing that bounds big-data fitting.\n"
         "- **Channels:** `y = exp(b·t)` with a spread of rates `b`, stacked as the "
         "columns of `Y` — a canonical, cheap signal that exercises the batched "

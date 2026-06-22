@@ -81,7 +81,7 @@ This notebook gets you to a first fit in a minute. The rest of the series:
 
 | # | Guide |
 |---|-------|
-| 02 | Fitting methods - LSI / EDA / DSB |
+| 02 | Fitting methods - LSI / EAC / DSB |
 | 03 | Model catalog, `suggest_models`, `auto_estimate` / `auto_forecast` |
 | 04 | scikit-learn `NonlineRegressor` |
 | 05 | Streaming / online trackers |
@@ -175,7 +175,7 @@ print(res2.summary())
 NB_02 = [
     md(
         """
-# Fitting methods - LSI, EDA, DSB
+# Fitting methods - LSI, EAC, DSB
 
 Three differential-transformation batch fitters, each with a different
 *measurement* of "fit":
@@ -183,7 +183,7 @@ Three differential-transformation batch fitters, each with a different
 - **LSI** (`fit_lsi`) - integral least-squares in a reconditioned **Legendre
   spectrum**. The general default; strong on smooth bulk shapes and (with the
   oscillatory recipe) cycles.
-- **EDA** (`fit_eda`, `fit_eda_adaptive`) - **equal-areas** integral matching
+- **EAC** (`fit_eac`, `fit_eac_adaptive`) - **equal-areas** integral matching
   over windows. Strong on transients, peaks and saturating shapes; supports
   robust losses for outliers.
 - **DSB** (`fit_dsb`) - symbolic **differential-spectra balance** against a
@@ -237,7 +237,7 @@ plt.title("LSI oscillatory recipe:  A sin(w x + p)"); plt.show()
     ),
     md(
         """
-## EDA - `fit_eda` / `fit_eda_adaptive`
+## EAC - `fit_eac` / `fit_eac_adaptive`
 
 Equal-areas matches *integrals* over windows, so it naturally averages over
 sparse outliers; the `loss="soft_l1"` option adds extra protection under heavier
@@ -248,7 +248,7 @@ transients and peaks.
     ),
     code(
         """
-from dtfit import fit_eda
+from dtfit import fit_eac
 
 x = np.linspace(0, 5, 250)
 y = 3.0 * np.arctan(1.5 * x) + rng.normal(0, 0.1, x.size)   # truth: a=3, w=1.5
@@ -256,29 +256,29 @@ y_out = y.copy()
 idx = rng.choice(x.size, 12, replace=False)
 y_out[idx] += rng.normal(0, 3.0, 12)                        # scattered outliers
 
-res = fit_eda(x, y_out, "a*atan(w*x)", "x", loss="soft_l1")
+res = fit_eac(x, y_out, "a*atan(w*x)", "x", loss="soft_l1")
 print("truth    : {'a': 3.0, 'w': 1.5}")
 print("recovered:", {k: round(v, 3) for k, v in res.params.items()})
 
 plt.scatter(x, y_out, s=10, color="0.6", label="data + outliers")
-plt.plot(x, res.predict(x), "r-", lw=2, label="EDA (soft_l1)")
+plt.plot(x, res.predict(x), "r-", lw=2, label="EAC (soft_l1)")
 plt.plot(x, 3.0 * np.arctan(1.5 * x), "k--", lw=1, label="truth")
-plt.legend(); plt.title("EDA is robust to sparse outliers"); plt.show()
+plt.legend(); plt.title("EAC is robust to sparse outliers"); plt.show()
 """
     ),
     code(
         """
-from dtfit import fit_eda_adaptive
+from dtfit import fit_eac_adaptive
 
 x = np.linspace(0, 6, 300)
 y = 5.0 * x * np.exp(-1.2 * x) + rng.normal(0, 0.03, x.size)   # rise-then-decay peak
 
-res = fit_eda_adaptive(x, y, "a*x*exp(-b*x)", "x", window_mode="curvature")
+res = fit_eac_adaptive(x, y, "a*x*exp(-b*x)", "x", window_mode="curvature")
 print("params:", {k: round(v, 3) for k, v in res.params.items()})
 
 plt.scatter(x, y, s=8, color="0.6")
 plt.plot(x, res.predict(x), "r-", lw=2)
-plt.title("curvature-adaptive EDA on a transient peak"); plt.show()
+plt.title("curvature-adaptive EAC on a transient peak"); plt.show()
 """
     ),
     md(
@@ -318,13 +318,13 @@ plt.title("DSB symbolic differential-spectra balance"); plt.show()
     ),
     code(
         """
-from dtfit import fit_eda
+from dtfit import fit_eac
 from dtfit.diagnostics import fit_report
 
 x = np.linspace(0, 3, 200)
 y = 1.4 * np.exp(0.8 * x) + rng.normal(0, 0.15, x.size)
 for name, r in [("LSI", fit_lsi(x, y, "a*exp(b*x)", "x")),
-                ("EDA", fit_eda(x, y, "a*exp(b*x)", "x"))]:
+                ("EAC", fit_eac(x, y, "a*exp(b*x)", "x"))]:
     rep = fit_report(r, x, y)
     print(f"{name}:  r2={rep['r2']:.4f}   rmse={rep['rmse']:.4f}   aic={rep['aic']:.1f}")
 """
@@ -486,7 +486,7 @@ NB_04 = [
         """
 # scikit-learn estimator - `NonlineRegressor`
 
-`NonlineRegressor` wraps the LSI / EDA / DSB methods behind the standard
+`NonlineRegressor` wraps the LSI / EAC / DSB methods behind the standard
 estimator API (`fit` / `predict` / `score`), so it composes with `Pipeline`,
 `GridSearchCV` and `cross_val_score`. It takes a single input feature (the
 model's variable).
@@ -526,7 +526,7 @@ from sklearn.model_selection import GridSearchCV
 pipe = Pipeline([("fit", NonlineRegressor("a0 + a1*exp(a2*x)", "x"))])
 grid = GridSearchCV(
     pipe,
-    {"fit__method": ["lsi", "eda"], "fit__k_star": [4, 6]},
+    {"fit__method": ["lsi", "eac"], "fit__k_star": [4, 6]},
     cv=3, scoring="r2",
 )
 grid.fit(X, y)
@@ -561,7 +561,7 @@ These estimators ingest one sample at a time with bounded per-update cost
 (`partial_fit(t, y)`), for control loops and big-data streams. Each filter is
 the streaming twin of a batch method and carries built-in **drift detection**.
 
-- `EDAFilter` - streaming equal-areas (twin of `fit_eda`).
+- `EACFilter` - streaming equal-areas (twin of `fit_eac`).
 - `LSIFilter` - streaming Legendre spectrum (twin of `fit_lsi`); same API plus
   an `order=` knob.
 - `FilterBank` - many independent streams updated in lockstep.
@@ -571,7 +571,7 @@ the streaming twin of a batch method and carries built-in **drift detection**.
     PREAMBLE,
     md(
         """
-## `EDAFilter` - track a drifting parameter
+## `EACFilter` - track a drifting parameter
 
 The exponential rate `b` jumps mid-stream; the filter re-adapts (its drift test
 detects the change and re-arms the covariance).
@@ -579,21 +579,21 @@ detects the change and re-arms the covariance).
     ),
     code(
         """
-from dtfit import EDAFilter
+from dtfit import EACFilter
 
 T = 500
 t = np.linspace(0, 8, T)
 b_true = np.where(t < 4, 0.30, 0.55)
 y = np.exp(b_true * t) + rng.normal(0, 0.05, T)
 
-flt = EDAFilter("exp(b*t)", "t", p0=[0.2], window_size=40, q_diag=[1e-4], r=0.5)
+flt = EACFilter("exp(b*t)", "t", p0=[0.2], window_size=40, q_diag=[1e-4], r=0.5)
 track = []
 for ti, yi in zip(t, y):
     flt.partial_fit(ti, yi)
     track.append(flt.p[0])
 
 plt.plot(t, b_true, "k--", label="true b")
-plt.plot(t, track, "r-", lw=1.3, label="EDAFilter estimate")
+plt.plot(t, track, "r-", lw=1.3, label="EACFilter estimate")
 plt.ylim(0, 0.8); plt.legend(); plt.title("online tracking with a mid-stream step")
 plt.xlabel("t"); plt.ylabel("b"); plt.show()
 """
@@ -676,7 +676,7 @@ Per-problem independence makes dtfit embarrassingly parallel. Three tools:
   across CPU cores.
 - `fit_lsi_batched` / `project_spectra` - many channels' projections in one
   GEMM, on a pluggable backend (`numpy` / `cupy` / `torch`).
-- `PartitionedLSI` / `PartitionedEDA` / `PartitionedBatchLSI` - one-pass /
+- `PartitionedLSI` / `PartitionedEAC` / `PartitionedBatchLSI` - one-pass /
   distributed (map-reduce) estimators for streams too big for memory.
 """
     ),

@@ -1,6 +1,6 @@
-"""Experimental EDA/LSI adaptations -- each recovers parameters on a fitting case.
+"""Experimental EAC/LSI adaptations -- each recovers parameters on a fitting case.
 
-The promoted map-reduce estimators (PartitionedLSI / PartitionedEDA) live in
+The promoted map-reduce estimators (PartitionedLSI / PartitionedEAC) live in
 ``dtfit`` now and are tested in the stable suite (``tests/test_partitioned.py``).
 """
 

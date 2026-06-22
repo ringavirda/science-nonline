@@ -34,7 +34,7 @@ baseline in the suite.
 least squares, but large residuals are **down-weighted** by a robust loss
 (soft-L1 / Huber / Cauchy) so a few wild points don't dominate. **Why chosen:** it
 is the *established* way to fit a known model when outliers are present -- the
-direct, fair comparison for EDA's robust-loss and the ensemble adaptation.
+direct, fair comparison for EAC's robust-loss and the ensemble adaptation.
 
 ### `numpy.polyfit` -- polynomial least squares
 **What:** fit a plain polynomial. **How:** linear least squares on powers of `x`.
@@ -117,7 +117,7 @@ numbers in `experiments/06_benchmark_ltsf`, which is the fair way to cite them.)
 
 ## 3. Online / streaming baselines (the real-time foils)
 
-These ingest one sample at a time -- the fair competitors for `EDAFilter` /
+These ingest one sample at a time -- the fair competitors for `EACFilter` /
 `LSIFilter`, which also run online.
 
 ### Extended Kalman Filter for parameters (`EKFParam`)

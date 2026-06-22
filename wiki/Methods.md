@@ -22,16 +22,16 @@ routes to the right variant automatically.
 |------|--------|-----|--------------|------|
 | **reference** | **DSB** -- Differential Spectra Balance | [dsb.md](Methods-DSB) | symbolic (offline) | analytical ground truth / derivation |
 | **batch** | **LSI** -- Least-Squares Integral | [lsi.md](Methods-LSI) | numeric (offline) | accurate batch fit, model selection, pluggable basis, oscillatory recipe |
-| **batch** | **EDA** -- Equal Differential Areas | [eda.md](Methods-EDA) | numeric (offline) | noise-robust / fast batch fit; overdetermined & curvature-adaptive variants |
-| **batch** | **Ensemble** -- overlapping-window aggregation | [ensemble.md](Methods-Ensemble) | numeric (offline) | **outlier-robust** bagging over EDA/LSI window fits (median + spread) |
-| **streaming** | **EDAFilter** -- recursive EDA | [equal_areas_filter.md](Methods-Equal-Areas-Filter) | numeric (online) | real-time tracking via an **area** measurement + drift detection |
+| **batch** | **EAC** -- Equal-Areas Criterion | [eac.md](Methods-EAC) | numeric (offline) | noise-robust / fast batch fit; overdetermined & curvature-adaptive variants |
+| **batch** | **Ensemble** -- overlapping-window aggregation | [ensemble.md](Methods-Ensemble) | numeric (offline) | **outlier-robust** bagging over EAC/LSI window fits (median + spread) |
+| **streaming** | **EACFilter** -- recursive EAC | [equal_areas_filter.md](Methods-Equal-Areas-Filter) | numeric (online) | real-time tracking via an **area** measurement + drift detection |
 | **streaming** | **LSIFilter** -- recursive LSI | [legendre_filter.md](Methods-Legendre-Filter) | numeric (online) | real-time tracking via a **spectrum** measurement (oscillatory plants) |
 | **streaming** | **FilterBank / Fusedchi^2** -- multi-stream | [filter_bank.md](Methods-Filter-Bank) | numeric (online) | many streams in lockstep + pooled multi-axis fault detection |
 | **scale** | **Partitioned / Batched** -- map-reduce & GEMM | [scaling.md](Methods-Scaling) | numeric (offline) | one-pass / distributed / many-channel batch fitting |
 | **compose** | **auto_estimate / auto_forecast** | [auto.md](Methods-Auto) | numeric (offline) | shape-routed estimation and structured forecasting |
 
-The production methods (LSI, EDA, the filters, the scale backends) are **numeric
-successors** to the symbolic originals (DSBI -> LSI, DSBE -> EDA). DSB is kept as
+The production methods (LSI, EAC, the filters, the scale backends) are **numeric
+successors** to the symbolic originals (DSBI -> LSI, DSBE -> EAC). DSB is kept as
 the analytical reference. The split follows the dissertation's hard requirement
 that the **runtime path carry no unbounded symbolic solve** -- SymPy is allowed
 only once, offline, at derivation/initialization time. (For the full lineage --
@@ -62,7 +62,7 @@ So $X(k)$ is the $k$-th Maclaurin coefficient of $x$, rescaled by $H^k$. The
 transform is a **linear bijection** between an analytic function and its spectrum
 on the radius of convergence: two analytic functions are equal **iff** their
 spectra agree discrete-by-discrete. This is the identity every method below leans
-on -- matching spectra (DSB, LSI), matching integrals of spectra (EDA, the
+on -- matching spectra (DSB, LSI), matching integrals of spectra (EAC, the
 filters), or accumulating spectra additively (the scale backends) all recover the
 function and hence its parameters.
 
@@ -106,13 +106,13 @@ methods go further and replace the monomial spectrum with a better-conditioned
  exact balance  weighted-L2    integral / area   additive over       compose /
  F(k;θ)=Z(k)    of spectra     matching          domain & channels   route
    |              |               |                |                  |
-  DSB            LSI             EDA            Partitioned* /        auto_estimate
+  DSB            LSI             EAC            Partitioned* /        auto_estimate
  (symbolic     (∫ recon.      (∫ over          fit_lsi_batched       auto_forecast
   solve)        error)         windows)         (map-reduce, GEMM)    (shape routing)
                   |               |
           run recursively, one sample at a time
                   |               |
-              LSIFilter        EDAFilter -- FilterBank -- FusedChiSquareDetector
+              LSIFilter        EACFilter -- FilterBank -- FusedChiSquareDetector
            (spectrum meas.)  (area meas.)   (K streams)   (pooled fault test)
 ```
 
@@ -122,10 +122,10 @@ methods go further and replace the monomial spectrum with a better-conditioned
 - **LSI** relaxes the exact balance to a **weighted integral least-squares**
   discrepancy of the two spectra on an orthogonal basis -- numeric, noise-tolerant,
   accurate; with a pluggable basis and an oscillatory recipe.
-- **EDA** matches **integrals (areas)** of model and data over windows rather than
+- **EAC** matches **integrals (areas)** of model and data over windows rather than
   spectra -- integration smooths noise, so it is the most robust; overdetermined by
   default and curvature-adaptive on demand.
-- **EDAFilter / LSIFilter** run EDA / LSI **recursively**, one sample at a time,
+- **EACFilter / LSIFilter** run EAC / LSI **recursively**, one sample at a time,
   with a Kalman-style update and drift detection -- the real-time path; a
   **FilterBank** runs many in lockstep and the **FusedChiSquareDetector** pools
   their innovations.

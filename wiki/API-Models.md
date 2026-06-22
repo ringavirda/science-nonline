@@ -45,8 +45,8 @@ seeder unless you override them.
 |---|---|
 | `"auto"` (default) | routes by `shape` through [`auto_estimate`](API-Auto#auto_estimate) |
 | `"lsi"` | [`fit_lsi`](API-Fitting#fit_lsi) (passing `freq_param`) |
-| `"eda"` | [`fit_eda`](API-Fitting#fit_eda) |
-| `"adaptive"` | [`fit_eda_adaptive`](API-Fitting#fit_eda_adaptive) |
+| `"eac"` | [`fit_eac`](API-Fitting#fit_eac) |
+| `"adaptive"` | [`fit_eac_adaptive`](API-Fitting#fit_eac_adaptive) |
 
 ### `seed(x, y) -> dict`
 The data-driven `{name: (p0, lo, hi)}` seed map (empty if the family has no

@@ -1,4 +1,4 @@
-"""Recursive equal-areas filter -- the streaming counterpart of EDA.
+"""Recursive equal-areas filter -- the streaming counterpart of EAC.
 
 A Kalman-style recursive estimator whose "measurement" is the area innovation
 (experimental minus model area over a sliding window) and whose measurement
@@ -34,7 +34,7 @@ from dtfit._core._kernels import simpson_windows, simpson_windows_rows
 from dtfit.types import InitialGuess
 
 
-class EDAFilter:
+class EACFilter:
     """Online equal-areas parameter tracker with drift detection."""
 
     def __init__(
@@ -167,7 +167,7 @@ class EDAFilter:
             d = np.full_like(t_arr, d, dtype=float)
         return d
 
-    def partial_fit(self, t_new: float, y_new: float) -> "EDAFilter":
+    def partial_fit(self, t_new: float, y_new: float) -> "EACFilter":
         """Ingest one ``(t, y)`` sample and update the estimate in place."""
         self.drift_flag_ = False  # true only on the exact step a drift fires
         self._t.append(float(t_new))

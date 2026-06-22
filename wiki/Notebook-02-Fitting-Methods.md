@@ -1,4 +1,4 @@
-# Fitting methods - LSI, EDA, DSB
+# Fitting methods - LSI, EAC, DSB
 
 Three differential-transformation batch fitters, each with a different
 *measurement* of "fit":
@@ -6,7 +6,7 @@ Three differential-transformation batch fitters, each with a different
 - **LSI** (`fit_lsi`) - integral least-squares in a reconditioned **Legendre
   spectrum**. The general default; strong on smooth bulk shapes and (with the
   oscillatory recipe) cycles.
-- **EDA** (`fit_eda`, `fit_eda_adaptive`) - **equal-areas** integral matching
+- **EAC** (`fit_eac`, `fit_eac_adaptive`) - **equal-areas** integral matching
   over windows. Strong on transients, peaks and saturating shapes; supports
   robust losses for outliers.
 - **DSB** (`fit_dsb`) - symbolic **differential-spectra balance** against a
@@ -96,7 +96,7 @@ plt.title("LSI oscillatory recipe:  A sin(w x + p)"); plt.show()
     
 
 
-## EDA - `fit_eda` / `fit_eda_adaptive`
+## EAC - `fit_eac` / `fit_eac_adaptive`
 
 Equal-areas matches *integrals* over windows, so it naturally averages over
 sparse outliers. For extra protection, `loss="soft_l1"` down-weights windows an
@@ -109,7 +109,7 @@ bends, wide where it is smooth - which suits localized transients and peaks.
 
 
 ```python
-from dtfit import fit_eda
+from dtfit import fit_eac
 
 x = np.linspace(0, 5, 250)
 y = 3.0 * np.arctan(1.5 * x) + rng.normal(0, 0.1, x.size)   # truth: a=3, w=1.5
@@ -123,16 +123,16 @@ y_out[idx] += rng.normal(0, 3.0, 12)                        # scattered outliers
 # the contaminated windows; `f_scale` is set near a clean window's area residual
 # (the default 1.0 dwarfs them and leaves soft_l1 in its quadratic == linear regime).
 common = dict(active_ratio=1.0, n_windows=60)
-lin = fit_eda(x, y_out, "a*atan(w*x)", "x", loss="linear", **common)
-res = fit_eda(x, y_out, "a*atan(w*x)", "x", loss="soft_l1", f_scale=0.05, **common)
+lin = fit_eac(x, y_out, "a*atan(w*x)", "x", loss="linear", **common)
+res = fit_eac(x, y_out, "a*atan(w*x)", "x", loss="soft_l1", f_scale=0.05, **common)
 print("truth   : {'a': 3.0, 'w': 1.5}")
 print("linear  :", {k: round(v, 3) for k, v in lin.params.items()})
 print("soft_l1 :", {k: round(v, 3) for k, v in res.params.items()})
 
 plt.scatter(x, y_out, s=10, color="0.6", label="data + outliers")
-plt.plot(x, res.predict(x), "r-", lw=2, label="EDA (soft_l1)")
+plt.plot(x, res.predict(x), "r-", lw=2, label="EAC (soft_l1)")
 plt.plot(x, 3.0 * np.arctan(1.5 * x), "k--", lw=1, label="truth")
-plt.legend(); plt.title("EDA is robust to sparse outliers"); plt.show()
+plt.legend(); plt.title("EAC is robust to sparse outliers"); plt.show()
 ```
 
     truth   : {'a': 3.0, 'w': 1.5}
@@ -148,17 +148,17 @@ plt.legend(); plt.title("EDA is robust to sparse outliers"); plt.show()
 
 
 ```python
-from dtfit import fit_eda_adaptive
+from dtfit import fit_eac_adaptive
 
 x = np.linspace(0, 6, 300)
 y = 5.0 * x * np.exp(-1.2 * x) + rng.normal(0, 0.03, x.size)   # rise-then-decay peak
 
-res = fit_eda_adaptive(x, y, "a*x*exp(-b*x)", "x", window_mode="curvature")
+res = fit_eac_adaptive(x, y, "a*x*exp(-b*x)", "x", window_mode="curvature")
 print("params:", {k: round(v, 3) for k, v in res.params.items()})
 
 plt.scatter(x, y, s=8, color="0.6")
 plt.plot(x, res.predict(x), "r-", lw=2)
-plt.title("curvature-adaptive EDA on a transient peak"); plt.show()
+plt.title("curvature-adaptive EAC on a transient peak"); plt.show()
 ```
 
     params: {'a': 4.998, 'b': 1.199}
@@ -213,16 +213,16 @@ plt.title("DSB symbolic differential-spectra balance"); plt.show()
 
 
 ```python
-from dtfit import fit_eda
+from dtfit import fit_eac
 from dtfit.diagnostics import fit_report
 
 x = np.linspace(0, 3, 200)
 y = 1.4 * np.exp(0.8 * x) + rng.normal(0, 0.15, x.size)
 for name, r in [("LSI", fit_lsi(x, y, "a*exp(b*x)", "x")),
-                ("EDA", fit_eda(x, y, "a*exp(b*x)", "x"))]:
+                ("EAC", fit_eac(x, y, "a*exp(b*x)", "x"))]:
     rep = fit_report(r, x, y)
     print(f"{name}:  r2={rep['r2']:.4f}   rmse={rep['rmse']:.4f}   aic={rep['aic']:.1f}")
 ```
 
     LSI:  r2=0.9985   rmse=0.1513   aic=-751.4
-    EDA:  r2=0.9985   rmse=0.1515   aic=-750.9
+    EAC:  r2=0.9985   rmse=0.1515   aic=-750.9

@@ -25,11 +25,11 @@ There are **three core fitting methods**, plus a streaming one. They are all the
 same idea (match integral fingerprints) applied differently:
 
 - **LSI** -- the accurate, general-purpose batch fitter. *Start here.*
-- **EDA** -- the fast, most noise-robust batch fitter, best for few-parameter
+- **EAC** -- the fast, most noise-robust batch fitter, best for few-parameter
   transient/saturating shapes.
 - **DSB** -- a symbolic *reference* method, used to derive and check the others;
   not for production.
-- **EDAFilter / LSIFilter** -- the streaming versions: feed one sample at a time,
+- **EACFilter / LSIFilter** -- the streaming versions: feed one sample at a time,
   track parameters that change over time, and detect when the system changes
   regime.
 

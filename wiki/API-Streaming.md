@@ -6,21 +6,21 @@ at construction; each update is pure NumPy. Concept:
 [../guides/methods-explained.md#streaming](Guides-Methods-Explained#streaming);
 math: [../methods/equal_areas_filter.md](Methods-Equal-Areas-Filter).
 
-- [`EDAFilter`](#edafilter) -- area-measurement filter (cheaper; monotone/saturating)
+- [`EACFilter`](#edafilter) -- area-measurement filter (cheaper; monotone/saturating)
 - [`LSIFilter`](#lsifilter) -- spectrum-measurement filter (oscillatory plants)
 - [`FilterBank`](#filterbank) -- many streams in lockstep
 - [`FusedChiSquareDetector`](#fused) -- pooled multi-stream fault detection
 
-Each filter is the **streaming twin of a batch method**: `EDAFilter` <->
-[`fit_eda`](API-Fitting#fit_eda), `LSIFilter` <-> [`fit_lsi`](API-Fitting#fit_lsi).
+Each filter is the **streaming twin of a batch method**: `EACFilter` <->
+[`fit_eac`](API-Fitting#fit_eac), `LSIFilter` <-> [`fit_lsi`](API-Fitting#fit_lsi).
 
 ---
 
 <a name="edafilter"></a>
-## `EDAFilter`
+## `EACFilter`
 
 ```python
-EDAFilter(expr, var, *, p0=None, window_size=50, q_diag=None, r=1.0,
+EACFilter(expr, var, *, p0=None, window_size=50, q_diag=None, r=1.0,
           alpha=0.001, cusum_k=0.5, cusum_h=5.0, n_sub=1,
           adapt_r=False, drift_reset="full", drift_inflation=100.0)
 ```
@@ -58,8 +58,8 @@ parameters and detects drift.
   `last_residual_` -- most recent one-step innovation (NaN until the window fills).
 
 ```python
-from dtfit import EDAFilter
-flt = EDAFilter("a*exp(b*t)", "t", window_size=40)
+from dtfit import EACFilter
+flt = EACFilter("a*exp(b*t)", "t", window_size=40)
 for t, y in stream:
     flt.partial_fit(t, y)
     if flt.drift_flag_:
@@ -78,13 +78,13 @@ LSIFilter(expr, var, *, p0=None, window_size=50, order=5, q_diag=None, r=1.0,
           adapt_r=False, drift_reset="full", drift_inflation=100.0)
 ```
 
-Drop-in sibling of `EDAFilter` with the same `partial_fit` / `predict` / `params_`
+Drop-in sibling of `EACFilter` with the same `partial_fit` / `predict` / `params_`
 API, but the measurement is the window's **Legendre spectrum** (the first
 `order+1` coefficients) instead of a single area. The spectrum captures
 oscillations the area criterion partly cancels, so **use `LSIFilter` for
 oscillatory plants**.
 
-Differs from `EDAFilter` only in:
+Differs from `EACFilter` only in:
 
 | name | default | meaning |
 |---|---|---|
@@ -100,13 +100,13 @@ Differs from `EDAFilter` only in:
 
 ```python
 FilterBank(filters)
-FilterBank.from_model(expr, var, n_streams, *, filter_cls=EDAFilter, **kwargs)
+FilterBank.from_model(expr, var, n_streams, *, filter_cls=EACFilter, **kwargs)
 ```
 
 A bank of `K` independent streaming filters updated in lockstep -- e.g. the x/y/z
 axes of a trajectory, or a sensor array. Build it from a model with
 `from_model` (forwards `**kwargs` to each filter's constructor; `filter_cls` is
-`EDAFilter` or `LSIFilter`).
+`EACFilter` or `LSIFilter`).
 
 **Methods & attributes**
 

@@ -36,7 +36,7 @@ EXPERIMENTS = [
 # Adaptation-effectiveness matrix from the suite (win / partial / loss / n/a).
 # Promotion gate: a clear win on >= 2 distinct application domains.
 ADAPTATIONS = [
-    ("#1 map-reduce LSI/EDA (PartitionedLSI/EDA)",
+    ("#1 map-reduce LSI/EAC (PartitionedLSI/EAC)",
      {"big data": "win", "parallel": "win", "forecasting": "n/a"},
      "PROMOTE — exact one-pass distributed estimator; enables the big-data "
      "scaling law and the parallel map-reduce. Clears the gate."),
@@ -48,7 +48,7 @@ ADAPTATIONS = [
      "phase over long horizons); it did not beat the tuned forecasting baselines."),
     ("#3 overlapping-window ensemble (ensemble_fit)",
      {"noise/outliers": "partial", "gps": "n/a"},
-     "Keep experimental — helps EDA at low outlier rates but unstable once many "
+     "Keep experimental — helps EAC at low outlier rates but unstable once many "
      "windows are corrupted; LSI's built-in smoothing is the more reliable "
      "robustness route."),
     ("#4 joint multi-channel fit (fit_joint)",
@@ -59,7 +59,7 @@ ADAPTATIONS = [
      {"forecasting": "win", "ltsf": "n/a"},
      "Keep experimental — a clear win on CO2 (trend+season) but only one domain "
      "demonstrated; promote if a second domain confirms."),
-    ("#6 adaptive-window EDA (fit_eda_adaptive)",
+    ("#6 adaptive-window EAC (fit_eac_adaptive)",
      {"transient fit": "win"},
      "Keep experimental — recovers localized-transient parameters well; needs "
      "broader evaluation before promotion."),
@@ -69,7 +69,7 @@ ADAPTATIONS = [
 def _extra_sections(results: list[Result]) -> list[str]:
     lines = [
         "\n## Architecture-adaptation effectiveness matrix\n",
-        "Each novel EDA/LSI adaptation, scored across the experiments that "
+        "Each novel EAC/LSI adaptation, scored across the experiments that "
         "exercised it (win / partial / loss / n/a). **Promotion gate**: a clear "
         "win on ≥ 2 distinct application domains.\n",
         "| adaptation | per-domain result | decision |",
@@ -80,7 +80,7 @@ def _extra_sections(results: list[Result]) -> list[str]:
     lines += [
         "\n## Promotion outcome\n",
         "- **Promoted to the stable API:** the map-reduce estimators "
-        "(`PartitionedLSI` / `PartitionedEDA`, adaptation #1) — re-exported from "
+        "(`PartitionedLSI` / `PartitionedEAC`, adaptation #1) — re-exported from "
         "`dtfit` and documented; they cleared the gate (big-data + parallel).\n",
         "- **Kept experimental in `dtfit_experimental`:** #2–#6, with the honest "
         "per-experiment findings above. They remain available and documented but "

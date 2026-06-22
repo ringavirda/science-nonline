@@ -101,7 +101,7 @@ res2 = FittingResult.from_dict(json.loads(blob))   # rebuilt, ready to predict
 
 - The `model` callable broadcasts scalars: a constant model still returns an array
   matching `x`.
-- `cov` is `None` for exactly- or under-determined fits (e.g. EDA with
+- `cov` is `None` for exactly- or under-determined fits (e.g. EAC with
   `n_windows == n_params`); uncertainty methods then raise with a clear message.
 - Parameter **order is by sorted name**, consistently across the whole library --
   so `coeffs`, `names`, and `params` always agree.

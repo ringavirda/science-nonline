@@ -35,9 +35,9 @@ def _errs(name):
         p0, _ = m._seed_arrays(x, y)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            pe = param_err(scn, names, dt.fit_eda(x, y, m.expr, m.var, p0=p0).coeffs)
+            pe = param_err(scn, names, dt.fit_eac(x, y, m.expr, m.var, p0=p0).coeffs)
             ee = param_err(scn, names,
-                           dt.ensemble_fit(x, y, m.expr, m.var, method="eda",
+                           dt.ensemble_fit(x, y, m.expr, m.var, method="eac",
                                            p0=p0).coeffs)
         plain.append(pe)
         ens.append(ee)

@@ -222,7 +222,7 @@ def tanh_step() -> Model:
                  category="sigmoid", seeder=seed)
 
 
-# saturating / rational (curvature on the early rise -> adaptive EDA)
+# saturating / rational (curvature on the early rise -> adaptive EAC)
 def michaelis_menten() -> Model:
     """Enzyme-kinetics saturation ``Vmax*x/(K + x)``."""
     def seed(x, y):

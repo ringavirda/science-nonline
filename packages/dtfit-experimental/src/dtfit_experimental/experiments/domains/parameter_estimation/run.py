@@ -11,12 +11,12 @@ against the established estimation toolkit.
 
 The organising result is an **applicability map** (see "Best estimator per
 family"): with the **shape-matched variant**, dtfit's integral estimators (LSI
-spectrum / EDA area / adaptive-window EDA) **tie the NLLS gold standard across all
+spectrum / EAC area / adaptive-window EAC) **tie the NLLS gold standard across all
 sixteen families**. The variant follows the shape -- oscillatory -> LSI with the
 oscillatory recipe (smoothing off, high order, a frequency seed, exactly as in
-forecasting); peaks / overlapping peaks -> EDA / adaptive-EDA (the spectrum blurs
-overlapping peaks); rational-saturating rises -> adaptive-EDA (curvature windows
-on the early bend); smooth bulk -> LSI / EDA. The only family where pointwise NLLS
+forecasting); peaks / overlapping peaks -> EAC / adaptive-EAC (the spectrum blurs
+overlapping peaks); rational-saturating rises -> adaptive-EAC (curvature windows
+on the early bend); smooth bulk -> LSI / EAC. The only family where pointwise NLLS
 keeps a slight edge is the heavy-tailed Lorentzian. (The previous report's
 'Michaelis-Menten exception' at 151% was a parameter-ordering bug -- the
 name-sorted LSI coefficients zipped to an unsorted name list -- now fixed; MM
@@ -30,10 +30,10 @@ METHODS UNDER TEST (dtfit) -- what each one actually does
   global differential-evolution search precedes local refinement. Oscillatory
   families are fitted with `filter_data=False`, a high `k_star` and an FFT
   frequency seed (the smoothing/low-order default erases a cycle).
-* **EDA** (`fit_eda`) -- equal areas: matches integrated model/data areas over
+* **EAC** (`fit_eac`) -- equal areas: matches integrated model/data areas over
   `2·n_params` windows (overdetermined -> noise-averaging); supports a `soft_l1`
   robust loss.
-* **#6 adaptive-window EDA** (`fit_eda_adaptive`) -- curvature-placed windows
+* **#6 adaptive-window EAC** (`fit_eac_adaptive`) -- curvature-placed windows
   concentrate resolution where the signal bends (a peak / transient).
 * **#3 overlapping-window ensemble** (`ensemble_fit`) -- median of per-window
   fits; rejects outlier-corrupted windows.
@@ -41,7 +41,7 @@ METHODS UNDER TEST (dtfit) -- what each one actually does
   from several weak channels at once.
 * **merged selector** (`merged_estimate`) -- routes each problem to the variant
   matching its shape: shared-parameter -> #4, concentrated transient -> #6,
-  outlier-contaminated -> #3, else the better of LSI / EDA by in-sample fit.
+  outlier-contaminated -> #3, else the better of LSI / EAC by in-sample fit.
 """
 
 from __future__ import annotations
@@ -49,7 +49,7 @@ from __future__ import annotations
 import numpy as np
 
 import dtfit as dt
-from dtfit import fit_eda_adaptive, ensemble_fit  # ensemble_fit promoted to dtfit
+from dtfit import fit_eac_adaptive, ensemble_fit  # ensemble_fit promoted to dtfit
 from dtfit_experimental import fit_joint
 
 from dtfit_experimental.experiments.common import ReportWriter, fmt, metrics
@@ -225,7 +225,7 @@ def gen(model, rng, *, n=220, noise=0.05, outliers=0.0, sparse=False):
     return t, y, clean
 
 
-def _eda_bounds(b):
+def _eac_bounds(b):
     return ([x[0] for x in b], [x[1] for x in b]) if b else None
 
 
@@ -243,23 +243,23 @@ def est_lsi(m, t, y):
     return dict(zip(sorted(m["names"]), r.coeffs))
 
 
-def est_eda(m, t, y, loss="linear"):
+def est_eac(m, t, y, loss="linear"):
     p0 = list(m["p0"]) if m.get("p0") else None
-    r = dt.fit_eda(t, y, m["expr"], "t", p0=p0, bounds=_eda_bounds(m["bounds"]),
+    r = dt.fit_eac(t, y, m["expr"], "t", p0=p0, bounds=_eac_bounds(m["bounds"]),
                    loss=loss)
     return dict(zip(sorted(m["names"]), r.coeffs))
 
 
 def est_adaptive(m, t, y):
     p0 = list(m["p0"]) if m.get("p0") else None
-    r = fit_eda_adaptive(t, y, m["expr"], "t", p0=p0, window_mode="curvature")
+    r = fit_eac_adaptive(t, y, m["expr"], "t", p0=p0, window_mode="curvature")
     return dict(zip(sorted(m["names"]), r.coeffs))
 
 
 def est_ensemble(m, t, y):
-    r = ensemble_fit(t, y, m["expr"], "t", method="eda", n_windows=8,
+    r = ensemble_fit(t, y, m["expr"], "t", method="eac", n_windows=8,
                      overlap=0.5, aggregate="median", p0=m["p0"],
-                     bounds=_eda_bounds(m["bounds"]))
+                     bounds=_eac_bounds(m["bounds"]))
     return dict(zip(sorted(m["names"]), r.coeffs))
 
 
@@ -267,7 +267,7 @@ def est_merged(m, t, y):
     """The merged selector, delegated to the promoted high-level entry point
     :func:`dtfit.auto_estimate`: it routes oscillatory families to the LSI
     oscillatory recipe (``freq_param``) and otherwise keeps the better of LSI /
-    EDA by in-sample fit. (The dedicated regime variants #3/#4/#6 are exercised
+    EAC by in-sample fit. (The dedicated regime variants #3/#4/#6 are exercised
     in Part C.)"""
     r = dt.auto_estimate(t, y, m["expr"], "t", shape="auto",
                          freq_param=m.get("osc") or None,
@@ -276,13 +276,13 @@ def est_merged(m, t, y):
 
 
 def est_nlls(m, t, y):
-    p = bl.scipy_curve_fit(t, y, m["func"], m["p0"], bounds=_eda_bounds(m["bounds"]))
+    p = bl.scipy_curve_fit(t, y, m["func"], m["p0"], bounds=_eac_bounds(m["bounds"]))
     return dict(zip(m["names"], p))
 
 
 def est_robust_nlls(m, t, y):
     p = bl.robust_curve_fit(t, y, m["func"], m["p0"],
-                            bounds=_eda_bounds(m["bounds"]), loss="soft_l1")
+                            bounds=_eac_bounds(m["bounds"]), loss="soft_l1")
     return dict(zip(m["names"], p))
 
 
@@ -296,10 +296,10 @@ def _safe(fn, m, t, y):
 # --------------------------------------------------------------------------- #
 # Part A -- recovery across families (clean), + the applicability map + figures
 # --------------------------------------------------------------------------- #
-A_METHODS = [("dtfit LSI", est_lsi), ("dtfit EDA", est_eda),
-             ("dtfit adaptive-EDA (#6)", est_adaptive),
+A_METHODS = [("dtfit LSI", est_lsi), ("dtfit EAC", est_eac),
+             ("dtfit adaptive-EAC (#6)", est_adaptive),
              ("dtfit merged", est_merged), ("SciPy NLLS (gold)", est_nlls)]
-DT_LABELS = ["dtfit LSI", "dtfit EDA", "dtfit adaptive-EDA (#6)", "dtfit merged"]
+DT_LABELS = ["dtfit LSI", "dtfit EAC", "dtfit adaptive-EAC (#6)", "dtfit merged"]
 
 
 def part_a(rep, rng, quick):
@@ -413,7 +413,7 @@ def _fig_heatmap(rep, models, err):
                "scale clipped at 3%). With the shape-matched variant dtfit ties "
                "NLLS across families; the amber cells are LSI on the "
                "overlapping-peak double-Gaussian and the noisier monotone fits, "
-               "which EDA / adaptive-EDA bring back to green.")
+               "which EAC / adaptive-EAC bring back to green.")
 
 
 # --------------------------------------------------------------------------- #
@@ -424,7 +424,7 @@ def part_b(rep, rng, quick):
 
     noise_levels = [0.02, 0.05, 0.1, 0.2, 0.3, 0.4]
     sweep_models = ["damped", "gauss", "logistic"]
-    sweep_methods = [("dtfit LSI", est_lsi), ("dtfit EDA", est_eda),
+    sweep_methods = [("dtfit LSI", est_lsi), ("dtfit EAC", est_eac),
                      ("dtfit merged", est_merged), ("SciPy NLLS", est_nlls)]
     if quick:
         noise_levels = [0.02, 0.1, 0.3]
@@ -450,7 +450,7 @@ def part_b(rep, rng, quick):
     rep.section("B1. Parameter error vs noise level", level=3)
     rep.text(
         "Mean parameter-recovery error (over seeds) as the Gaussian noise grows "
-        "to 40%. EDA's area-averaging and LSI's spectral smoothing degrade "
+        "to 40%. EAC's area-averaging and LSI's spectral smoothing degrade "
         "gracefully and track -- often beat -- NLLS as noise rises.")
     rep.figure(fig, "noise_sweep",
                "Parameter error vs noise level (log scale) for three families.")
@@ -459,9 +459,9 @@ def part_b(rep, rng, quick):
     # should matter.
     fracs = [0.0, 0.05, 0.1, 0.2]
     m = next(mm for mm in MODELS if mm["key"] == "damped")
-    rob_methods = [("dtfit EDA", est_eda),
-                   ("dtfit EDA soft-L1",
-                    lambda mm, t, y: est_eda(mm, t, y, loss="soft_l1")),
+    rob_methods = [("dtfit EAC", est_eac),
+                   ("dtfit EAC soft-L1",
+                    lambda mm, t, y: est_eac(mm, t, y, loss="soft_l1")),
                    ("dtfit ensemble (#3)", est_ensemble),
                    ("SciPy NLLS", est_nlls),
                    ("robust NLLS", est_robust_nlls)]
@@ -480,11 +480,11 @@ def part_b(rep, rng, quick):
     ax.set_yscale("log"); ax.legend(fontsize=7); ax.grid(alpha=0.3)
     rep.section("B2. Parameter error vs outlier fraction", level=3)
     rep.text(
-        "With gross outliers, plain EDA's integral averaging is already far more "
+        "With gross outliers, plain EAC's integral averaging is already far more "
         "robust than a pointwise LSI/NLLS, but the dedicated **robust NLLS "
         "(soft-L1) is the clear winner** -- the honest verdict that outliers want "
         "a robust loss, not window ensembling (the #3 ensemble does not reliably "
-        "separate from plain EDA).")
+        "separate from plain EAC).")
     rep.figure(fig2, "outlier_sweep",
                "Parameter error vs outlier fraction (log scale), damped oscillator.")
 
@@ -492,7 +492,7 @@ def part_b(rep, rng, quick):
     t, y, clean = gen(m, rng, n=300, noise=0.30)
     fitrows = []
     for label, pred in [
-        ("dtfit EDA", m["func"](t, *[est_eda(m, t, y)[k] for k in m["names"]])),
+        ("dtfit EAC", m["func"](t, *[est_eac(m, t, y)[k] for k in m["names"]])),
         ("SciPy NLLS", m["func"](t, *[est_nlls(m, t, y)[k] for k in m["names"]])),
         ("sklearn MLP (no params)", bl.mlp_curve(t, y, t)),
         ("Gaussian process (no params)", bl.gp_curve(t, y, t))]:
@@ -513,35 +513,35 @@ def part_c(rep, rng, quick):
     rep.section("C. Special regimes -- where the routing earns its keep")
     rows = []
 
-    # C1 concentrated transient (fast rise, long flat tail) -> adaptive-EDA (#6)
+    # C1 concentrated transient (fast rise, long flat tail) -> adaptive-EAC (#6)
     fo = next(mm for mm in MODELS if mm["key"] == "firstorder")
     fo_t = dict(fo, t=(0, 8), true={"K": 3.0, "tau": 0.4})
     t, y, _ = gen(fo_t, rng, n=400, noise=0.04)
     rows.append(["concentrated transient (fast τ, long tail)",
                  fmt(_safe(est_adaptive, fo_t, t, y), "{:.2f}"),
-                 fmt(_safe(est_eda, fo_t, t, y), "{:.2f}"),
+                 fmt(_safe(est_eac, fo_t, t, y), "{:.2f}"),
                  fmt(_safe(est_nlls, fo_t, t, y), "{:.2f}"),
-                 "adaptive-EDA (#6) -- curvature windows on the transient"])
+                 "adaptive-EAC (#6) -- curvature windows on the transient"])
 
     # C2 sparse / irregular sampling
     dm = next(mm for mm in MODELS if mm["key"] == "damped")
     t, y, _ = gen(dm, rng, n=300, noise=0.05, sparse=True)
     rows.append([f"sparse sampling ({t.size} pts)",
                  fmt(_safe(est_adaptive, dm, t, y), "{:.2f}"),
-                 fmt(_safe(est_eda, dm, t, y), "{:.2f}"),
+                 fmt(_safe(est_eac, dm, t, y), "{:.2f}"),
                  fmt(_safe(est_nlls, dm, t, y), "{:.2f}"),
-                 "EDA -- area criterion tolerant of irregular spacing"])
+                 "EAC -- area criterion tolerant of irregular spacing"])
 
     # C3 short record (few points)
     gm = next(mm for mm in MODELS if mm["key"] == "gauss")
     t, y, _ = gen(gm, rng, n=18, noise=0.05)
     rows.append(["short record (18 pts, gaussian)",
                  fmt(_safe(est_adaptive, gm, t, y), "{:.2f}"),
-                 fmt(_safe(est_eda, gm, t, y), "{:.2f}"),
+                 fmt(_safe(est_eac, gm, t, y), "{:.2f}"),
                  fmt(_safe(est_nlls, gm, t, y), "{:.2f}"),
                  "all comparable -- few points, no clear edge"])
     rep.section("C1-C3. Single-channel regimes (param err %)", level=3)
-    rep.table(["regime", "adaptive-EDA (#6)", "EDA", "SciPy NLLS", "note"], rows)
+    rep.table(["regime", "adaptive-EAC (#6)", "EAC", "SciPy NLLS", "note"], rows)
 
     # C4 multi-channel shared parameter -> joint (#4): a shared decay rate across
     # SHORT, NOISY channels, where each channel alone constrains tau poorly. (A
@@ -558,7 +558,7 @@ def part_c(rep, rng, quick):
     indep = []
     for (tx, yx) in chans:
         try:
-            r = dt.fit_eda(tx, yx, "K*(1-exp(-t/tau))", "t", p0=[1.0, 1.0],
+            r = dt.fit_eac(tx, yx, "K*(1-exp(-t/tau))", "t", p0=[1.0, 1.0],
                            bounds=([0.1, 0.05], [10, 5]))
             indep.append(float(r.coeffs[1]))     # sorted names [K, tau] -> tau
         except Exception:
@@ -570,13 +570,13 @@ def part_c(rep, rng, quick):
                 level=3)
     rep.table(["estimator", "shared τ err %"],
               [["dtfit joint (#4)", fmt(joint_err, "{:.2f}")],
-               [f"independent per-channel EDA (mean, scatter ±{indep_scatter:.2f})",
+               [f"independent per-channel EAC (mean, scatter ±{indep_scatter:.2f})",
                 fmt(indep_err, "{:.2f}")]])
     rep.text(
         "With only 30 noisy points per channel each per-channel τ scatters badly "
         f"(±{indep_scatter:.2f}); the joint fit pools the shared rate across all "
         "four channels into one substantially more accurate estimate — the regime "
-        "#4 is built for. (Adaptive-EDA #6 owns the concentrated transient in "
+        "#4 is built for. (Adaptive-EAC #6 owns the concentrated transient in "
         "C1.) These are the shapes the merged selector routes to #4 and #6.")
 
 
@@ -599,7 +599,7 @@ def part_d(rep, rng):
     expm = dict(expr="a*exp(b*t)", names=["a", "b"], func=_f_expgrow,
                 p0=[float(y[0]), 0.2], bounds=[(1, 1e6), (0.01, 2)])
     drows = []
-    for label, fn in [("dtfit LSI", est_lsi), ("dtfit EDA", est_eda),
+    for label, fn in [("dtfit LSI", est_lsi), ("dtfit EAC", est_eac),
                       ("SciPy NLLS", est_nlls)]:
         try:
             est = fn(expm, t, y)
@@ -623,7 +623,7 @@ def part_d(rep, rng):
     exm = dict(expr="a*exp(b*t)", names=["a", "b"], func=_f_expgrow,
                p0=[1.0, 0.5], bounds=[(0.2, 5), (0.01, 5)])
     d2 = []
-    for label, fn in [("dtfit LSI", est_lsi), ("dtfit EDA", est_eda),
+    for label, fn in [("dtfit LSI", est_lsi), ("dtfit EAC", est_eac),
                       ("SciPy NLLS", est_nlls)]:
         try:
             est = fn(exm, tt, seg)
@@ -700,7 +700,7 @@ def main(quick: bool = False) -> str:
 # applicability map: per-family (best dtfit method, reasoning)
 # --------------------------------------------------------------------------- #
 FAMILY_REASON = {
-    "damped": ("EDA / LSI",
+    "damped": ("EAC / LSI",
                "Oscillation — the frequency lives in the spectrum/area; fitted "
                "with smoothing off, high order and an FFT seed (the forecasting "
                "recipe), it ties NLLS."),
@@ -708,17 +708,17 @@ FAMILY_REASON = {
              "Pure harmonic — LSI's home turf once the cycle is not smoothed "
              "away; a default-smoothed low-order fit gives ~50% error, the osc "
              "recipe gives <1%."),
-    "firstorder": ("EDA / LSI",
+    "firstorder": ("EAC / LSI",
                    "A smooth saturating-exponential bulk; the area criterion "
                    "pins K and τ; ties NLLS."),
-    "biexp": ("EDA",
+    "biexp": ("EAC",
               "Two decay rates read from the integrated curve; ties NLLS (the "
               "rate pair is mildly ill-conditioned for everyone)."),
-    "decay_offset": ("LSI / EDA",
+    "decay_offset": ("LSI / EAC",
                      "Exponential decay to a non-zero baseline (Newton cooling / "
                      "RC discharge to a floor); a smooth bulk shape — the rate and "
                      "the offset come straight out of the integral; ties NLLS."),
-    "expgrow": ("LSI / EDA",
+    "expgrow": ("LSI / EAC",
                 "A monotone bulk shape; the rate sets the whole spectrum; ties "
                 "NLLS."),
     "power": ("LSI",
@@ -727,36 +727,36 @@ FAMILY_REASON = {
                   "KWW relaxation; LSI recovers it moderately — the stretch "
                   "exponent β trades off with τ for every method, so error is "
                   "larger than a plain exponential."),
-    "gauss": ("EDA / adaptive-EDA (#6)",
+    "gauss": ("EAC / adaptive-EAC (#6)",
               "A single peak — the area / curvature criteria concentrate on the "
               "bend where μ and σ are determined; ties NLLS."),
-    "lorentz": ("EDA",
+    "lorentz": ("EAC",
                 "A heavy-tailed resonance — the one family where NLLS keeps a "
                 "slight edge: the tails dominate any global integral, so the width "
                 "γ is a touch harder for the area criterion. Even so dtfit is "
                 "within ~0.1% of NLLS (both well under 0.5%)."),
-    "double_gauss": ("EDA / adaptive-EDA (#6)",
+    "double_gauss": ("EAC / adaptive-EAC (#6)",
                      "Two overlapping peaks: the **area / curvature** criteria "
                      "separate the components and tie NLLS, but the **LSI "
                      "spectrum** struggles (overlapping peaks blur the spectral "
-                     "signature, ~2–3% error) — use EDA, not LSI, for multi-peak "
+                     "signature, ~2–3% error) — use EAC, not LSI, for multi-peak "
                      "shapes."),
-    "logistic": ("LSI / EDA",
+    "logistic": ("LSI / EAC",
                  "Sigmoid — the inflection shapes the integral; ties NLLS."),
-    "gompertz": ("EDA / LSI",
+    "gompertz": ("EAC / LSI",
                  "Asymmetric sigmoid (growth); the bulk determines all three "
                  "parameters; ties NLLS."),
     "weibull": ("LSI",
                 "Reliability CDF (sigmoid); ties NLLS (slightly looser than the "
                 "logistic — the shape exponent k and scale λ partly trade off)."),
-    "mm": ("EDA / adaptive-EDA (#6)",
+    "mm": ("EAC / adaptive-EAC (#6)",
            "Rational saturation. **The old report's 151% 'Michaelis–Menten "
            "exception' was a parameter-ordering bug** (the spectral coefficients "
            "were zipped to the names in the wrong order); with the order fixed the "
            "rational saturation is recovered to ~0.3% — adaptive/curvature windows "
            "put resolution on the early rise where Km is set. It is *not* a "
            "boundary family."),
-    "hill": ("adaptive-EDA (#6) / LSI",
+    "hill": ("adaptive-EAC (#6) / LSI",
              "Rational saturation with a cooperativity exponent; the curvature "
              "windows concentrate on the rise that sets K and nh — ties NLLS "
              "(~0.3%), not a failure."),
@@ -772,16 +772,16 @@ _APPLICABILITY_DOC = (
     "- **oscillatory** (damped, sine) → **LSI** with the *oscillatory recipe* "
     "(smoothing off, high spectral order, an FFT frequency seed); the default "
     "smoothed low-order fit erases the cycle (sine 50% → <1%);\n"
-    "- **peaks / overlapping peaks** (gauss, lorentz, double-gauss) → **EDA / "
-    "adaptive-EDA**; the *area / curvature* criteria localise the bend, whereas "
-    "the LSI *spectrum* blurs overlapping peaks (use EDA there);\n"
-    "- **rational-saturating** (Michaelis–Menten, Hill) → **EDA / adaptive-EDA**; "
+    "- **peaks / overlapping peaks** (gauss, lorentz, double-gauss) → **EAC / "
+    "adaptive-EAC**; the *area / curvature* criteria localise the bend, whereas "
+    "the LSI *spectrum* blurs overlapping peaks (use EAC there);\n"
+    "- **rational-saturating** (Michaelis–Menten, Hill) → **EAC / adaptive-EAC**; "
     "the curvature windows sit on the early rise that sets the scale. **NB:** the "
     "old report's headline 'Michaelis–Menten exception' (151% error) was a "
     "*parameter-ordering bug*, not a real limitation — fixed, MM recovers to "
     "~0.3%;\n"
     "- **smooth bulk** (first-order, bi-exp, growth, power, sigmoids) → "
-    "**LSI / EDA** directly.\n"
+    "**LSI / EAC** directly.\n"
     "The only family where pointwise NLLS keeps a (slight) edge is the "
     "heavy-tailed **Lorentzian**, where the tails dominate any global integral — "
     "and even there dtfit is within ~0.1%.")
@@ -798,21 +798,21 @@ _READING_DOC = (
     "exception: Michaelis–Menten' (151% error) was a **parameter-ordering bug** — "
     "the LSI spectral coefficients (returned in name-sorted order) were zipped to "
     "an unsorted name list, silently swapping Vmax and Km. With the order fixed, "
-    "the rational saturation is recovered to ~0.3% by EDA/adaptive-EDA. The "
+    "the rational saturation is recovered to ~0.3% by EAC/adaptive-EAC. The "
     "estimators carry no intrinsic weakness on rational shapes.\n"
     "- **Variant selection follows shape.** Oscillatory → LSI with the "
     "*oscillatory recipe* (smoothing off, high order, FFT seed: a sinusoid is 50% "
     "error without it, <1% with it — the forecasting lesson); peaks and "
-    "overlapping peaks → EDA / adaptive-EDA (the spectrum blurs overlapping peaks, "
+    "overlapping peaks → EAC / adaptive-EAC (the spectrum blurs overlapping peaks, "
     "so LSI alone is the wrong choice for the double-Gaussian); rational / peaked "
-    "rises → adaptive-EDA, whose curvature windows sit on the informative bend.\n"
-    "- **Robustness.** Across the noise sweep EDA's area-averaging and LSI's "
+    "rises → adaptive-EAC, whose curvature windows sit on the informative bend.\n"
+    "- **Robustness.** Across the noise sweep EAC's area-averaging and LSI's "
     "spectral smoothing degrade gracefully and often beat NLLS as noise rises. "
-    "Under gross outliers plain EDA is already far more robust than a pointwise "
+    "Under gross outliers plain EAC is already far more robust than a pointwise "
     "fit, but the dedicated **robust NLLS (soft-L1) wins** and the #3 window "
-    "ensemble does not reliably separate from plain EDA — outliers want a robust "
+    "ensemble does not reliably separate from plain EAC — outliers want a robust "
     "loss, not ensembling.\n"
-    "- **Regime routing.** Adaptive-window EDA (#6) wins the concentrated "
+    "- **Regime routing.** Adaptive-window EAC (#6) wins the concentrated "
     "transient; the joint fit (#4) pools weak multi-channel evidence into one "
     "consistent shared ω where independent fits scatter — what the merged "
     "selector routes to.\n"
@@ -833,16 +833,16 @@ _METHODS_DOC = (
     "differential-evolution search before local refinement. **Oscillatory "
     "families** are fitted with `filter_data=False`, a high `k_star` and an FFT "
     "frequency seed (else the smoothing/low-order default erases the cycle).\n"
-    "- **EDA** (`fit_eda`) — equal areas over `2·n_params` windows "
+    "- **EAC** (`fit_eac`) — equal areas over `2·n_params` windows "
     "(overdetermined, noise-averaging); supports a `soft_l1` robust loss.\n"
-    "- **#6 adaptive-window EDA** (`fit_eda_adaptive`) — curvature-placed windows "
+    "- **#6 adaptive-window EAC** (`fit_eac_adaptive`) — curvature-placed windows "
     "concentrate resolution on the informative bend (a peak / transient).\n"
     "- **#3 overlapping-window ensemble** (`ensemble_fit`) — median of per-window "
     "fits; rejects outlier-corrupted windows.\n"
     "- **#4 joint multi-channel fit** (`fit_joint`) — one shared parameter "
     "estimated from all channels at once.\n"
     "- **merged selector** (`merged_estimate`) — routes by shape: shared→#4, "
-    "transient→#6, outliers→#3, else the better of LSI / EDA by in-sample fit.")
+    "transient→#6, outliers→#3, else the better of LSI / EAC by in-sample fit.")
 
 _BASELINE_DOC = (
     "- **SciPy `curve_fit`** — Levenberg–Marquardt / trust-region nonlinear "

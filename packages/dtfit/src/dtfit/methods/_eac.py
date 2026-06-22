@@ -1,4 +1,4 @@
-"""EDA -- Equal Differential Areas (equal-areas) fitting.
+"""EAC -- Equal-Areas Criterion fitting.
 
 Numeric successor to the symbolic DSBE method. Identifies model parameters by
 matching integral areas of the model and the data over a set of windows, rather
@@ -8,7 +8,7 @@ directly on raw ``(x, y)`` data.
 
 Overdetermined by default
 -------------------------
-The original EDA used exactly ``n`` windows for ``n`` parameters -- an
+The original EAC used exactly ``n`` windows for ``n`` parameters -- an
 exactly-determined system with no redundancy, which throws away the very noise
 averaging that integration buys. Here the active region is split into
 ``n_windows >= n`` windows (default ``2n``), giving an **overdetermined**
@@ -37,7 +37,7 @@ def _dominant_cycles(x: np.ndarray, y: np.ndarray) -> float:
     Uses the FFT peak above DC. Non-oscillatory shapes (a trend, a single peak,
     a sigmoid) concentrate their energy at/near DC and return ~0-1; a genuine
     oscillation returns roughly its cycle count. Used to auto-scale the window
-    count so windows stay sub-period (see ``fit_eda``).
+    count so windows stay sub-period (see ``fit_eac``).
     """
     if x.size < 8:
         return 0.0
@@ -53,7 +53,7 @@ def _dominant_cycles(x: np.ndarray, y: np.ndarray) -> float:
     return float(freqs[k_peak] * duration)
 
 
-def fit_eda(
+def fit_eac(
     data_x: np.ndarray,
     data_y: np.ndarray,
     expr: str,
@@ -108,7 +108,7 @@ def fit_eda(
     y = np.asarray(data_y, dtype=float)
     if x.size < 2 * n:
         raise RuntimeError(
-            f"Need at least {2 * n} samples to fit {n} parameters via EDA."
+            f"Need at least {2 * n} samples to fit {n} parameters via EAC."
         )
 
     model_func = sp.lambdify((t, *params), f_sym, "numpy")
@@ -143,7 +143,7 @@ def fit_eda(
         dtype=np.intp,
     )
     data_areas_arr = simpson_windows(y[:idx_max], x_active, starts, stops)
-    echo(f"EDA windows: {m} (params: {n})")
+    echo(f"EAC windows: {m} (params: {n})")
 
     def _eval(func: Callable[..., Any], c: np.ndarray) -> np.ndarray:
         v = func(x_active, *c)
@@ -182,7 +182,7 @@ def fit_eda(
             residuals, guess, jac=cast(Any, jacobian), method="lm"
         )
     coeffs = np.asarray(sol.x, dtype=np.float64)
-    echo("EDA fitted coefficients:", coeffs)
+    echo("EAC fitted coefficients:", coeffs)
 
     cov = _covariance(sol.jac, sol.fun, n)
 
@@ -207,7 +207,7 @@ def _curvature_edges(x: np.ndarray, y: np.ndarray, m: int) -> np.ndarray:
     return np.unique(edges)
 
 
-def fit_eda_adaptive(
+def fit_eac_adaptive(
     data_x: np.ndarray,
     data_y: np.ndarray,
     expr: str,
@@ -217,9 +217,9 @@ def fit_eda_adaptive(
     window_mode: str = "curvature",
     p0: InitialGuess = None,
 ) -> FittingResult:
-    """EDA with information-adaptive (curvature-weighted) window placement.
+    """EAC with information-adaptive (curvature-weighted) window placement.
 
-    Where :func:`fit_eda` splits the active region into **equal** windows, this
+    Where :func:`fit_eac` splits the active region into **equal** windows, this
     variant places window edges so each carries roughly equal *information*
     (cumulative absolute curvature): narrow windows where the signal bends and
     wide ones where it is smooth. For signals with a localized transient (a step
@@ -233,7 +233,7 @@ def fit_eda_adaptive(
         expr, var: Model expression and main variable.
         n_windows: Number of area windows (default ``2 * n_params``).
         window_mode: ``"curvature"`` (default, curvature-adaptive edges) or
-            ``"equal"`` (uniform edges, the :func:`fit_eda` baseline placement).
+            ``"equal"`` (uniform edges, the :func:`fit_eac` baseline placement).
         p0: Optional initial guess (defaults to ones).
 
     Returns:
@@ -267,7 +267,7 @@ def fit_eda_adaptive(
         if np.ndim(v) == 0:
             v = np.full_like(x, float(v))
         v = np.ascontiguousarray(v, dtype=float)
-        # See fit_eda: replace a measure-zero singular sample (e.g. x**n*log(x)
+        # See fit_eac: replace a measure-zero singular sample (e.g. x**n*log(x)
         # at x=0) with its finite integral contribution so it cannot poison the
         # window area / Jacobian and stall the solver.
         return np.nan_to_num(v, nan=0.0, posinf=0.0, neginf=0.0)

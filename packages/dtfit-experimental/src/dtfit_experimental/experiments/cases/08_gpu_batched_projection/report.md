@@ -4,12 +4,12 @@
 
 ## Intent
 
-Measure the recommendation-#2 reframe: expressing the LSI/EDA projection ∫y·φ_j as a single GEMM `S = Dᵀ·(w⊙Y)` over many channels. We quantify (1) the batched-GEMM speedup over a per-channel loop on CPU, (2) the fp32 vs fp64 throughput (the kernel is bandwidth-bound), and (3) the honest GPU story — resident vs streamed — for every available backend. The projection is exact (identical to the per-channel loop), so any speedup is real, not a corner cut.
+Measure the recommendation-#2 reframe: expressing the LSI/EAC projection ∫y·φ_j as a single GEMM `S = Dᵀ·(w⊙Y)` over many channels. We quantify (1) the batched-GEMM speedup over a per-channel loop on CPU, (2) the fp32 vs fp64 throughput (the kernel is bandwidth-bound), and (3) the honest GPU story — resident vs streamed — for every available backend. The projection is exact (identical to the per-channel loop), so any speedup is real, not a corner cut.
 
 ## Models fitted & why
 
 This experiment measures *projection throughput*, not fit quality, so the workload is deliberately simple and representative:
-- **Projection benchmark (model-free):** the raw GEMM `S = Dᵀ·(w⊙Y)` on a Legendre basis (order 6, k=7 coefficients) — chosen because it is the exact hot loop shared by LSI, EDA and the promoted `PartitionedLSI`, so its throughput is the thing that bounds big-data fitting.
+- **Projection benchmark (model-free):** the raw GEMM `S = Dᵀ·(w⊙Y)` on a Legendre basis (order 6, k=7 coefficients) — chosen because it is the exact hot loop shared by LSI, EAC and the promoted `PartitionedLSI`, so its throughput is the thing that bounds big-data fitting.
 - **Channels:** `y = exp(b·t)` with a spread of rates `b`, stacked as the columns of `Y` — a canonical, cheap signal that exercises the batched projection across many channels (the GEMM batch dimension).
 
 ## 1. Batched GEMM vs per-channel loop (CPU / BLAS)

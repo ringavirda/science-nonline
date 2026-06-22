@@ -24,9 +24,9 @@ their own amplitude and damping. The promise: coupling makes a shared parameter
 | estimator | shared omega | omega err % | amplitudes |
 |---|---|---|---|
 | **joint (#4)** | 3.327 | **10.90** | 1.12, 2.21, 3.30 |
-| independent EDA (mean) | 2.996 | **0.12** | (per-channel) |
+| independent EAC (mean) | 2.996 | **0.12** | (per-channel) |
 
--> Independent per-channel EDA recovered `ω` to **0.12%**; the joint fit to only
+-> Independent per-channel EAC recovered `ω` to **0.12%**; the joint fit to only
 **10.9%** -- two orders of magnitude worse on the shared parameter it was supposed
 to nail.
 
@@ -64,7 +64,7 @@ been tested**, and this is a subtler gap than it first looks. The GPS experiment
    [09_streaming_filters.md](Cases-Analysis-09-Streaming-Filters)). So GPS produces real
    numbers again.
 2. **But GPS does not actually exercise `fit_joint`.** Its per-axis trajectory
-   path uses *independent* `EDAFilter`s (one per axis), not a joint
+   path uses *independent* `EACFilter`s (one per axis), not a joint
    shared-parameter fit -- the axes don't share a parameter, so there is nothing
    to couple. The experiment's mention of #4 is aspirational, not realized.
 

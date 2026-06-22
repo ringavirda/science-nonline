@@ -12,13 +12,13 @@ Mean wall-clock cost of one steady-state update on this desktop (warmed window, 
 
 | estimator | config | size | us / update | max samples/s (1 core) |
 |---|---|---|---|---|
-| EDAFilter | CA quadratic (GPS axis) | n=3, W=15 | 33.6 | 29,774 |
-| EDAFilter | damped sine (control ID) | n=3, W=50 | 38.5 | 25,945 |
-| EDAFilter | linear (range smoother) | n=2, W=20 | 30.3 | 33,020 |
+| EACFilter | CA quadratic (GPS axis) | n=3, W=15 | 33.6 | 29,774 |
+| EACFilter | damped sine (control ID) | n=3, W=50 | 38.5 | 25,945 |
+| EACFilter | linear (range smoother) | n=2, W=20 | 30.3 | 33,020 |
 | LSIFilter | damped sine | n=3, W=50, ord=5 | 40.9 | 24,423 |
 | CA Kalman (3-axis) | reference | dim=3 | 28.41 | 35,205 |
 
-`FilterBank` is just K of these run together (one per axis/channel/satellite), so its cost and memory are Kx a single filter -- e.g. the 3-axis GPS tracker is 3 `EDAFilter`s. The Legendre filter is the heaviest per step (it projects onto `order+1` orthogonal moments for extra observability); the Kalman is the lightest (no window, no integral). All sit far under any real-time budget.
+`FilterBank` is just K of these run together (one per axis/channel/satellite), so its cost and memory are Kx a single filter -- e.g. the 3-axis GPS tracker is 3 `EACFilter`s. The Legendre filter is the heaviest per step (it projects onto `order+1` orthogonal moments for extra observability); the Kalman is the lightest (no window, no integral). All sit far under any real-time budget.
 
 ## 2. Resident state memory -- the deployable C struct
 
@@ -51,7 +51,7 @@ How the streaming filters stack up against the alternatives you might deploy for
 
 | method | resident state (f32) | grows w/ stream? | per-update compute | on-device adaptation |
 |---|---|---|---|---|
-| dtfit `EDAFilter` x3 | ~636 B | no (fixed window) | 1x (34 us) | yes -- recursive |
+| dtfit `EACFilter` x3 | ~636 B | no (fixed window) | 1x (34 us) | yes -- recursive |
 | dtfit `LSIFilter` | ~484 B + flash tables | no (fixed window) | ~1.2x | yes -- recursive |
 | CA Kalman x3 (gold standard) | ~144 B | no (no window) | 0.85x | yes -- recursive |
 | sliding-window `curve_fit` (LM) | ~window only | no (fixed window) | ~2x (62 us) | refit from scratch / step |

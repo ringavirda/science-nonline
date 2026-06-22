@@ -9,7 +9,7 @@
 Many real systems are **several streams of the same model** -- the x/y/z axes of a
 trajectory, the channels of a sensor array, the outputs of a multi-axis plant. A
 **FilterBank** runs $K$ independent streaming filters
-([EDAFilter](Methods-Equal-Areas-Filter) or [LSIFilter](Methods-Legendre-Filter)) over those
+([EACFilter](Methods-Equal-Areas-Filter) or [LSIFilter](Methods-Legendre-Filter)) over those
 streams in lockstep, and a **FusedChiSquareDetector** pools their per-stream
 innovations into a single fault test with far higher SNR than any one stream.
 
@@ -107,7 +107,7 @@ estimates at bounded cost and (optionally) thread-parallel throughput.
 
 **Add a FusedChiSquareDetector for:** **shared** faults/maneuvers -- a structural
 change that moves all channels together -- which a per-stream detector would miss.
-Pick `filter_cls=LSIFilter` for oscillatory channels, `EDAFilter` for
+Pick `filter_cls=LSIFilter` for oscillatory channels, `EACFilter` for
 monotone ones; set `alpha` (false-alarm rate), `inflate` (re-arm strength), and
 `warmup`/`cooldown` to the stream. Online detection is fundamentally SNR-limited;
 the fusion is precisely the lever that raises the SNR when a fault is shared.

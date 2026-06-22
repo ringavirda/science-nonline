@@ -4,7 +4,7 @@ These estimators ingest one sample at a time with bounded per-update cost
 (`partial_fit(t, y)`), for control loops and big-data streams. Each filter is
 the streaming twin of a batch method and carries built-in **drift detection**.
 
-- `EDAFilter` - streaming equal-areas (twin of `fit_eda`).
+- `EACFilter` - streaming equal-areas (twin of `fit_eac`).
 - `LSIFilter` - streaming Legendre spectrum (twin of `fit_lsi`); same API plus
   an `order=` knob.
 - `FilterBank` - many independent streams updated in lockstep.
@@ -28,28 +28,28 @@ plt.rcParams["grid.alpha"] = 0.3
 rng = np.random.default_rng(0)
 ```
 
-## `EDAFilter` - track a drifting parameter
+## `EACFilter` - track a drifting parameter
 
 The exponential rate `b` jumps mid-stream; the filter re-adapts (its drift test
 detects the change and re-arms the covariance).
 
 
 ```python
-from dtfit import EDAFilter
+from dtfit import EACFilter
 
 T = 500
 t = np.linspace(0, 8, T)
 b_true = np.where(t < 4, 0.30, 0.55)
 y = np.exp(b_true * t) + rng.normal(0, 0.05, T)
 
-flt = EDAFilter("exp(b*t)", "t", p0=[0.2], window_size=40, q_diag=[1e-4], r=0.5)
+flt = EACFilter("exp(b*t)", "t", p0=[0.2], window_size=40, q_diag=[1e-4], r=0.5)
 track = []
 for ti, yi in zip(t, y):
     flt.partial_fit(ti, yi)
     track.append(flt.p[0])
 
 plt.plot(t, b_true, "k--", label="true b")
-plt.plot(t, track, "r-", lw=1.3, label="EDAFilter estimate")
+plt.plot(t, track, "r-", lw=1.3, label="EACFilter estimate")
 plt.ylim(0, 0.8); plt.legend(); plt.title("online tracking with a mid-stream step")
 plt.xlabel("t"); plt.ylabel("b"); plt.show()
 ```

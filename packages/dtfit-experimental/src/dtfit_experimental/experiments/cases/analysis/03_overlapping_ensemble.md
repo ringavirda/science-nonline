@@ -1,6 +1,6 @@
 # #3 — Overlapping-window ensemble + robust aggregation
 
-**Verdict: EXPERIMENTAL — partial.** Helps EDA at *low* outlier rates, but its
+**Verdict: EXPERIMENTAL — partial.** Helps EAC at *low* outlier rates, but its
 aggregation breaks down once many windows are corrupted, and plain **LSI is both
 simpler and more robust**. Does not clear the promotion gate.
 
@@ -20,7 +20,7 @@ also get an empirical uncertainty band for free.
 Exponential family, R² vs the clean signal as a fraction of points become gross
 outliers (Exp 3):
 
-| outlier % | stock EDA | **EDA-ensemble (#3)** | LSI | curve_fit |
+| outlier % | stock EAC | **EAC-ensemble (#3)** | LSI | curve_fit |
 |---|---|---|---|---|
 | 0 | 1.000 | 0.995 | 1.000 | 1.000 |
 | 5 | 0.861 | **0.960** | 0.949 | 0.949 |
@@ -28,11 +28,11 @@ outliers (Exp 3):
 | 15 | 0.551 | **−1.479** | 0.919 | 0.913 |
 | 20 | −0.200 | 0.015 | 0.892 | 0.893 |
 
-The soft-L1 robust-loss variant tracked stock EDA (little benefit).
+The soft-L1 robust-loss variant tracked stock EAC (little benefit).
 
 ## Reading the numbers
 
-- At **≤10% outliers** the ensemble genuinely lifts EDA (0.792 vs 0.622) — the
+- At **≤10% outliers** the ensemble genuinely lifts EAC (0.792 vs 0.622) — the
   bagging works while most windows are clean.
 - At **15%** it *collapses* to R² = −1.48 — worse than doing nothing.
 - **LSI alone holds R² ≈ 0.92 at 20%** — better than the ensemble at every

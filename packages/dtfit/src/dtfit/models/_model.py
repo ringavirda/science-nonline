@@ -17,7 +17,7 @@ import numpy as np
 import sympy as sp
 
 from dtfit.types import FittingResult
-from dtfit.methods import fit_lsi, fit_eda, fit_eda_adaptive
+from dtfit.methods import fit_lsi, fit_eac, fit_eac_adaptive
 from dtfit.auto import auto_estimate
 
 # A seeder reads (x, y) and returns ``{param_name: (p0, lo, hi)}``.
@@ -127,7 +127,7 @@ class Model:
         """Fit this model to ``(x, y)``.
 
         ``method="auto"`` (default) routes by :attr:`shape` through
-        :func:`dtfit.auto_estimate`; ``"lsi"``/``"eda"``/``"adaptive"`` force a
+        :func:`dtfit.auto_estimate`; ``"lsi"``/``"eac"``/``"adaptive"`` force a
         specific engine. Seeds and bounds come from the model's seeder unless
         overridden.
         """
@@ -141,13 +141,13 @@ class Model:
         if method == "lsi":
             return fit_lsi(x, y, self.expr, self.var, p0=p0, bounds=bounds,
                            freq_param=self.freq_param)
-        if method == "eda":
+        if method == "eac":
             eb = ([b[0] for b in bounds], [b[1] for b in bounds]) if bounds else None
-            return fit_eda(x, y, self.expr, self.var, p0=p0, bounds=eb)
+            return fit_eac(x, y, self.expr, self.var, p0=p0, bounds=eb)
         if method == "adaptive":
-            return fit_eda_adaptive(x, y, self.expr, self.var, p0=p0)
+            return fit_eac_adaptive(x, y, self.expr, self.var, p0=p0)
         raise ValueError(
-            f"unknown method {method!r}; expected auto/lsi/eda/adaptive"
+            f"unknown method {method!r}; expected auto/lsi/eac/adaptive"
         )
 
     # composition

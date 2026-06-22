@@ -1,11 +1,11 @@
-# EDAFilter -- recursive (streaming) EDA
+# EACFilter -- recursive (streaming) EAC
 
 > Numeric **online** method -- the deployable real-time path. Source:
-> [`streaming/_eda.py`](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit/src/dtfit/streaming/_eda.py).
-> Invoke via `dt.EDAFilter(expr, var, p0=, window_size=, ...)` then
+> [`streaming/_eac.py`](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit/src/dtfit/streaming/_eac.py).
+> Invoke via `dt.EACFilter(expr, var, p0=, window_size=, ...)` then
 > `flt.partial_fit(t, y)` per sample; `flt.predict(x)`, `flt.params_`.
 
-The EDAFilter runs [EDA](Methods-EDA)'s equal-areas identification
+The EACFilter runs [EAC](Methods-EAC)'s equal-areas identification
 **recursively**, one sample at a time, as a Kalman-style estimator. It tracks
 **time-varying** parameters online at bounded cost per update and carries a
 two-sided **concept-drift detector**. This is the tier that satisfies the
@@ -13,7 +13,7 @@ dissertation's hard requirement -- bounded per-sample latency, no symbolic solve
 on the hot path.
 
 It is the **area-measurement** streaming filter -- the online twin of batch
-[EDA](Methods-EDA). Its sibling, the [LSIFilter](Methods-Legendre-Filter), is the same
+[EAC](Methods-EAC). Its sibling, the [LSIFilter](Methods-Legendre-Filter), is the same
 recursion with a **spectrum** measurement (use it for oscillatory plants, whose
 cycle an area criterion partly cancels). Many streams run in lockstep via a
 [FilterBank](Methods-Filter-Bank), with a pooled multi-axis fault detector.
@@ -23,14 +23,14 @@ cycle an area criterion partly cancels). Many streams run in lockstep via a
 The state is the parameter vector $\theta$, modelled as a random walk
 $\theta_{t} = \theta_{t-1} + w_t$, $w_t\sim\mathcal N(0,Q)$ (the process noise
 $Q$ is what lets parameters drift). Over the current sliding window of length
-$W$, the **measurement** is the EDA area innovation
+$W$, the **measurement** is the EAC area innovation
 
 $$
 e \;=\; \underbrace{\int_W y\,dt}_{S_{\exp}} \;-\; \underbrace{\int_W f(t;\theta)\,dt}_{S_{\text{theor}}},
 $$
 
 experimental minus model area. Its sensitivity to the parameters is the
-**integrated Jacobian** (exactly EDA's)
+**integrated Jacobian** (exactly EAC's)
 
 $$
 h_j \;=\; \int_{W} \frac{\partial f}{\partial\theta_j}(t;\theta)\,dt .
@@ -60,7 +60,7 @@ runs on the scalar full-window innovation (the sum of the additive sub-areas),
 so its careful calibration is untouched.
 
 Because the measurement is an **area** (an integral), the same noise-robustness
-argument as batch EDA applies -- the filter corrects against a denoised integral
+argument as batch EAC applies -- the filter corrects against a denoised integral
 functional of the window, not against a raw sample. The model and its
 derivatives are compiled (`lambdify`) **once in `__init__`**; every
 `partial_fit` is pure NumPy/Simpson at $O(W\cdot m)$ cost, so the hot path
@@ -140,7 +140,7 @@ down).
 
 - **Compile-once** model + derivatives; **bounded $O(W\cdot m)$** per update, no
   SymPy on the hot path -> real-time safe.
-- **Integral (area) measurement** -> inherits EDA's noise robustness.
+- **Integral (area) measurement** -> inherits EAC's noise robustness.
 - Drift guards: **self-standardized** innovation, **decimated** testing,
   **warmup**, **NIS + two-sided CUSUM**, **covariance reset** for fast
   re-adaptation. (See above.)
@@ -166,8 +166,8 @@ flagged **1** structural break.
 
 | method | R^2 | RMSE | MAPE % |
 |---|---|---|---|
-| EDAFilter (lag-1 tracking) | 0.7933 | 2.483 | 9.22 |
-| EDAFilter (1-step-ahead) | 0.7883 | 2.51 | 9.36 |
+| EACFilter (lag-1 tracking) | 0.7933 | 2.483 | 9.22 |
+| EACFilter (1-step-ahead) | 0.7883 | 2.51 | 9.36 |
 | naive random walk (1-step) | 0.9963 | 0.331 | 0.67 |
 
 **Read this honestly.** Daily FX is famously near a random walk, so "tomorrow =
@@ -180,7 +180,7 @@ random walk cannot do.
 
 ## Where it is best applied
 
-**Use the EDAFilter for:** real-time / streaming control loops
+**Use the EACFilter for:** real-time / streaming control loops
 (unmanned/motion control), sensor and economic/currency streams where the model
 parameters drift over time, and any setting that needs **bounded per-sample
 latency** with **automatic regime-change detection**, on **monotone / saturating**
@@ -189,7 +189,7 @@ signals where the cheap area measurement suffices.
 **Caveats.** It tracks parameters at a one-sample lag; it is not a point
 forecaster that will beat a random walk on near-RW series. For **oscillatory**
 plants use the [LSIFilter](Methods-Legendre-Filter) (the area measurement partly cancels
-a cycle). For an accurate *static* batch fit use [LSI](Methods-LSI) or [EDA](Methods-EDA).
+a cycle). For an accurate *static* batch fit use [LSI](Methods-LSI) or [EAC](Methods-EAC).
 Tune `window_size` (smoothing vs responsiveness), `q_diag` (drift speed), `r`
 (measurement trust) and the CUSUM `cusum_k`/`cusum_h` (detection sensitivity vs
 false alarms) to the stream.

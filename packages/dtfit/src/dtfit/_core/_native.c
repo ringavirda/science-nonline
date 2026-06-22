@@ -6,7 +6,7 @@
  * inner loops that the methods repeat thousands of times and that carry heavy
  * per-call Python / scipy overhead:
  *
- *   simpson_windows(y, x, starts, stops)        -> areas               (EDA, EAF)
+ *   simpson_windows(y, x, starts, stops)        -> areas               (EAC, EAF)
  *   simpson_windows_rows(Y, x, starts, stops)   -> areas per row       (Jacobians)
  *   legendre_project(fv, qw, legvander, norm)   -> spectral coeffs     (LSI)
  *

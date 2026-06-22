@@ -1,6 +1,6 @@
 # GEMM-batched projection (CPU / BLAS)
 
-**Verdict: WORKS.** Expressing the LSI/EDA projection as one matrix product over
+**Verdict: WORKS.** Expressing the LSI/EAC projection as one matrix product over
 many channels turns a Python per-channel loop into a single BLAS GEMM -- up to
 ~340x faster on CPU, exact to machine precision, and the form that also unlocks
 the GPU.

@@ -2,10 +2,10 @@
 
 import numpy as np
 
-from dtfit import FittingProblem, fit_many, fit_eda
+from dtfit import FittingProblem, fit_many, fit_eac
 
 
-def _problems(n=6, method="eda"):
+def _problems(n=6, method="eac"):
     rng = np.random.default_rng(0)
     probs = []
     for i in range(n):
@@ -32,7 +32,7 @@ def test_fit_many_matches_direct_fit():
     probs = _problems(n=3)
     res = fit_many(probs, n_jobs=1)
     for p, r in zip(probs, res):
-        direct = fit_eda(p.x, p.y, p.expr, p.var, **p.kwargs)
+        direct = fit_eac(p.x, p.y, p.expr, p.var, **p.kwargs)
         np.testing.assert_allclose(r.coeffs, direct.coeffs, rtol=1e-8, atol=1e-8)
 
 

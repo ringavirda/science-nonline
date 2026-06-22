@@ -41,9 +41,9 @@ went):
 
 | was experimental | now in `dtfit` as |
 |---|---|
-| #1 one-pass / distributed map-reduce | `PartitionedLSI`, `PartitionedEDA` |
+| #1 one-pass / distributed map-reduce | `PartitionedLSI`, `PartitionedEAC` |
 | GEMM-batched multi-channel projection | `fit_lsi_batched`, `project_spectra`, `PartitionedBatchLSI` |
-| #6 curvature-adaptive windows | `fit_eda_adaptive` |
+| #6 curvature-adaptive windows | `fit_eac_adaptive` |
 | the LSI oscillatory recipe | `fit_lsi(oscillatory=..., freq_param=...)`, `fft_frequency_seed` |
 | fused multi-axis fault detection | `FusedChiSquareDetector` |
 | #3 overlapping-window ensemble | `ensemble_fit`, `EnsembleResult` |
@@ -93,16 +93,16 @@ the **per-channel private** parameters estimated locally, solved in a single pas
 More equations per shared unknown means you observe it better than any channel
 could alone.
 
-**The math it rests on.** EDA's area equations are just rows of a least-squares
+**The math it rests on.** EAC's area equations are just rows of a least-squares
 system; rows from different channels referring to the same shared parameter
 simply stack. The stacked system is still linear in the residual/Jacobian
-structure EDA already builds.
+structure EAC already builds.
 
 ### #5 -- Stage-wise residual boosting (`boosted_fit`)
 
 **Intuition.** One parametric form may not capture *both* a trend and a cycle.
 Boosting stages the methods: fit stage 1 (say an LSI exponential/polynomial
-trend), subtract its prediction, fit stage 2 (say an EDA-fitted oscillatory
+trend), subtract its prediction, fit stage 2 (say an EAC-fitted oscillatory
 residual) to what's left, and sum the stages. Each stage stays a cheap,
 well-posed fit, but the composite is more expressive than either method alone.
 
@@ -144,10 +144,10 @@ adaptation earns promotion. The four domains and their honest headline results:
 
 | domain | what it tests | headline result |
 |---|---|---|
-| **Forecasting** | LSI, EDA, Fourier-LSI, boosting, the auto-merged pipeline -- on 12 series x 2 horizons -- vs random walk, seasonal-naive, drift, poly-extrap, Holt-Winters, Theta, (S)ARIMA, MLP, LSTM | dtfit wins where the series has real *extrapolable nonlinear structure*; trails the general learners on near-random-walk / irregular series (and says so) |
-| **Parameter estimation** | LSI, EDA, adaptive-EDA, ensemble, joint, the merged selector -- across 15+ nonlinear model families, noise/outlier/sparse/short/multi-channel regimes, real recovery -- vs NLLS, robust NLLS, MLP, Gaussian process | with the **shape-matched variant**, dtfit's integral estimators **tie the NLLS gold standard** across the families; pointwise NLLS keeps a slight edge only on the heavy-tailed Lorentzian |
+| **Forecasting** | LSI, EAC, Fourier-LSI, boosting, the auto-merged pipeline -- on 12 series x 2 horizons -- vs random walk, seasonal-naive, drift, poly-extrap, Holt-Winters, Theta, (S)ARIMA, MLP, LSTM | dtfit wins where the series has real *extrapolable nonlinear structure*; trails the general learners on near-random-walk / irregular series (and says so) |
+| **Parameter estimation** | LSI, EAC, adaptive-EAC, ensemble, joint, the merged selector -- across 15+ nonlinear model families, noise/outlier/sparse/short/multi-channel regimes, real recovery -- vs NLLS, robust NLLS, MLP, Gaussian process | with the **shape-matched variant**, dtfit's integral estimators **tie the NLLS gold standard** across the families; pointwise NLLS keeps a slight edge only on the heavy-tailed Lorentzian |
 | **Big-data processing** | GEMM batch, fused streaming, distributed merge, streaming filter -- multi-channel panels + a real 321-channel set -- exactness, memory/throughput scaling, numerical stability, mergeability, online cost -- vs per-channel NLLS, vectorized poly lstsq, SGD `partial_fit`, RLS | the additive projection is exact across batch/streaming/distributed routes and scales with bounded memory; trades peak throughput for that bounded memory |
-| **Embedded control** | EDAFilter, LSIFilter, FilterBank + fused chi^2 detector -- 4 plant shapes, robustness profile, multi-axis fault detection, sub-KiB footprint, real streaming -- vs EKF, RLS, constant-accel Kalman, sliding-window refit | the *integral* measurement wins under outliers/dropouts at fixed O(1)/sample cost; online fault detection is SNR-limited (and reported as such) |
+| **Embedded control** | EACFilter, LSIFilter, FilterBank + fused chi^2 detector -- 4 plant shapes, robustness profile, multi-axis fault detection, sub-KiB footprint, real streaming -- vs EKF, RLS, constant-accel Kalman, sliding-window refit | the *integral* measurement wins under outliers/dropouts at fixed O(1)/sample cost; online fault detection is SNR-limited (and reported as such) |
 
 Run: `python -m dtfit_experimental.experiments.domains.run_domains`
 (index: `domains/DOMAINS.md`).

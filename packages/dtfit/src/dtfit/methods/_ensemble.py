@@ -5,12 +5,12 @@ record gives a single estimate with full exposure to outliers. ``ensemble_fit``
 instead fits the model on many **overlapping subwindows** and aggregates the
 per-window coefficients robustly: the **median** of the estimates rejects windows
 corrupted by outliers, and the inter-window spread is a cheap empirical
-uncertainty band. This is bagging over the time axis, applicable to both EDA and
+uncertainty band. This is bagging over the time axis, applicable to both EAC and
 LSI.
 
 When to use it: **outlier-contaminated** data. The median-of-windows aggregation
 rejects whole corrupted windows without the per-problem ``f_scale`` tuning that
-``fit_eda(loss="soft_l1", ...)`` needs -- and stays stable where that robust loss
+``fit_eac(loss="soft_l1", ...)`` needs -- and stays stable where that robust loss
 can diverge. On clean (Gaussian-noise) data prefer a single whole-record fit:
 the ensemble trades a little accuracy there for the outlier robustness, so it is
 a specialised tool rather than the default path.
@@ -24,9 +24,9 @@ import numpy as np
 
 from dtfit.types import FittingResult, InitialGuess
 from ._lsi import fit_lsi
-from ._eda import fit_eda
+from ._eac import fit_eac
 
-_FITTERS: dict[str, Callable[..., FittingResult]] = {"lsi": fit_lsi, "eda": fit_eda}
+_FITTERS: dict[str, Callable[..., FittingResult]] = {"lsi": fit_lsi, "eac": fit_eac}
 
 
 class EnsembleResult(FittingResult):
@@ -67,7 +67,7 @@ def ensemble_fit(
     expr: str,
     var: str,
     *,
-    method: str = "eda",
+    method: str = "eac",
     n_windows: int = 8,
     overlap: float = 0.5,
     aggregate: str = "median",
@@ -79,7 +79,7 @@ def ensemble_fit(
     Args:
         data_x, data_y: Observed samples.
         expr, var: Model expression and main variable.
-        method: Underlying batch fitter, ``"eda"`` (default) or ``"lsi"``.
+        method: Underlying batch fitter, ``"eac"`` (default) or ``"lsi"``.
         n_windows: Target number of overlapping subwindows.
         overlap: Fractional overlap between consecutive windows (``0..0.9``).
         aggregate: ``"median"`` (robust, default) or ``"mean"``.
@@ -94,7 +94,7 @@ def ensemble_fit(
     """
     fitter = _FITTERS.get(method)
     if fitter is None:
-        raise ValueError(f"method must be 'lsi' or 'eda', got {method!r}")
+        raise ValueError(f"method must be 'lsi' or 'eac', got {method!r}")
     if aggregate not in ("median", "mean"):
         raise ValueError(f"aggregate must be 'median' or 'mean', got {aggregate!r}")
     x = np.asarray(data_x, dtype=float)

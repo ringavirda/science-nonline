@@ -8,12 +8,12 @@ This repository is a **monorepo of two distributions**:
 
 | package | path | what it is |
 |---|---|---|
-| **`dtfit`** | [`packages/dtfit`](packages/dtfit) | the stable, published library — the public API (`NonlineRegressor`, `EDAFilter`, `fit_lsi`/`fit_eda`/`fit_dsb`, `PartitionedLSI`/`PartitionedEDA`, streaming filters, the `models` framework + `suggest_models`, `auto_estimate`/`auto_forecast`, diagnostics). |
-| **`dtfit-experimental`** | [`packages/dtfit-experimental`](packages/dtfit-experimental) | experimental EDA/LSI adaptations + the full experiment / validation suite. Depends on `dtfit`; **never ships inside the `dtfit` wheel**. |
+| **`dtfit`** | [`packages/dtfit`](packages/dtfit) | the stable, published library — the public API (`NonlineRegressor`, `EACFilter`, `fit_lsi`/`fit_eac`/`fit_dsb`, `PartitionedLSI`/`PartitionedEAC`, streaming filters, the `models` framework + `suggest_models`, `auto_estimate`/`auto_forecast`, diagnostics). |
+| **`dtfit-experimental`** | [`packages/dtfit-experimental`](packages/dtfit-experimental) | experimental EAC/LSI adaptations + the full experiment / validation suite. Depends on `dtfit`; **never ships inside the `dtfit` wheel**. |
 
 The dependency is one-directional: `dtfit-experimental` → `dtfit`. When an
 experimental adaptation proves itself across the experiment suite it is
-**promoted** — physically moved into `dtfit` (as `PartitionedLSI` / `PartitionedEDA`
+**promoted** — physically moved into `dtfit` (as `PartitionedLSI` / `PartitionedEAC`
 were) and re-exported from there, never imported back out of the experimental
 package.
 

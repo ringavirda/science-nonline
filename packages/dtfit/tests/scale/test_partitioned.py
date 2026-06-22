@@ -1,4 +1,4 @@
-"""Promoted map-reduce estimators (PartitionedLSI / PartitionedEDA).
+"""Promoted map-reduce estimators (PartitionedLSI / PartitionedEAC).
 
 These were validated in the experiment suite and promoted to the stable API, so
 they are tested here against ``dtfit`` directly (not the experimental package).
@@ -7,7 +7,7 @@ they are tested here against ``dtfit`` directly (not the experimental package).
 import numpy as np
 import pytest
 
-from dtfit import PartitionedLSI, PartitionedEDA
+from dtfit import PartitionedLSI, PartitionedEAC
 
 
 @pytest.fixture
@@ -59,9 +59,9 @@ def test_partitioned_lsi_merge_is_associative(exp_stream):
                                atol=1e-9)
 
 
-def test_partitioned_eda_reduce_recovers(exp_stream):
+def test_partitioned_eac_reduce_recovers(exp_stream):
     t, y, (a, b) = exp_stream
-    acc = PartitionedEDA("a*exp(b*t)", "t", domain=(0, 3), n_windows=8)
+    acc = PartitionedEAC("a*exp(b*t)", "t", domain=(0, 3), n_windows=8)
     for xc, yc in zip(np.array_split(t, 5), np.array_split(y, 5)):
         acc.update(xc, yc)
     r = acc.fit(p0=[1.0, 1.0])

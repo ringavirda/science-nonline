@@ -9,11 +9,11 @@ running it -- and every cell runs end-to-end if you do.
 | # | Notebook | Covers |
 |---|----------|--------|
 | 01 | [Quickstart](Notebook-01-Quickstart) | The core idea, a first `fit_lsi`, the `FittingResult` (params, uncertainty, prediction bands), `auto_estimate` |
-| 02 | [Fitting methods](Notebook-02-Fitting-Methods) | `fit_lsi` (+ oscillatory recipe, `fft_frequency_seed`), `fit_eda` / `fit_eda_adaptive`, `fit_dsb` (+ `find_degree`), comparing fits |
+| 02 | [Fitting methods](Notebook-02-Fitting-Methods) | `fit_lsi` (+ oscillatory recipe, `fft_frequency_seed`), `fit_eac` / `fit_eac_adaptive`, `fit_dsb` (+ `find_degree`), comparing fits |
 | 03 | [Models & automatic fitting](Notebook-03-Models-and-Auto) | The model catalog (`models.*`, `CATALOG`), self-seeding `Model.fit`, composition with `+`, `suggest_models`, `auto_estimate`, `auto_forecast` |
 | 04 | [scikit-learn estimator](Notebook-04-Sklearn-Estimator) | `NonlineRegressor` -- `fit`/`predict`/`score`, `Pipeline`, `GridSearchCV`, `cross_val_score` |
-| 05 | [Streaming trackers](Notebook-05-Streaming) | `EDAFilter` / `LSIFilter` (`partial_fit`, drift detection), `FilterBank`, `FusedChiSquareDetector` |
-| 06 | [Scaling](Notebook-06-Scaling) | `fit_many` (+ `FittingProblem`, `BatchFittingResult`), `project_spectra` / `fit_lsi_batched`, `PartitionedLSI` / `PartitionedEDA` / `PartitionedBatchLSI` (one-pass & map-reduce) |
+| 05 | [Streaming trackers](Notebook-05-Streaming) | `EACFilter` / `LSIFilter` (`partial_fit`, drift detection), `FilterBank`, `FusedChiSquareDetector` |
+| 06 | [Scaling](Notebook-06-Scaling) | `fit_many` (+ `FittingProblem`, `BatchFittingResult`), `project_spectra` / `fit_lsi_batched`, `PartitionedLSI` / `PartitionedEAC` / `PartitionedBatchLSI` (one-pass & map-reduce) |
 | 07 | [Diagnostics](Notebook-07-Diagnostics) | `fit_report`, `residual_diagnostics`, `FitDisplay` / `ResidualsDisplay`, `enable_logging`, `to_dict` / `from_dict` |
 
 Between them the notebooks exercise the entire `dtfit` public namespace.

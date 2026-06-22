@@ -16,7 +16,7 @@ def _exp_data(seed=0):
 
 def test_ensemble_recovers_with_spread_and_members():
     t, y, (a, b) = _exp_data()
-    e = dt.ensemble_fit(t, y, "a*exp(b*t)", "t", method="eda", n_windows=6,
+    e = dt.ensemble_fit(t, y, "a*exp(b*t)", "t", method="eac", n_windows=6,
                         p0=[1.0, 1.0])
     assert abs(e.coeffs[1] - b) < 0.2
     assert e.spread.shape == (2,) and np.all(e.spread >= 0)

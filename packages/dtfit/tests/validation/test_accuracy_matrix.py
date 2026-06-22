@@ -8,7 +8,7 @@ Two complementary sweeps, so a doc example cannot land in an unvalidated regime:
   and required to stay competitive with the ``scipy.curve_fit`` gold standard.
 * :func:`test_every_method_runs` -- every batch method on every family must
   return a finite fit (no crash, NaN, or silent solver stall). This is the guard
-  that catches the singular-Jacobian class of bug (e.g. EDA on ``x**n`` at x=0).
+  that catches the singular-Jacobian class of bug (e.g. EAC on ``x**n`` at x=0).
 
 Thresholds are deliberately generous absolute ceilings *plus* a not-much-worse-
 than-baseline clause: tight enough to catch a real regression (a method that
@@ -22,7 +22,7 @@ import warnings
 import numpy as np
 import pytest
 
-from dtfit import fit_lsi, fit_eda, fit_eda_adaptive
+from dtfit import fit_lsi, fit_eac, fit_eac_adaptive
 from accuracy.scenarios import SCENARIOS, NOISE_LEVELS
 from accuracy.harness import (
     ordered_params,
@@ -76,8 +76,8 @@ def test_recovery_matrix(scn, noise):
 
 _METHODS = {
     "lsi": lambda x, y, e, v, p0: fit_lsi(x, y, e, v, p0=p0),
-    "eda": lambda x, y, e, v, p0: fit_eda(x, y, e, v, p0=p0),
-    "adaptive": lambda x, y, e, v, p0: fit_eda_adaptive(x, y, e, v, p0=p0),
+    "eac": lambda x, y, e, v, p0: fit_eac(x, y, e, v, p0=p0),
+    "adaptive": lambda x, y, e, v, p0: fit_eac_adaptive(x, y, e, v, p0=p0),
 }
 _RUN_CASES = [(s, m) for s in SCENARIOS for m in _METHODS]
 _RUN_IDS = [f"{s.name}-{m}" for s, m in _RUN_CASES]

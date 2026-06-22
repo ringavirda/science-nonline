@@ -53,8 +53,8 @@ GH_BLOB = f"https://github.com/{GH_REPO}/blob/main/"
 
 # Words that should be fully upper-cased in generated page titles.
 ACRONYMS = {
-    "lsi", "eda", "dsb", "api", "gpu", "gil", "gemm", "ltsf", "gps",
-    "rlc", "ac", "am", "eda", "id", "cpu", "io",
+    "lsi", "eac", "dsb", "api", "gpu", "gil", "gemm", "ltsf", "gps",
+    "rlc", "ac", "am", "eac", "id", "cpu", "io",
 }
 
 IMG_EXT = {".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp"}
@@ -431,9 +431,9 @@ def make_sidebar() -> str:
             ("Overview", "Methods"),
             ("DSB", "Methods-DSB"),
             ("LSI", "Methods-LSI"),
-            ("EDA", "Methods-EDA"),
+            ("EAC", "Methods-EAC"),
             ("Ensemble", "Methods-Ensemble"),
-            ("EDAFilter", "Methods-Equal-Areas-Filter"),
+            ("EACFilter", "Methods-Equal-Areas-Filter"),
             ("LSIFilter", "Methods-Legendre-Filter"),
             ("Filter bank", "Methods-Filter-Bank"),
             ("Scaling", "Methods-Scaling"),

@@ -174,7 +174,7 @@ Error is against the *clean* signal (true parameter recovery).
 | method | recovered params | R^2 | RMSE | MAPE % | fit (ms) |
 |---|---|---|---|---|---|
 | **LSI** | a=1.000, b=1.203 | 0.9999 | 0.01133 | 0.24 | 15.3 |
-| EDA | a=1.002, b=1.203 | 0.9999 | 0.01641 | 0.41 | 3.4 |
+| EAC | a=1.002, b=1.203 | 0.9999 | 0.01641 | 0.41 | 3.4 |
 | SciPy `curve_fit` | a=1.000, b=1.204 | 0.9999 | 0.01305 | 0.25 | 0.1 |
 | numpy.polyfit (deg 5) | -- | 0.9997 | 0.02302 | 0.85 | 0.1 |
 
@@ -186,7 +186,7 @@ Error is against the *clean* signal (true parameter recovery).
 | method | R^2 | RMSE | MAPE % |
 |---|---|---|---|
 | **LSI** | 0.9877 | 275.1 | 13.00 |
-| EDA | 0.8506 | 960.1 | 9.39 |
+| EAC | 0.8506 | 960.1 | 9.39 |
 | SciPy `curve_fit` | 0.9879 | 273.5 | 13.34 |
 
 LSI lands within a few percent of the NLS gold standard on model data and tracks
@@ -205,6 +205,6 @@ and the model-selection workhorse (its BIC/order machinery underlies
 **Caveats.** The empirical spectrum is a Maclaurin-type fit, so LSI needs a
 **modest dynamic range** -- normalize a wide domain (e.g. to `[0, 1.5]`) and scale
 the series to O(1) before fitting. For real-time/streaming use the
-[LSIFilter](Methods-Legendre-Filter) / [EDAFilter](Methods-Equal-Areas-Filter); for the most
-noise-robust batch fit with few parameters, [EDA](Methods-EDA); at scale (one-pass,
+[LSIFilter](Methods-Legendre-Filter) / [EACFilter](Methods-Equal-Areas-Filter); for the most
+noise-robust batch fit with few parameters, [EAC](Methods-EAC); at scale (one-pass,
 distributed, or many-channel), the [partitioned / batched backends](Methods-Scaling).

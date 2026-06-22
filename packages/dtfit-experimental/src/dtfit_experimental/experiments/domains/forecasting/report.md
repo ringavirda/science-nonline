@@ -4,12 +4,12 @@
 
 ## Intent
 
-Test every applicable dtfit forecasting method (LSI, EDA, #2 Fourier-basis LSI, #5 boosting, and the auto-merged pipeline) against the standard forecasting toolkit (random walk, seasonal naïve, drift, polynomial extrapolation, Holt-Winters ETS, Theta, (S)ARIMA, MLP, LSTM) across twelve series spanning measured data (growth, currency, solar, climate, ocean, hydrology, energy-load) AND physics / signal-processing waveforms (an RLC ring-down transient, an AC power waveform with harmonics, an AM carrier and a linear chirp), at a short and a long horizon. Reported honestly.
+Test every applicable dtfit forecasting method (LSI, EAC, #2 Fourier-basis LSI, #5 boosting, and the auto-merged pipeline) against the standard forecasting toolkit (random walk, seasonal naïve, drift, polynomial extrapolation, Holt-Winters ETS, Theta, (S)ARIMA, MLP, LSTM) across twelve series spanning measured data (growth, currency, solar, climate, ocean, hydrology, energy-load) AND physics / signal-processing waveforms (an RLC ring-down transient, an AC power waveform with harmonics, an AM carrier and a linear chirp), at a short and a long horizon. Reported honestly.
 
 ## Methods under test (dtfit)
 
 - **LSI** (`fit_lsi`) — integral least-squares in the reconditioned Legendre differential-transformation scheme: projects the data onto an orthonormal Legendre basis (its *empirical spectrum*) and solves for the model parameters whose analytic spectrum matches. A smoothing spectral fit. Applied to each series' structural model — exponential/quadratic for the measured datasets, and the **correct physical waveform model** for the signals: a **damped sinusoid** for the RLC ring-down, a **Fourier series** (fundamental + harmonics) for the AC waveform, an **AM model** `(1+m·cos ω_m x)·sin(ω_c x+φ)` for the modulated carrier, and a **chirp** `A·sin(ω₀x + k x² + φ)` for the sweep — fitted at a Fourier-basis order high enough to resolve the highest harmonic.
-- **EDA** (`fit_eda`) — the equal-areas criterion: matches the model's *integrated area* to the data's over a set of windows (overdetermined → noise-averaging). The batch twin of the streaming equal-areas filter.
+- **EAC** (`fit_eac`) — the equal-areas criterion: matches the model's *integrated area* to the data's over a set of windows (overdetermined → noise-averaging). The batch twin of the streaming equal-areas filter.
 - **#2 Fourier-basis LSI** (`fit_lsi_basis`, `basis="fourier"`) — the LSI spectral match on a **Fourier** basis, the natural orthogonal basis for periodic data; a few harmonics express a cycle cleanly.
 - **#5 stage-wise boosting** (`boosted_fit`) — additive stages each fit to the previous residual: a structured **trend** stage (LSI) then a **seasonal** stage (LSI sine), composing trend+season from two simple fits.
 - **merged (auto)** (`merged_forecaster`) — one pipeline, no per-series hand-tuning: it routes the model class (logistic for saturating growth; a joint linear+seasonal fit when an FFT gate finds a cycle; a quadratic level otherwise; physics classes passed through), then applies a **divergence guard** (drop a runaway quadratic to linear) and a **no-structure guard** (persist when the fit cannot beat a random walk on a held-out training tail).
@@ -80,7 +80,7 @@ The single biggest lever in this study is **picking the structurally correct mod
 | Theta | 1599 | 17.11 | -1.908 |
 | MLP | 1636 | 17.23 | -2.045 |
 | LSTM | 1656 | 17.15 | -2.120 |
-| dtfit EDA | 1794 | 20.19 | -2.660 |
+| dtfit EAC | 1794 | 20.19 | -2.660 |
 | random walk | 2169 | 23.15 | -4.355 |
 
 ### USD/UAH (linear_wave)
@@ -99,7 +99,7 @@ The single biggest lever in this study is **picking the structurally correct mod
 | dtfit Fourier-LSI (#2) | 3.026 | 10.43 | -11.309 |
 | dtfit boosted (#5) | 3.662 | 15.72 | -17.029 |
 | poly extrap | 6.269 | 26.77 | -51.831 |
-| dtfit EDA | 75.17 | 313.37 | -7594.594 |
+| dtfit EAC | 75.17 | 313.37 | -7594.594 |
 
 ### Sunspots (sine, seasonal)
 
@@ -119,7 +119,7 @@ The single biggest lever in this study is **picking the structurally correct mod
 | random walk | 70.03 | 82.01 | -0.883 |
 | SARIMA | 75.91 | 69.99 | -1.212 |
 | dtfit Fourier-LSI (#2) | 141.7 | 474.87 | -6.711 |
-| dtfit EDA | 198.6 | 591.31 | -14.151 |
+| dtfit EAC | 198.6 | 591.31 | -14.151 |
 
 ### Mauna Loa CO2 (poly_seasonal, seasonal)
 
@@ -131,7 +131,7 @@ The single biggest lever in this study is **picking the structurally correct mod
 | dtfit merged (auto) | 4.189 | 1.06 | 0.428 |
 | poly extrap | 4.378 | 1.02 | 0.375 |
 | dtfit boosted (#5) | 4.39 | 1.02 | 0.372 |
-| dtfit EDA | 5.779 | 1.36 | -0.089 |
+| dtfit EAC | 5.779 | 1.36 | -0.089 |
 | Theta | 6.068 | 1.40 | -0.200 |
 | ETS (Holt-Winters) | 8.372 | 1.88 | -1.285 |
 | ARIMA | 9.473 | 2.16 | -1.926 |
@@ -159,7 +159,7 @@ The single biggest lever in this study is **picking the structurally correct mod
 | poly extrap | 2.356 | 8.93 | -0.043 |
 | random walk | 3.67 | 11.91 | -1.530 |
 | drift | 4.01 | 13.39 | -2.020 |
-| dtfit EDA | 6.103 | 23.62 | -5.996 |
+| dtfit EAC | 6.103 | 23.62 | -5.996 |
 
 ### Nile flow (poly)
 
@@ -176,7 +176,7 @@ The single biggest lever in this study is **picking the structurally correct mod
 | Theta | 174 | 14.28 | -1.317 |
 | drift | 177.7 | 14.83 | -1.416 |
 | LSTM | 182.4 | 16.48 | -1.544 |
-| dtfit EDA | 208.1 | 18.51 | -2.313 |
+| dtfit EAC | 208.1 | 18.51 | -2.313 |
 
 ### ETTh1 oil-temp (linear_seasonal, seasonal)
 
@@ -191,7 +191,7 @@ The single biggest lever in this study is **picking the structurally correct mod
 | Theta | 2.062 | 18.93 | -0.142 |
 | ARIMA | 2.298 | 20.26 | -0.419 |
 | LSTM | 2.314 | 23.96 | -0.438 |
-| dtfit EDA | 2.341 | 20.15 | -0.472 |
+| dtfit EAC | 2.341 | 20.15 | -0.472 |
 | random walk | 2.39 | 21.03 | -0.535 |
 | drift | 2.395 | 21.08 | -0.541 |
 | dtfit boosted (#5) | 3.979 | 39.28 | -3.252 |
@@ -203,7 +203,7 @@ The single biggest lever in this study is **picking the structurally correct mod
 |---|---|---|---|
 | dtfit LSI ⭐ | 2.237 | 0.20 | 0.822 |
 | dtfit Fourier-LSI (#2) | 2.581 | 0.21 | 0.763 |
-| dtfit EDA | 2.582 | 0.22 | 0.763 |
+| dtfit EAC | 2.582 | 0.22 | 0.763 |
 | ARIMA | 9.103 | 0.88 | -1.946 |
 | ETS (Holt-Winters) | 13.01 | 1.26 | -5.021 |
 | dtfit merged (auto) | 13.2 | 1.33 | -5.188 |
@@ -220,7 +220,7 @@ The single biggest lever in this study is **picking the structurally correct mod
 
 | method (best ⭐) | RMSE | MAPE % | R² |
 |---|---|---|---|
-| dtfit EDA ⭐ | 0.02207 | 68.61 | 0.840 |
+| dtfit EAC ⭐ | 0.02207 | 68.61 | 0.840 |
 | dtfit LSI | 0.02279 | 65.01 | 0.829 |
 | dtfit boosted (#5) | 0.02279 | 65.01 | 0.829 |
 | dtfit merged (auto) | 0.02279 | 65.01 | 0.829 |
@@ -250,7 +250,7 @@ The single biggest lever in this study is **picking the structurally correct mod
 | drift | 0.7639 | 102.23 | -0.167 |
 | ARIMA | 0.7751 | 121.34 | -0.201 |
 | poly extrap | 1.428 | 252.80 | -3.076 |
-| dtfit EDA | 1.239e+05 | 25377385.95 | -30711474360.984 |
+| dtfit EAC | 1.239e+05 | 25377385.95 | -30711474360.984 |
 
 ### AM signal (am)
 
@@ -260,7 +260,7 @@ The single biggest lever in this study is **picking the structurally correct mod
 | dtfit LSI | 0.03033 | 20.42 | 0.998 |
 | dtfit boosted (#5) | 0.03033 | 20.42 | 0.998 |
 | dtfit merged (auto) | 0.03033 | 20.42 | 0.998 |
-| dtfit EDA | 0.03222 | 22.14 | 0.997 |
+| dtfit EAC | 0.03222 | 22.14 | 0.997 |
 | MLP | 0.3622 | 99.02 | 0.659 |
 | ARIMA | 0.3992 | 230.22 | 0.586 |
 | LSTM | 0.4433 | 119.80 | 0.490 |
@@ -278,7 +278,7 @@ The single biggest lever in this study is **picking the structurally correct mod
 | dtfit LSI | 0.03363 | 20.55 | 0.998 |
 | dtfit boosted (#5) | 0.03363 | 20.55 | 0.998 |
 | dtfit merged (auto) | 0.03363 | 20.55 | 0.998 |
-| dtfit EDA | 0.03846 | 24.62 | 0.997 |
+| dtfit EAC | 0.03846 | 24.62 | 0.997 |
 | poly extrap | 0.7558 | 207.28 | -0.177 |
 | LSTM | 0.8613 | 424.20 | -0.528 |
 | ARIMA | 0.9109 | 347.27 | -0.709 |
@@ -300,7 +300,7 @@ The single biggest lever in this study is **picking the structurally correct mod
 | Nile flow | dtfit LSI | dtfit LSI (131) | poly extrap (136) |
 | ETTh1 oil-temp | dtfit LSI | dtfit LSI (1.68) | poly extrap (1.91) |
 | Weather LTSF | dtfit LSI | dtfit LSI (2.24) | ARIMA (9.1) |
-| RLC transient | dtfit EDA | dtfit EDA (0.0221) | MLP (0.0275) |
+| RLC transient | dtfit EAC | dtfit EAC (0.0221) | MLP (0.0275) |
 | AC + harmonics | dtfit Fourier-LSI (#2) | dtfit Fourier-LSI (#2) (0.036) | MLP (0.038) |
 | AM signal | dtfit Fourier-LSI (#2) | dtfit Fourier-LSI (#2) (0.0303) | MLP (0.362) |
 | Linear chirp | dtfit Fourier-LSI (#2) | dtfit Fourier-LSI (#2) (0.0313) | poly extrap (0.756) |
@@ -318,7 +318,7 @@ The single biggest lever in this study is **picking the structurally correct mod
 | ETTh1 oil-temp | 10% | dtfit Fourier-LSI (#2) | 1.356 | 1.7 | 1.69 |
 | ETTh1 oil-temp | 25% | dtfit LSI | 1.678 | 1.95 | 2.39 |
 | RLC transient | 10% | dtfit LSI | 0.02497 | 0.07658 | 0.03091 |
-| RLC transient | 25% | dtfit EDA | 0.02279 | 0.1101 | 0.06564 |
+| RLC transient | 25% | dtfit EAC | 0.02279 | 0.1101 | 0.06564 |
 | AC + harmonics | 10% | dtfit LSI | 0.03087 | 0.07671 | 1.479 |
 | AC + harmonics | 25% | dtfit Fourier-LSI (#2) | 0.04759 | 0.07342 | 0.761 |
 

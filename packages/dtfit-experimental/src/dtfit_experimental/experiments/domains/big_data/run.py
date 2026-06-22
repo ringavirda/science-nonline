@@ -29,7 +29,7 @@ reduces chunk-by-chunk). The estimators exploit both:
 * **distributed reduce** (`PartitionedBatchLSI.merge`, on the promoted
   `PartitionedLSI` #1) -- per-partition accumulators combined by an associative,
   order-independent `merge`.
-* **streaming filter** (`EDAFilter`) -- the online twin: an O(1)/sample
+* **streaming filter** (`EACFilter`) -- the online twin: an O(1)/sample
   recursive update that tracks a model's parameters in bounded memory.
 """
 
@@ -42,7 +42,7 @@ from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 
 from dtfit import fit_lsi_batched, project_spectra, PartitionedBatchLSI
-from dtfit.streaming import EDAFilter
+from dtfit.streaming import EACFilter
 
 from dtfit_experimental.experiments.common import ReportWriter, fmt, metrics
 from dtfit_experimental.experiments.common import baselines as bl
@@ -633,7 +633,7 @@ def part_online(rep, quick):
         "The streaming *filter* is the real-time twin of the reduce: an "
         "O(1)/sample recursive update. We track a sinusoid with a **mid-stream "
         "frequency jump** one sample at a time, comparing dtfit's "
-        "`EDAFilter` against the established online toolkit — recursive "
+        "`EACFilter` against the established online toolkit — recursive "
         "least squares (RLS) and an incremental SGD net — on per-sample cost, "
         "memory, one-step prediction error, and whether the **physical frequency** "
         "is recovered.")
@@ -646,8 +646,8 @@ def part_online(rep, quick):
     phase = np.cumsum(w_seq * dt_)
     y = 3.0 * np.sin(phase) + rng.normal(0, 0.3, n)
 
-    # dtfit EDAFilter -- tracks the physical model A*sin(w*t)
-    flt = EDAFilter("A*sin(w*t)", "t", p0=[2.0, 1.0], window_size=50,
+    # dtfit EACFilter -- tracks the physical model A*sin(w*t)
+    flt = EACFilter("A*sin(w*t)", "t", p0=[2.0, 1.0], window_size=50,
                            q_diag=[1e-3, 5e-4], r=5.0, n_sub=2, adapt_r=True)
     costs, w_hist, pred_eaf = [], [], np.full(n, np.nan)
     import tracemalloc
@@ -699,7 +699,7 @@ def part_online(rep, quick):
     rep.table(
         ["online method", "µs / sample", "memory", "one-step RMSE (post-jump)",
          "recovers physics"],
-        [["dtfit EDAFilter", fmt(us_eaf, "{:.1f}"),
+        [["dtfit EACFilter", fmt(us_eaf, "{:.1f}"),
           f"bounded ({peak_eaf:.1f} MB)", fmt(osr(pred_eaf), "{:.3f}"),
           f"**yes** (ω err {w_err:.1f}%)"],
          ["recursive least squares (AR6)", fmt(us_rls, "{:.1f}"), "bounded",
@@ -716,7 +716,7 @@ def part_online(rep, quick):
         "domain's structured-vs-surrogate distinction. (A batch re-fit would be "
         "O(N) per step → O(N²); only a recursive O(1)/sample update is feasible.)")
     fig, ax = plt.subplots(figsize=(10, 3.6))
-    ax.plot(t, w_hist, "tab:red", lw=1.2, label="EDAFilter tracked ω")
+    ax.plot(t, w_hist, "tab:red", lw=1.2, label="EACFilter tracked ω")
     ax.axhline(1.0, color="0.6", ls=":", lw=1)
     ax.axhline(1.6, color="0.6", ls=":", lw=1)
     ax.axvline(t[half], color="0.4", ls="--", label="true frequency jump")
@@ -851,7 +851,7 @@ _METHODS_DOC = (
     "- **distributed reduce** (`PartitionedBatchLSI.merge`, on the promoted "
     "`PartitionedLSI` #1) — per-partition accumulators combined by an associative, "
     "order-independent `merge`.\n"
-    "- **streaming filter** (`EDAFilter`) — the online twin: an "
+    "- **streaming filter** (`EACFilter`) — the online twin: an "
     "O(1)/sample recursive update tracking a model's parameters in bounded memory.\n"
     "All the reduce routes are the identical additive projection → identical result.")
 

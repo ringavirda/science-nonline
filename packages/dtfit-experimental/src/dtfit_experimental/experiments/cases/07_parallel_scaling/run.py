@@ -85,7 +85,7 @@ def fitmany_scaling(Ps, n_problems):
         x = np.linspace(0, 1.5, 400)
         y = (1 + 0.2 * (i % 5)) * np.exp((0.6 + 0.05 * (i % 7)) * x) + rng.normal(0, 0.03, 400)
         probs.append(FittingProblem(x=x, y=y, expr="a*exp(b*t)", var="t",
-                                method="eda", kwargs={"p0": [1.0, 1.0]}))
+                                method="eac", kwargs={"p0": [1.0, 1.0]}))
     fit_many(probs[:16], n_jobs=max(Ps), backend="loky")  # warm pool
     times = {P: _timed(lambda: fit_many(probs, n_jobs=P, backend="loky")) for P in Ps}
     return {P: times[1] / times[P] for P in Ps}, times
@@ -177,7 +177,7 @@ def main(quick: bool = False) -> str:
     # --- 2. fit_many process scaling ------------------------------------ #
     rep.section(
         "2. fit_many — independent fits across processes",
-        "A batch of independent EDA fits fanned across loky workers. These are "
+        "A batch of independent EAC fits fanned across loky workers. These are "
         "embarrassingly parallel, but each fit is short (~ms, with a SymPy "
         "lambdify) so on this platform the process dispatch/spawn overhead caps "
         "the practical speedup of fine-grained fits.")

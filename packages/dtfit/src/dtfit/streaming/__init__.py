@@ -7,8 +7,8 @@ Jacobian) is done once at construction; updates are pure NumPy/SciPy.
 Each filter is the **streaming twin of a batch method** and is named for that
 method, so the same method is discoverable across execution modes:
 
-- :class:`EDAFilter` -- streaming twin of :func:`dtfit.fit_eda` /
-  :class:`dtfit.PartitionedEDA`; its measurement is the integrated **area**
+- :class:`EACFilter` -- streaming twin of :func:`dtfit.fit_eac` /
+  :class:`dtfit.PartitionedEAC`; its measurement is the integrated **area**
   innovation over a sliding window.
 - :class:`LSIFilter` -- streaming twin of :func:`dtfit.fit_lsi` /
   :class:`dtfit.PartitionedLSI`; its measurement is the window's **Legendre
@@ -16,8 +16,8 @@ method, so the same method is discoverable across execution modes:
   partly cancels).
 """
 
-from ._eda import EDAFilter
+from ._eac import EACFilter
 from ._lsi import LSIFilter
 from ._bank import FilterBank, FusedChiSquareDetector
 
-__all__ = ["EDAFilter", "LSIFilter", "FilterBank", "FusedChiSquareDetector"]
+__all__ = ["EACFilter", "LSIFilter", "FilterBank", "FusedChiSquareDetector"]

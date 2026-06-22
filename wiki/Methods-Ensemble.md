@@ -1,6 +1,6 @@
 # Ensemble -- overlapping-window robust aggregation
 
-> Numeric batch method (a *composition* of EDA / LSI). Source:
+> Numeric batch method (a *composition* of EAC / LSI). Source:
 > [`methods/_ensemble.py`](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit/src/dtfit/methods/_ensemble.py).
 > Invoke via `ensemble_fit(x, y, expr, var, ...)`. Promoted from the experimental
 > adaptations (#3) after the validation suite showed a consistent win on
@@ -16,7 +16,7 @@ this is *bagging over the time axis*.
 
 For a record of $n$ samples, slide a window of width $w$ with stride
 $s = \frac{n}{M}(1-\text{overlap})$, fitting the model on each window with the
-chosen base method (EDA by default, or LSI). This yields a set of per-window
+chosen base method (EAC by default, or LSI). This yields a set of per-window
 coefficient vectors $\{\hat\theta_1,\dots,\hat\theta_K\}$, aggregated as
 
 $$
@@ -38,7 +38,7 @@ restricted to a sub-interval is still a valid (if higher-variance) estimate of t
 ## Algorithm
 
 1. **Window** the record into $M$ overlapping spans (`n_windows`, `overlap`).
-2. **Fit** the model on each window with the base `method` (`"eda"`/`"lsi"`),
+2. **Fit** the model on each window with the base `method` (`"eac"`/`"lsi"`),
    forwarding `p0` and any extra fitter `kwargs` (e.g. `bounds`). A window whose
    fit fails (e.g. too few clean points) is simply **skipped**.
 3. **Aggregate** the surviving per-window coefficients by `median` (default) or
@@ -53,7 +53,7 @@ restricted to a sub-interval is still a valid (if higher-variance) estimate of t
 when a fraction of samples are spikes / dropouts / sensor glitches, for two
 reasons:
 
-- it needs **no tuning** -- unlike [`fit_eda(loss="soft_l1", f_scale=...)`](Methods-EDA),
+- it needs **no tuning** -- unlike [`fit_eac(loss="soft_l1", f_scale=...)`](Methods-EAC),
   whose robust loss acts on *window-area* residuals and only bites when `f_scale`
   is matched to the (small) residual scale, the median aggregation is
   parameter-free;
@@ -70,9 +70,9 @@ contamination -- a **specialised tool, not the default path**.
 
 Recovery error (max relative parameter error, median over 6 noise draws) on the
 [validation corpus](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit/tests/accuracy) with **4 % of samples
-replaced by 8sigma spikes**, plain whole-record EDA vs the ensemble:
+replaced by 8sigma spikes**, plain whole-record EAC vs the ensemble:
 
-| family | plain EDA | **ensemble** |
+| family | plain EAC | **ensemble** |
 |---|---|---|
 | exponential | 0.125 | **0.027** |
 | exp_decay | 0.117 | **0.052** |
@@ -91,10 +91,10 @@ is gated in
 
 **Use the ensemble for:** outlier-/glitch-contaminated records where you still
 want a point estimate and a cheap uncertainty band, with no robust-loss tuning.
-Pick `method="eda"` (default, fastest/most robust base) for transient/saturating
+Pick `method="eac"` (default, fastest/most robust base) for transient/saturating
 shapes, `method="lsi"` when the base fit benefits from the spectral criterion.
 
-**Prefer instead:** a single [`fit_eda`](Methods-EDA) / [`fit_lsi`](Methods-LSI) (or
+**Prefer instead:** a single [`fit_eac`](Methods-EAC) / [`fit_lsi`](Methods-LSI) (or
 [`auto_estimate`](Methods-Auto)) on clean data; the recursive
-[`EDAFilter`](Methods-Equal-Areas-Filter) for *streaming* drift rather than batch
+[`EACFilter`](Methods-Equal-Areas-Filter) for *streaming* drift rather than batch
 contamination.

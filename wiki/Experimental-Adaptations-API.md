@@ -70,7 +70,7 @@ res = fit_lsi_basis(x, y, "A*sin(w*x + p)", "x", basis="fourier", order=4)
 **What it is.** Several channels often share structure -- a common frequency across
 x/y/z axes, a common growth rate across regions, a common time constant across a
 plant's outputs. Fitting them independently wastes that coupling. `fit_joint`
-stacks **all** channels' EDA area equations into one system with **shared**
+stacks **all** channels' EAC area equations into one system with **shared**
 parameters (estimated jointly from every channel) and **per-channel private**
 parameters, solved in one pass. More equations per shared unknown means you
 observe it better than any single channel could.
@@ -117,7 +117,7 @@ print(jr.shared["w"], jr.private[0])
 **What it is.** One parametric form may not capture both a trend and a cycle.
 Boosting stages the methods: fit stage 1 to the data, subtract its prediction, fit
 stage 2 to the residual, and so on. The composite is the **sum** of the stages --
-e.g. an LSI trend plus an EDA-fitted oscillatory residual -- more expressive than
+e.g. an LSI trend plus an EAC-fitted oscillatory residual -- more expressive than
 either alone, while each stage stays a cheap, well-posed fit. (It works because
 the fingerprint transform is linear, so the fingerprint of a sum is the sum of
 fingerprints.)
@@ -129,7 +129,7 @@ boosted_fit(data_x, data_y, stages) -> BoostedModel
 | arg | meaning |
 |---|---|
 | `data_x`, `data_y` | observed samples |
-| `stages` | ordered list of stage specs, each a dict with `expr`, `var`, `method` (`"lsi"`/`"eda"`), plus any extra fitter kwargs (`p0`, `bounds`, ...) |
+| `stages` | ordered list of stage specs, each a dict with `expr`, `var`, `method` (`"lsi"`/`"eac"`), plus any extra fitter kwargs (`p0`, `bounds`, ...) |
 
 <a name="boostedmodel"></a>
 ### `BoostedModel`
@@ -144,7 +144,7 @@ boosted_fit(data_x, data_y, stages) -> BoostedModel
 from dtfit_experimental import boosted_fit
 bm = boosted_fit(x, y, [
     {"expr": "a0 + a1*x", "var": "x", "method": "lsi"},      # trend
-    {"expr": "A*sin(w*x + p)", "var": "x", "method": "eda"}, # cycle on the residual
+    {"expr": "A*sin(w*x + p)", "var": "x", "method": "eac"}, # cycle on the residual
 ])
 y_hat = bm.predict(x)
 ```

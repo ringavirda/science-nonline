@@ -66,7 +66,10 @@ testpaths = ["tests"]
 pythonpath = ["tests"]
 
 [tool.mypy]
-python_version = "3.10"
+# No `python_version` pin: mypy targets each CI matrix interpreter (3.10-3.13).
+# Pinning to 3.10 forced mypy to reject PEP 695 `type` statements in the newer
+# numpy stubs that pip installs on the 3.12/3.13 runners (numpy/__init__.pyi);
+# the 3.10 matrix job still enforces the language floor.
 files = ["src/dtfit"]
 ignore_missing_imports = true  # scipy/sklearn/sympy/matplotlib ship partial stubs
 

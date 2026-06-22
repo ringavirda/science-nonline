@@ -1,6 +1,6 @@
 """Parallel batch fitting -- fan many independent fits across CPU cores.
 
-The batch methods (:func:`dtfit.fit_lsi`, :func:`dtfit.fit_eda`) are pure per
+The batch methods (:func:`dtfit.fit_lsi`, :func:`dtfit.fit_eac`) are pure per
 problem: fitting one signal never touches another. A real workload -- the
 channels of a multivariate series, the cells of a noise/size sweep, the chunks
 of a large stream, the axes of a trajectory -- is therefore *embarrassingly
@@ -32,14 +32,14 @@ from typing import Any, Callable, Sequence, cast
 import numpy as np
 from joblib import Parallel, delayed
 
-from dtfit.methods import fit_lsi, fit_eda
+from dtfit.methods import fit_lsi, fit_eac
 from dtfit.types import FittingResult
 
 __all__ = ["FittingProblem", "BatchFittingResult", "fit_many"]
 
 _FITTERS: dict[str, Callable[..., FittingResult]] = {
     "lsi": fit_lsi,
-    "eda": fit_eda,
+    "eac": fit_eac,
 }
 
 
@@ -51,7 +51,7 @@ class FittingProblem:
         x, y: Observed samples for this problem.
         expr: Model expression string, e.g. ``"a*exp(b*t)"``.
         var: Main variable name in ``expr``.
-        method: ``"lsi"`` or ``"eda"``.
+        method: ``"lsi"`` or ``"eac"``.
         kwargs: Method-specific keyword arguments (e.g. ``p0``, ``bounds``).
         label: Optional tag carried through to the result (channel name, etc.).
     """
@@ -119,7 +119,7 @@ def _fit_one(problem: FittingProblem) -> BatchFittingResult:
         return BatchFittingResult(
             coeffs=np.array([]), expr=problem.expr, var=problem.var,
             label=problem.label,
-            error=f"unknown method {problem.method!r} (use 'lsi' or 'eda')",
+            error=f"unknown method {problem.method!r} (use 'lsi' or 'eac')",
         )
     try:
         res = fitter(

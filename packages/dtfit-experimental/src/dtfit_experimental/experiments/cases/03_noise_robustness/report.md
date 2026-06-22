@@ -8,7 +8,7 @@ Map fitting accuracy across noise level, outlier fraction and sample size for fo
 
 ## Models fitted & why
 
-Four model families are fitted, each with a known ground truth so the error is true parameter recovery, chosen to span the classes LSI/EDA target:
+Four model families are fitted, each with a known ground truth so the error is true parameter recovery, chosen to span the classes LSI/EAC target:
 - **exponential** `a·exp(b·x)` — monotone growth/decay (the canonical nonlinear-in-parameters case);
 - **transcendental** `a·atan(w·x)` — a saturating non-Taylor curve;
 - **sine** `A·sin(w·x)` — an oscillatory signal (the adversarial case for area-based fitting, where frequency must be recovered);
@@ -31,7 +31,7 @@ R² vs clean as a fraction of points become gross outliers (exponential family).
 
 *Robust variants degrade more gracefully.*
 
-| outlier % | EDA | LSI | curve_fit | EDA-ensemble | EDA-softl1 |
+| outlier % | EAC | LSI | curve_fit | EAC-ensemble | EAC-softl1 |
 |---|---|---|---|---|---|
 | 0 | 1.000 | 1.000 | 1.000 | 0.997 | 1.000 |
 | 5 | 0.819 | 0.935 | 0.935 | 0.956 | 0.819 |
@@ -41,7 +41,7 @@ R² vs clean as a fraction of points become gross outliers (exponential family).
 
 ## Parameter-recovery error grid (parallel via fit_many)
 
-Median EDA parameter-recovery error (%) over a noise×size grid for the exponential family, the whole grid fitted in parallel across cores with `fit_many`.
+Median EAC parameter-recovery error (%) over a noise×size grid for the exponential family, the whole grid fitted in parallel across cores with `fit_many`.
 
 ![Error falls with more data, rises with noise.](figures/param_grid.png)
 
@@ -49,7 +49,7 @@ Median EDA parameter-recovery error (%) over a noise×size grid for the exponent
 
 ## Reading it
 
-- LSI/EDA stay close to the NLLS `curve_fit` across noise and clearly beat the `polyfit` surrogate and the black-box MLP on the structured families (the integral criterion averages noise).
-- Under outliers **LSI is the standout**: its Savitzky-Golay pre-filter plus integral projection reject gross outliers, so it holds R²≈0.9 even at 20% contamination — matching or beating `curve_fit`, while stock EDA collapses.
-- Adaptation #3 (overlapping-window ensemble) helps EDA at low contamination (≤10%) but its median-of-coefficients aggregation becomes unstable once many windows are corrupted; the soft-L1 robust loss gave little benefit here. So #3 shows only a *partial* outlier-robustness win and does **not** cleanly clear the promotion gate on this experiment — LSI's built-in smoothing is the more reliable route.
+- LSI/EAC stay close to the NLLS `curve_fit` across noise and clearly beat the `polyfit` surrogate and the black-box MLP on the structured families (the integral criterion averages noise).
+- Under outliers **LSI is the standout**: its Savitzky-Golay pre-filter plus integral projection reject gross outliers, so it holds R²≈0.9 even at 20% contamination — matching or beating `curve_fit`, while stock EAC collapses.
+- Adaptation #3 (overlapping-window ensemble) helps EAC at low contamination (≤10%) but its median-of-coefficients aggregation becomes unstable once many windows are corrupted; the soft-L1 robust loss gave little benefit here. So #3 shows only a *partial* outlier-robustness win and does **not** cleanly clear the promotion gate on this experiment — LSI's built-in smoothing is the more reliable route.
 - Parameter-recovery error falls with sample size and rises with noise, as expected; the whole grid was fitted in parallel with `fit_many`.

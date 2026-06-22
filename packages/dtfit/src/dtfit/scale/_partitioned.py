@@ -1,6 +1,6 @@
-"""Map-reduce / partitioned LSI & EDA (promoted from the experiment suite).
+"""Map-reduce / partitioned LSI & EAC (promoted from the experiment suite).
 
-The empirical LSI spectrum coefficient is an integral ``∫ y·φ_j dx`` and an EDA
+The empirical LSI spectrum coefficient is an integral ``∫ y·φ_j dx`` and an EAC
 window area is an integral ``∫ y dx``. Integrals are **additive over a partition
 of the domain**, so the data-side sufficient statistic can be accumulated chunk
 by chunk and summed -- an associative reduce. This turns the batch methods into
@@ -10,7 +10,7 @@ by reducing per-partition partial statistics with no re-pass over the data.
 
 * :class:`PartitionedLSI` accumulates the basis-projection integrals per chunk
   (and merges across workers), then solves the usual LSI spectral match once.
-* :class:`PartitionedEDA` accumulates per-window areas the same way.
+* :class:`PartitionedEAC` accumulates per-window areas the same way.
 
 Both require the **global domain fixed up front** (so every chunk projects onto
 the same basis); pass it to the constructor.
@@ -108,13 +108,13 @@ class PartitionedLSI:
         return solve_spectral(self.expr, self.var, self.basis, self.spectrum(), p0=guess)
 
 
-class PartitionedEDA:
-    """Streaming / distributed EDA via additive per-window area accumulation.
+class PartitionedEAC:
+    """Streaming / distributed EAC via additive per-window area accumulation.
 
     The domain is split into ``n_windows`` fixed area windows; each chunk adds
     its contribution to whichever windows it overlaps. The model is then matched
     to the reduced data areas with the same overdetermined least-squares solve
-    as batch EDA.
+    as batch EAC.
     """
 
     def __init__(
@@ -134,7 +134,7 @@ class PartitionedEDA:
         self._last: tuple[float, float] | None = None
         self.n_samples = 0
 
-    def update(self, x_chunk: np.ndarray, y_chunk: np.ndarray) -> "PartitionedEDA":
+    def update(self, x_chunk: np.ndarray, y_chunk: np.ndarray) -> "PartitionedEAC":
         x = np.asarray(x_chunk, dtype=float)
         y = np.asarray(y_chunk, dtype=float)
         n_orig = x.size
@@ -154,7 +154,7 @@ class PartitionedEDA:
         self.n_samples += n_orig
         return self
 
-    def merge(self, other: "PartitionedEDA") -> "PartitionedEDA":
+    def merge(self, other: "PartitionedEAC") -> "PartitionedEAC":
         self._areas += other._areas
         self.n_samples += other.n_samples
         return self

@@ -4,10 +4,10 @@
 > [`scale/_partitioned.py`](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit/src/dtfit/scale/_partitioned.py),
 > [`scale/_batched.py`](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit/src/dtfit/scale/_batched.py),
 > [`scale/_parallel.py`](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit/src/dtfit/scale/_parallel.py).
-> `PartitionedLSI`, `PartitionedEDA`, `PartitionedBatchLSI`, `fit_lsi_batched`,
+> `PartitionedLSI`, `PartitionedEAC`, `PartitionedBatchLSI`, `fit_lsi_batched`,
 > `project_spectra`, `fit_many`. API: [../api/scaling.md](API-Scaling).
 
-The fitting *math* of [LSI](Methods-LSI)/[EDA](Methods-EDA) is unchanged here; these are
+The fitting *math* of [LSI](Methods-LSI)/[EAC](Methods-EAC) is unchanged here; these are
 alternative **execution backends** that run those methods on data too big for
 memory, spread across workers, or spanning thousands of channels. They are exact --
 not approximations -- because the empirical spectrum has two structural properties:
@@ -35,7 +35,7 @@ $$
 So a stream can be reduced **chunk by chunk** in fixed $O(\text{order})$ memory,
 and independent workers can each accumulate a partial $\mathbf s$ and **`merge`**
 by addition -- an associative, order-independent reduce. The same holds for
-[EDA](Methods-EDA): a window's area is additive over the samples that fall in it.
+[EAC](Methods-EAC): a window's area is additive over the samples that fall in it.
 
 **Exactness at chunk boundaries.** The trapezoid rule needs the interval
 *connecting* two chunks. Each `update` therefore carries the previous chunk's last
@@ -65,12 +65,12 @@ path is identical.
 
 ## The estimators
 
-### `PartitionedLSI` / `PartitionedEDA` -- one-pass / distributed (map-reduce)
+### `PartitionedLSI` / `PartitionedEAC` -- one-pass / distributed (map-reduce)
 
 Accumulate, then solve. `PartitionedLSI` accumulates the additive projection
-integrals $\mathbf s$; `PartitionedEDA` accumulates per-window areas. Both expose
+integrals $\mathbf s$; `PartitionedEAC` accumulates per-window areas. Both expose
 `update(x_chunk, y_chunk)` (fold a chunk), `merge(other)` (combine workers), and
-`fit(p0=...)` (solve the spectral / area match -- LSI's `solve_spectral`, EDA's
+`fit(p0=...)` (solve the spectral / area match -- LSI's `solve_spectral`, EAC's
 midpoint-area least squares). Fixed memory, exact, one pass.
 
 ```
@@ -80,7 +80,7 @@ for x_chunk, y_chunk in stream:   # one pass, O(order) memory
 result = acc.fit(p0=[1.0, 1.0])
 ```
 
-`PartitionedEDA` matches the model's window areas to the reduced data areas; it
+`PartitionedEAC` matches the model's window areas to the reduced data areas; it
 uses a **midpoint-rule** model area per window ($f(\text{center})\times\text{width}$)
 so the model side is cheap and consistent across solver iterations, while the data
 areas were accumulated by trapezoid during the reduce.
@@ -143,7 +143,7 @@ approximate. **Right:** `fit_lsi_batched` recovers the per-channel growth rate o
 
 | situation | backend |
 |---|---|
-| stream too big for memory, one pass | `PartitionedLSI` / `PartitionedEDA` |
+| stream too big for memory, one pass | `PartitionedLSI` / `PartitionedEAC` |
 | distributed workers, then combine | the same accumulators via `.merge()` |
 | many channels on a shared grid | `project_spectra` / `fit_lsi_batched` |
 | many channels **and** a big stream | `PartitionedBatchLSI` |
@@ -152,5 +152,5 @@ approximate. **Right:** `fit_lsi_batched` recovers the per-channel growth rate o
 **Trade-off.** Streaming/partitioned estimators trade peak throughput for
 **bounded memory**; the GEMM-batched path trades memory (data resident) for
 **maximal throughput**. Both return the same parameters as the in-memory
-[LSI](Methods-LSI)/[EDA](Methods-EDA). For real-time *online* tracking (as opposed to batch
+[LSI](Methods-LSI)/[EAC](Methods-EAC). For real-time *online* tracking (as opposed to batch
 at scale) use the [streaming filters](Methods-Legendre-Filter).

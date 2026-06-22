@@ -15,17 +15,17 @@ Is the data arriving live / do the parameters change over time?
 |
 +- YES > use a STREAMING filter
 |        +- signal oscillates (a cycle)         > LSIFilter   (spectrum measurement)
-|        +- signal is monotone / saturating      > EDAFilter   (area measurement, cheaper)
+|        +- signal is monotone / saturating      > EACFilter   (area measurement, cheaper)
 |
 +- NO (you have the whole batch) > use a BATCH method
          +- you want one reliable default        > LSI            (fit_lsi)
          +- data is very noisy / few parameters
-         |   / a transient or saturating shape    > EDA           (fit_eda)
-         +- a localized peak or sharp bend         > adaptive EDA  (fit_eda_adaptive)
+         |   / a transient or saturating shape    > EAC           (fit_eac)
+         +- a localized peak or sharp bend         > adaptive EAC  (fit_eac_adaptive)
          +- a sinusoid / clear cycle               > LSI oscillatory recipe
          |                                           (fit_lsi(..., freq_param="w"))
          +- outliers / glitches present            > Ensemble  (ensemble_fit)
-                                                     (or EDA robust loss if you can
+                                                     (or EAC robust loss if you can
                                                       tune f_scale to the window scale)
 ```
 
@@ -36,15 +36,15 @@ production fitter (see [methods-explained.md#dsb](Guides-Methods-Explained#dsb))
 
 - **Start with LSI.** It's the accurate general default and handles most smooth,
   nonlinear-in-parameters models.
-- **Switch to EDA when noise is high or you need speed**, and the model has few
-  (2-4) parameters. EDA is ~5x faster than LSI and the most noise-robust.
-- **Use the adaptive EDA for peaks and saturating rises** (Gaussian, Lorentzian,
+- **Switch to EAC when noise is high or you need speed**, and the model has few
+  (2-4) parameters. EAC is ~5x faster than LSI and the most noise-robust.
+- **Use the adaptive EAC for peaks and saturating rises** (Gaussian, Lorentzian,
   Michaelis-Menten, Hill, `arctan`) -- curvature-placed windows fit the bend.
 - **Use the oscillatory recipe for anything with a cycle.** A plain smoothed fit
   erases cycles; you must pass `freq_param`/`oscillatory=True`.
 - **Use the ensemble when outliers/glitches contaminate the record.**
   `ensemble_fit` fits overlapping windows and takes the median, rejecting whole
-  corrupted windows with no `f_scale` tuning -- more reliable than the EDA robust
+  corrupted windows with no `f_scale` tuning -- more reliable than the EAC robust
   loss on spiky data. It's a specialised tool: on clean data prefer a single fit.
 
 ---
@@ -82,7 +82,7 @@ Only relevant for large or many-channel data ([api/scaling.md](API-Scaling)):
 |---|---|
 | Many **independent** fits (different series/models) | `fit_many` (process/thread fan-out) |
 | Many **channels on a shared x-grid**, fit at once | `fit_lsi_batched` / `project_spectra` (one GEMM) |
-| A dataset **too big for memory**, one pass | `PartitionedLSI` / `PartitionedEDA` (streaming map-reduce) |
+| A dataset **too big for memory**, one pass | `PartitionedLSI` / `PartitionedEAC` (streaming map-reduce) |
 | **Distributed** workers, then combine | the same `Partitioned*` accumulators via `.merge()` |
 | Many channels **and** streaming | `PartitionedBatchLSI` |
 
@@ -115,7 +115,7 @@ Before trusting any fit:
    dynamic range; map a wide `x` into roughly `[0, 1.5]` and scale `y` to O(1)
    first (invertible, doesn't change R^2). This is the single most common cause of
    a bad dtfit fit.
-2. **Pick `active_ratio` to match where the information is** (EDA): `1.0` for
+2. **Pick `active_ratio` to match where the information is** (EAC): `1.0` for
    saturating tails, the default `0.8` for early transients.
 3. **Seed oscillations.** Always pass `freq_param` for sinusoids.
 4. **Give bounds for hard models.** Bounds turn on LSI's global search and keep it

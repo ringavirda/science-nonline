@@ -2,12 +2,12 @@
 
 This is the online analogue of the batch integral-least-squares method
 (:func:`dtfit.methods._lsi.fit_lsi`). It is structurally identical to
-:class:`dtfit.streaming._eda.EDAFilter`: a Kalman-style recursive
+:class:`dtfit.streaming._eac.EACFilter`: a Kalman-style recursive
 estimator whose "measurement" is an innovation between an experimental quantity
 and the model's prediction of it, with a measurement Jacobian of integrated
 parameter sensitivities. The *only* difference is the measurement itself.
 
-``EDAFilter`` measures **areas** -- the signal projected onto piecewise
+``EACFilter`` measures **areas** -- the signal projected onto piecewise
 indicator functions (the zeroth moment over each sub-window). This filter
 instead measures the **Legendre spectrum** -- the signal projected onto the
 first ``order + 1`` orthogonal Legendre polynomials over the window. That gives
@@ -47,7 +47,7 @@ from dtfit.types import InitialGuess
 class LSIFilter:
     """Online integral-least-squares (LSI) parameter tracker with drift detection.
 
-    Drop-in sibling of :class:`EDAFilter` with the same ``partial_fit`` /
+    Drop-in sibling of :class:`EACFilter` with the same ``partial_fit`` /
     ``predict`` / ``params_`` API; it swaps the area measurement for an
     orthogonal Legendre-spectrum measurement (streaming LSI).
     """
@@ -148,14 +148,14 @@ class LSIFilter:
         self._r_scale = 1.0  # adaptive multiplier on R when adapt_r
 
         # Drift detector state (decimated, non-overlapping windows + warmup),
-        # mirroring EDAFilter so the two are directly comparable.
+        # mirroring EACFilter so the two are directly comparable.
         self._ewma_lambda = 0.15
         self._warmup_tests = 5
         # Robust self-calibration: one EWMA scale for the scalar spectral-energy
         # innovation (jump test) and one for the mean coefficient (CUSUM). A
         # single scale per statistic -- rather than six per-coefficient scales --
         # keeps the test from inheriting the heavy tails of a noisy variance
-        # estimate, exactly as the scalar EDAFilter detector does.
+        # estimate, exactly as the scalar EACFilter detector does.
         self._s_scale = 0.0   # EWMA of the spectral-energy innovation S
         self._e0_scale2 = 0.0  # EWMA of the mean-coefficient innovation power
         self._n_full = 0
@@ -167,7 +167,7 @@ class LSIFilter:
         self.last_drift_direction_ = 0
 
         # Most recent one-step forecast residual (innovation); see
-        # EDAFilter.last_residual_. NaN until the window first fills.
+        # EACFilter.last_residual_. NaN until the window first fills.
         self.last_residual_ = float("nan")
 
         self._t: list[float] = []

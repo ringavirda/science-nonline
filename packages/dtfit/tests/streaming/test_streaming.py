@@ -1,8 +1,8 @@
-"""Streaming EDAFilter (online EDA with NIS drift detection)."""
+"""Streaming EACFilter (online EAC with NIS drift detection)."""
 
 import numpy as np
 
-from dtfit import EDAFilter, LSIFilter
+from dtfit import EACFilter, LSIFilter
 
 
 def test_filter_tracks_stable_sine():
@@ -10,7 +10,7 @@ def test_filter_tracks_stable_sine():
     t = np.linspace(0, 40, 2000)
     y = 3.0 * np.sin(1.5 * t) + rng.normal(0, 0.3, t.size)
 
-    flt = EDAFilter(
+    flt = EACFilter(
         "A*sin(w*t)", "t", p0=[1.0, 1.0], window_size=50,
         q_diag=[0.05, 0.001], r=20.0,
     )
@@ -23,14 +23,14 @@ def test_filter_tracks_stable_sine():
 
 
 def test_params_and_predict_shapes():
-    flt = EDAFilter("A*sin(w*t)", "t", p0=[2.0, 1.5], window_size=10)
+    flt = EACFilter("A*sin(w*t)", "t", p0=[2.0, 1.5], window_size=10)
     assert set(flt.params_) == {"A", "w"}
     out = flt.predict(np.array([0.0, 1.0, 2.0]))
     assert out.shape == (3,)
 
 
 def test_partial_fit_returns_self():
-    flt = EDAFilter("A*sin(w*t)", "t")
+    flt = EACFilter("A*sin(w*t)", "t")
     assert flt.partial_fit(0.0, 0.0) is flt
 
 
@@ -39,7 +39,7 @@ def _feed_step(low: float, high: float, n: int = 120):
     rng = np.random.default_rng(0)
     levels = np.r_[np.full(n, low), np.full(n, high)] + rng.normal(0, 0.02, 2 * n)
     x = np.linspace(0, 1.0, levels.size)
-    flt = EDAFilter(
+    flt = EACFilter(
         "a*exp(b*x)", "x", p0=[1.0, 0.0], window_size=20, q_diag=[1e-3, 1e-3], r=0.2
     )
     direction = 0
@@ -66,7 +66,7 @@ def test_no_false_drift_on_stable_signal():
     rng = np.random.default_rng(0)
     t = np.linspace(0, 40, 2000)
     y = 3.0 * np.sin(1.5 * t) + rng.normal(0, 0.3, t.size)
-    flt = EDAFilter(
+    flt = EACFilter(
         "A*sin(w*t)", "t", p0=[1.0, 1.0], window_size=50, q_diag=[0.05, 0.001], r=20.0
     )
     for ti, yi in zip(t, y):
@@ -79,7 +79,7 @@ def test_vector_measurement_tracks_with_adaptive_r():
     rng = np.random.default_rng(1)
     t = np.linspace(0, 40, 2000)
     y = 3.0 * np.sin(1.5 * t) + rng.normal(0, 0.3, t.size)
-    flt = EDAFilter(
+    flt = EACFilter(
         "A*sin(w*t)", "t", p0=[1.0, 1.0], window_size=50,
         q_diag=[0.05, 0.001], r=20.0, n_sub=4, adapt_r=True,
     )
@@ -94,7 +94,7 @@ def test_inflate_drift_reset_detects_step_and_keeps_window():
     rng = np.random.default_rng(0)
     levels = np.r_[np.full(120, 1.0), np.full(120, 3.0)] + rng.normal(0, 0.02, 240)
     x = np.linspace(0, 1.0, levels.size)
-    flt = EDAFilter(
+    flt = EACFilter(
         "a*exp(b*x)", "x", p0=[1.0, 0.0], window_size=20,
         q_diag=[1e-3, 1e-3], r=0.2, drift_reset="inflate",
     )
@@ -197,7 +197,7 @@ def test_filter_survives_exp_overflow_without_nan_poisoning():
     rng = np.random.default_rng(0)
     t = np.linspace(0, 12, 400)
     y = 5.0 + 4.0 * (1.0 - np.exp(-t / 3.0)) + rng.normal(0, 0.3, t.size)
-    flt = EDAFilter(
+    flt = EACFilter(
         "z0 + c*(1-exp(-k*t))", "t", p0=[3.0, 0.3, 4.0], window_size=40,
         q_diag=[1e-3, 1e-3, 1e-3], r=0.5, n_sub=2, adapt_r=True,
     )
@@ -229,7 +229,7 @@ def test_last_residual_is_the_forecast_innovation():
     rng = np.random.default_rng(2)
     t = np.linspace(0, 6, 200)
     y = 2.0 + 0.5 * t + 0.1 * t**2 + rng.normal(0, 0.2, t.size)
-    flt = EDAFilter(
+    flt = EACFilter(
         "c0 + c1*t + c2*t**2", "t", p0=[0.0, 0.0, 0.0], window_size=15,
         q_diag=[1e-2, 1e-2, 1e-2], r=0.5, n_sub=2, adapt_r=True,
     )
@@ -260,7 +260,7 @@ def test_inflate_scales_covariance_for_both_filters():
     """``inflate`` multiplies the parameter covariance (the external-detector
     re-arming hook) -- both with an explicit factor and the configured default."""
     for cls, kw in [
-        (EDAFilter, dict(window_size=15)),
+        (EACFilter, dict(window_size=15)),
         (LSIFilter, dict(window_size=20, order=3)),
     ]:
         flt = cls("c0 + c1*t", "t", p0=[0.0, 0.0],

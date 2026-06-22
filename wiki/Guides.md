@@ -7,7 +7,7 @@ and still understand the point. When you want the fully rigorous derivations,
 each section links to the matching file in [../methods/](Methods).
 
 - **This page** -- the one core idea behind everything, with pictures in words.
-- [methods-explained.md](Guides-Methods-Explained) -- each fitting method (LSI, EDA,
+- [methods-explained.md](Guides-Methods-Explained) -- each fitting method (LSI, EAC,
   DSB, the streaming filters): intuition -> how it works -> the proof -> the tuning
   knobs and adaptations.
 - [lineage-and-variants.md](Guides-Lineage-and-Variants) -- the **complete atlas**:
@@ -138,7 +138,7 @@ strictly* they match it. From strictest/most-fragile to most-relaxed/robust:
                                   |
    +------------------+----------------------+---------------------+
    |                  |                      |                     |
- DSB                 LSI                    EDA                EDAFilter / LSIFilter
+ DSB                 LSI                    EAC                EACFilter / LSIFilter
  match the           match the              match integrated     match fingerprints
  fingerprint         fingerprints in a      AREAS over           one sample at a
  EXACTLY             least-squares sense    windows              time (streaming)
@@ -157,14 +157,14 @@ strictly* they match it. From strictest/most-fragile to most-relaxed/robust:
   (Legendre polynomials) that is numerically stable.
   -> [methods-explained.md#lsi](Guides-Methods-Explained#lsi)
 
-- **EDA -- Equal Differential Areas.** Matches the simplest possible integral
+- **EAC -- Equal-Areas Criterion.** Matches the simplest possible integral
   fingerprint: the **area** under the curve over a handful of windows. Because it
   only ever integrates the data (never differentiates, never builds a high-order
   polynomial), it is the **most noise-robust** and the **fastest** batch method.
   Best for few-parameter transient and saturating shapes.
-  -> [methods-explained.md#eda](Guides-Methods-Explained#eda)
+  -> [methods-explained.md#eac](Guides-Methods-Explained#eac)
 
-- **EDAFilter / LSIFilter -- the streaming versions.** Run EDA's (or LSI's)
+- **EACFilter / LSIFilter -- the streaming versions.** Run EAC's (or LSI's)
   matching **recursively**, updating the estimate with each new sample at fixed
   cost, like a Kalman filter. They **track parameters that change over time** and
   **detect regime changes** (a sudden break in the data). This is the real-time

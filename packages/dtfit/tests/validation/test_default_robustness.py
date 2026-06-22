@@ -54,7 +54,7 @@ _REGRESSOR_MODELS = [
 
 
 @pytest.mark.parametrize("name", _REGRESSOR_MODELS)
-@pytest.mark.parametrize("method", ["lsi", "eda"])
+@pytest.mark.parametrize("method", ["lsi", "eac"])
 def test_nonline_regressor_defaults(name, method):
     scn = next(s for s in SCENARIOS if s.name == name)
     x, y, clean = scn.make(0.03, seed=0)

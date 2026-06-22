@@ -1,6 +1,6 @@
 """Experiment 9 -- embedded / low-resource footprint of the streaming filters.
 
-The streaming estimators (`EDAFilter`, `LSIFilter`) are the
+The streaming estimators (`EACFilter`, `LSIFilter`) are the
 only part of dtfit meant for *online* deployment, and the natural place to ask
 the hardware question raised by the GPS experiment: **can this run on the kind of
 microcontroller you would bolt to a GPS module?** (Arduino / STM32 / ESP32 class.)
@@ -31,7 +31,7 @@ import tracemalloc
 import numpy as np
 from scipy.optimize import curve_fit
 
-from dtfit.streaming import EDAFilter, LSIFilter
+from dtfit.streaming import EACFilter, LSIFilter
 
 from dtfit_experimental.experiments.common import ReportWriter, fmt
 from dtfit_experimental.experiments.common.plotting import plt
@@ -43,8 +43,8 @@ EXP_DIR = __file__.rsplit("run.py", 1)[0]
 # --------------------------------------------------------------------------- #
 # algorithmic (deployable) state size -- the C struct, the real embedded number
 # --------------------------------------------------------------------------- #
-def state_doubles_eda(n: int, w: int, n_sub: int = 2) -> int:
-    """Floating-point words a minimal C port of EDAFilter must keep alive
+def state_doubles_eac(n: int, w: int, n_sub: int = 2) -> int:
+    """Floating-point words a minimal C port of EACFilter must keep alive
     between samples (a fixed-size, no-malloc struct):
 
       * ring buffer  t[W], y[W]                       -> 2W
@@ -61,7 +61,7 @@ def state_doubles_eda(n: int, w: int, n_sub: int = 2) -> int:
 
 
 def state_bytes(n: int, w: int, dtype_bytes: int) -> int:
-    return state_doubles_eda(n, w) * dtype_bytes
+    return state_doubles_eac(n, w) * dtype_bytes
 
 
 def state_doubles_lsi_ram(n: int, w: int) -> int:
@@ -91,7 +91,7 @@ def state_doubles_kalman(dim: int = 3) -> int:
 
 
 def approx_flops_per_update(n: int, w: int, n_sub: int = 2) -> int:
-    """Rough FLOP count for one EDAFilter update with a degree-(n-1)
+    """Rough FLOP count for one EACFilter update with a degree-(n-1)
     polynomial model. Dominated by evaluating the model and its n derivatives
     over the W-point window (~2*W*n each), plus the small (n_sub x n) Kalman
     algebra. Order-of-magnitude, for the MCU compute sanity check."""
@@ -221,10 +221,10 @@ def main(quick: bool = False) -> str:
     lat_by_cfg = {}
     for label, expr, var, p0, kw, n, w in configs:
         def make(expr=expr, var=var, p0=p0, kw=kw):
-            return EDAFilter(expr, var, p0=p0, **kw)
+            return EACFilter(expr, var, p0=p0, **kw)
         us = measure_latency(make, n_warm=w + 5, n_timed=n_timed)
         lat_by_cfg[label] = us
-        lat_rows.append(["EDAFilter", label, f"n={n}, W={w}",
+        lat_rows.append(["EACFilter", label, f"n={n}, W={w}",
                          fmt(us, "{:.1f}"), fmt(1e6 / us, "{:,.0f}")])
     # LSIFilter (the orthogonal-spectrum sibling): more observability
     # per window at the cost of an order+1 projection -- so a bit heavier per step.
@@ -246,7 +246,7 @@ def main(quick: bool = False) -> str:
     rep.text(
         "`FilterBank` is just K of these run together (one per axis/channel/"
         "satellite), so its cost and memory are K× a single filter — e.g. the "
-        "3-axis GPS tracker is 3 `EDAFilter`s. The Legendre filter is the "
+        "3-axis GPS tracker is 3 `EACFilter`s. The Legendre filter is the "
         "heaviest per step (it projects onto `order+1` orthogonal moments for "
         "extra observability); the Kalman is the lightest (no window, no "
         "integral). All sit far under any real-time budget.")
@@ -263,7 +263,7 @@ def main(quick: bool = False) -> str:
         "for these window sizes).")
     mem_rows = []
     for label, expr, var, p0, kw, n, w in configs:
-        words = state_doubles_eda(n, w)
+        words = state_doubles_eac(n, w)
         mem_rows.append([
             label, f"n={n}, W={w}", f"{words}",
             f"{state_bytes(n, w, 8):,} B", f"{state_bytes(n, w, 4):,} B",
@@ -293,7 +293,7 @@ def main(quick: bool = False) -> str:
     py_label, *_ = configs[0]
     _, expr0, var0, p00, kw0, _, w0 = configs[0]
     py_bytes = measure_resident_python(
-        lambda: EDAFilter(expr0, var0, p0=p00, **kw0), n_warm=w0 + 5)
+        lambda: EACFilter(expr0, var0, p0=p00, **kw0), n_warm=w0 + 5)
     rep.text(
         f"For contrast, one *Python* filter object (warmed) holds ≈ "
         f"**{py_bytes / 1024:,.0f} KB** of interpreter/NumPy objects — hundreds of "
@@ -333,8 +333,8 @@ def main(quick: bool = False) -> str:
 
     # ---- comparison vs existing methods --------------------------------- #
     cf_us = measure_curvefit_latency(w=15, n_timed=120 if quick else 400)
-    eda_us = lat_by_cfg[configs[0][0]]
-    cf_ratio = cf_us / eda_us
+    eac_us = lat_by_cfg[configs[0][0]]
+    cf_ratio = cf_us / eac_us
     mlp_lag, mlp_hid = 10, 16
     mlp_weights = mlp_lag * mlp_hid + mlp_hid + mlp_hid + 1  # 1 hidden layer
     rep.section(
@@ -345,12 +345,12 @@ def main(quick: bool = False) -> str:
         "compute**, and **(c) can it adapt on-device** (vs. train-offline-only). "
         "State is the 3-axis / equivalent figure in float32.")
     comp_rows = [
-        ["dtfit `EDAFilter` ×3", f"~{state_bytes(3, 15, 4) * 3:,} B",
-         "no (fixed window)", f"1× ({eda_us:.0f} µs)", "yes — recursive"],
+        ["dtfit `EACFilter` ×3", f"~{state_bytes(3, 15, 4) * 3:,} B",
+         "no (fixed window)", f"1× ({eac_us:.0f} µs)", "yes — recursive"],
         ["dtfit `LSIFilter`", f"~{lsi_ram * 4:,} B + flash tables",
-         "no (fixed window)", f"~{lsi_us / eda_us:.1f}×", "yes — recursive"],
+         "no (fixed window)", f"~{lsi_us / eac_us:.1f}×", "yes — recursive"],
         ["CA Kalman ×3 (gold standard)", f"~{state_doubles_kalman(3) * 4} B",
-         "no (no window)", f"{kf_us / eda_us:.2f}×", "yes — recursive"],
+         "no (no window)", f"{kf_us / eac_us:.2f}×", "yes — recursive"],
         ["sliding-window `curve_fit` (LM)", "~window only",
          "no (fixed window)", f"~{cf_ratio:.0f}× ({cf_us:.0f} µs)",
          "refit from scratch / step"],

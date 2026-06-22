@@ -1,6 +1,6 @@
 """Shared internals of the differential-transformation fitting methods.
 
-Collected here so the method modules (``lsi`` / ``eda`` / ``dsb``) draw on one
+Collected here so the method modules (``lsi`` / ``eac`` / ``dsb``) draw on one
 small toolbox rather than a scatter of one-function files:
 
 - symbolic spectrum helpers: :func:`model_params`, :func:`taylor_coeffs`;

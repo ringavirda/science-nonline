@@ -30,13 +30,13 @@ signatures, arguments, return types, and behavior.
 
 | Area | Names | Page |
 |---|---|---|
-| **Batch fitting** | `fit_lsi`, `fit_eda`, `fit_eda_adaptive`, `fit_dsb`, `find_degree`, `fft_frequency_seed` | [fitting.md](API-Fitting) |
+| **Batch fitting** | `fit_lsi`, `fit_eac`, `fit_eac_adaptive`, `fit_dsb`, `find_degree`, `fft_frequency_seed` | [fitting.md](API-Fitting) |
 | **Result type** | `FittingResult` | [types.md](API-Types) |
 | **sklearn estimator** | `NonlineRegressor` | [estimator.md](API-Estimator) |
 | **One-call entry points** | `auto_estimate`, `auto_forecast` | [auto.md](API-Auto) |
 | **Model framework** | `models`, `Model`, `suggest_models` (+ catalog families) | [models.md](API-Models) |
-| **Streaming / online** | `EDAFilter`, `LSIFilter`, `FilterBank`, `FusedChiSquareDetector` | [streaming.md](API-Streaming) |
-| **Scaling backends** | `fit_many`, `FittingProblem`, `BatchFittingResult`, `PartitionedLSI`, `PartitionedEDA`, `PartitionedBatchLSI`, `fit_lsi_batched`, `project_spectra` | [scaling.md](API-Scaling) |
+| **Streaming / online** | `EACFilter`, `LSIFilter`, `FilterBank`, `FusedChiSquareDetector` | [streaming.md](API-Streaming) |
+| **Scaling backends** | `fit_many`, `FittingProblem`, `BatchFittingResult`, `PartitionedLSI`, `PartitionedEAC`, `PartitionedBatchLSI`, `fit_lsi_batched`, `project_spectra` | [scaling.md](API-Scaling) |
 | **Diagnostics** | `fit_report`, `residual_diagnostics`, `FitDisplay`, `ResidualsDisplay` | [diagnostics.md](API-Diagnostics) |
 | **Logging** | `enable_logging`, `logger` | [below](#logging) |
 
@@ -44,7 +44,7 @@ signatures, arguments, return types, and behavior.
 
 ```python
 # batch fitting
-from dtfit import (fit_lsi, fit_eda, fit_eda_adaptive, fit_dsb,
+from dtfit import (fit_lsi, fit_eac, fit_eac_adaptive, fit_dsb,
                    find_degree, fft_frequency_seed, FittingResult)
 
 # high-level entry points
@@ -57,11 +57,11 @@ from dtfit import models, Model, suggest_models
 from dtfit import NonlineRegressor
 
 # streaming
-from dtfit import EDAFilter, LSIFilter, FilterBank, FusedChiSquareDetector
+from dtfit import EACFilter, LSIFilter, FilterBank, FusedChiSquareDetector
 
 # scaling
 from dtfit import (fit_many, FittingProblem, BatchFittingResult,
-                   PartitionedLSI, PartitionedEDA, PartitionedBatchLSI,
+                   PartitionedLSI, PartitionedEAC, PartitionedBatchLSI,
                    fit_lsi_batched, project_spectra)
 
 # diagnostics (submodule, not top-level - sklearn convention)

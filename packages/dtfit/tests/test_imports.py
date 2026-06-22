@@ -11,9 +11,9 @@ import dtfit
 def test_top_level_api():
     for name in [
         "NonlineRegressor",
-        "EDAFilter",
+        "EACFilter",
         "fit_lsi",
-        "fit_eda",
+        "fit_eac",
         "fit_dsb",
         "models",
         "suggest_models",

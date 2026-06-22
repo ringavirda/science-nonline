@@ -19,7 +19,7 @@ benefits from the GIL-released kernels).
 
 ## Measured results
 
-A batch of independent EDA fits across loky workers (Exp 7):
+A batch of independent EAC fits across loky workers (Exp 7):
 
 | workers P | time (s) | speedup |
 |---|---|---|

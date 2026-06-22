@@ -4,7 +4,7 @@ Produces, for the per-method documentation (the wiki ``Methods`` pages):
 
   * figures (PNG) into ``wiki/figures/`` -- a scenario plot per method
     showing it on the data it is *best* at (LSI exponential + oscillatory recipe;
-    EDA saturation + adaptive-window peak; DSB additive form; the EDA/LSI streaming
+    EAC saturation + adaptive-window peak; DSB additive form; the EAC/LSI streaming
     filters; the fused multi-axis bank; the partitioned/GEMM scale backends; the
     auto pipelines), plus a cross-method error bar chart, in the paper style;
   * comparison tables (printed as GitHub-flavoured markdown to stdout) of the
@@ -38,7 +38,7 @@ import numpy as np
 from scipy.optimize import curve_fit
 
 import dtfit as dt
-from dtfit.streaming import EDAFilter
+from dtfit.streaming import EACFilter
 
 DATA_DIR = Path(__file__).resolve().parent / "data"
 
@@ -140,8 +140,8 @@ def table_model_exponential() -> str:
     res, ms = timed(lambda: dt.fit_lsi(x, y, expr, var, bounds=bounds))
     add("LSI", res.coeffs, np.asarray(res.model(x)), ms)
 
-    res, ms = timed(lambda: dt.fit_eda(x, y, expr, var, p0=[1.0, 1.0]))
-    add("EDA", res.coeffs, np.asarray(res.model(x)), ms)
+    res, ms = timed(lambda: dt.fit_eac(x, y, expr, var, p0=[1.0, 1.0]))
+    add("EAC", res.coeffs, np.asarray(res.model(x)), ms)
 
     def sci():
         p, _ = curve_fit(lambda xx, a, b: a * np.exp(b * xx), x, y,
@@ -194,7 +194,7 @@ def table_dsb_additive() -> str:
     title = ("**Model data** — `y = a0 + a1·x + a2·exp(a3·x)` (DSB's intended "
              "additive form), x∈[0,3], 5 % noise. DSB is evaluated as a *curve "
              "fit* (R²); under noise it does not uniquely recover the four "
-             "parameters, which is why the numeric LSI/EDA successors exist.")
+             "parameters, which is why the numeric LSI/EAC successors exist.")
     return title + "\n\n" + md_table(
         ["method", "R²", "RMSE", "MAPE %", "fit (ms)"], rows)
 
@@ -214,7 +214,7 @@ def table_real_data() -> str:
     cov_rows = []
     for name, coeffs in [
         ("LSI", dt.fit_lsi(t, ys, "a*exp(b*x)", "x", bounds=bounds).coeffs),
-        ("EDA", dt.fit_eda(t, ys, "a*exp(b*x)", "x", p0=[ys[0], 1.0]).coeffs),
+        ("EAC", dt.fit_eac(t, ys, "a*exp(b*x)", "x", p0=[ys[0], 1.0]).coeffs),
     ]:
         a, b = coeffs
         m = metrics(y, a * np.exp(b * t) * y[0])
@@ -233,7 +233,7 @@ def table_real_data() -> str:
     tt = np.arange(n) * h
     r0 = rate[0]
     rs = rate / r0
-    flt = EDAFilter("a*exp(b*x)", "x", p0=[1.0, 0.0],
+    flt = EACFilter("a*exp(b*x)", "x", p0=[1.0, 0.0],
                            window_size=30, q_diag=[5e-3, 5e-3], r=0.5)
     track, truth, drifts = [], [], 0
     for i in range(n):
@@ -247,9 +247,9 @@ def table_real_data() -> str:
     m_step = metrics(truth[1:], track[:-1])
     m_rw = metrics(truth[1:], truth[:-1])
     fx_rows = [
-        ["EDAFilter (lag-1 tracking)", f"{m_track['R2']:.4f}",
+        ["EACFilter (lag-1 tracking)", f"{m_track['R2']:.4f}",
          f"{m_track['RMSE']:.4g}", f"{m_track['MAPE']:.2f}"],
-        ["EDAFilter (1-step-ahead)", f"{m_step['R2']:.4f}",
+        ["EACFilter (1-step-ahead)", f"{m_step['R2']:.4f}",
          f"{m_step['RMSE']:.4g}", f"{m_step['MAPE']:.2f}"],
         ["naive random walk (1-step)", f"{m_rw['R2']:.4f}",
          f"{m_rw['RMSE']:.4g}", f"{m_rw['MAPE']:.2f}"],
@@ -304,16 +304,16 @@ def fig_lsi() -> None:
     plt.close(fig)
 
 
-def fig_eda() -> None:
+def fig_eac() -> None:
     x, y, clean, _ = synthetic_atan()
-    res = dt.fit_eda(x, y, "a*atan(w*x)", "x", p0=[1.0, 1.0])
+    res = dt.fit_eac(x, y, "a*atan(w*x)", "x", p0=[1.0, 1.0])
     yhat = np.asarray(res.model(x))
     a, w = res.coeffs
 
     fig, ax = plt.subplots(1, 2, figsize=(10, 3.8))
     ax[0].scatter(x, y, s=12, c="0.6", label="noisy samples (8 %)")
     ax[0].plot(x, clean, "k--", lw=1, label="ground truth")
-    ax[0].plot(x, yhat, "tab:green", lw=2, label="EDA fit")
+    ax[0].plot(x, yhat, "tab:green", lw=2, label="EAC fit")
     # shade the per-parameter integration windows
     n = 2
     idx_max = max(int(x.size * 0.8), n + 1)
@@ -322,12 +322,12 @@ def fig_eda() -> None:
         s = i * win
         e = (i + 1) * win if i < n - 1 else idx_max
         ax[0].axvspan(x[s], x[min(e, x.size) - 1], alpha=0.07, color="tab:green")
-    ax[0].set_title(f"EDA fit — y = a·atan(w·x)  (a={a:.2f}, w={w:.2f})")
+    ax[0].set_title(f"EAC fit — y = a·atan(w·x)  (a={a:.2f}, w={w:.2f})")
     ax[0].set_xlabel("x")
     ax[0].set_ylabel("y")
     ax[0].legend(fontsize=8)
 
-    # cumulative area: the quantity EDA actually matches
+    # cumulative area: the quantity EAC actually matches
     from scipy.integrate import cumulative_trapezoid
     area_d = cumulative_trapezoid(y, x, initial=0)
     area_m = cumulative_trapezoid(yhat, x, initial=0)
@@ -338,7 +338,7 @@ def fig_eda() -> None:
     ax[1].set_ylabel("cumulative area")
     ax[1].legend(fontsize=8)
     fig.tight_layout()
-    fig.savefig(FIG_DIR / "eda_fit.png")
+    fig.savefig(FIG_DIR / "eac_fit.png")
     plt.close(fig)
 
 
@@ -349,7 +349,7 @@ def fig_filter() -> None:
     t = np.arange(n) * h
     r0 = rate[0]
     rs = rate / r0
-    flt = EDAFilter("a*exp(b*x)", "x", p0=[1.0, 0.0],
+    flt = EACFilter("a*exp(b*x)", "x", p0=[1.0, 0.0],
                            window_size=30, q_diag=[5e-3, 5e-3], r=0.5)
     track, drift_idx = [], []
     b_hist = []
@@ -367,7 +367,7 @@ def fig_filter() -> None:
     for j, di in enumerate(drift_idx):
         ax[0].axvline(di, color="tab:purple", ls="--", lw=1.2,
                       label="drift detected" if j == 0 else None)
-    ax[0].set_title("EDAFilter — online tracking + drift detection")
+    ax[0].set_title("EACFilter — online tracking + drift detection")
     ax[0].set_xlabel("sample (trading day)")
     ax[0].set_ylabel("UAH per USD")
     ax[0].legend(fontsize=8)
@@ -420,7 +420,7 @@ def fig_comparison() -> None:
     expr, var = "a*exp(b*x)", "x"
     preds = {}
     preds["LSI"] = np.asarray(dt.fit_lsi(x, y, expr, var, bounds=[(0.2, 5), (0.5, 4)]).model(x))
-    preds["EDA"] = np.asarray(dt.fit_eda(x, y, expr, var, p0=[1.0, 1.0]).model(x))
+    preds["EAC"] = np.asarray(dt.fit_eac(x, y, expr, var, p0=[1.0, 1.0]).model(x))
     p, _ = curve_fit(lambda xx, a, b: a * np.exp(b * xx), x, y, p0=[1, 1], maxfev=10000)
     preds["SciPy\ncurve_fit"] = p[0] * np.exp(p[1] * x)
     c = np.polyfit(x, y, 5)
@@ -488,8 +488,8 @@ def fig_lsi_oscillatory() -> None:
     fig.tight_layout(); fig.savefig(FIG_DIR / "lsi_oscillatory.png"); plt.close(fig)
 
 
-def fig_eda_adaptive() -> None:
-    """Adaptive EDA's scenario: a sharp sigmoid step, where the curvature is
+def fig_eac_adaptive() -> None:
+    """Adaptive EAC's scenario: a sharp sigmoid step, where the curvature is
     localized at the bend so curvature-placed windows cluster there (carrying the
     parameter information) instead of spreading evenly."""
     rng = np.random.default_rng(4)
@@ -497,7 +497,7 @@ def fig_eda_adaptive() -> None:
     L_t, k_t, x0_t = 1.0, 2.5, 5.0
     clean = L_t / (1.0 + np.exp(-k_t * (x - x0_t)))   # sharp step at x0=5
     y = clean + rng.normal(0, 0.02, x.size)
-    res = dt.fit_eda_adaptive(x, y, "L/(1 + exp(-k*(x - x0)))", "x", p0=[1.0, 1.0, 5.0])
+    res = dt.fit_eac_adaptive(x, y, "L/(1 + exp(-k*(x - x0)))", "x", p0=[1.0, 1.0, 5.0])
     yhat = np.asarray(res.model(x))
     m = 6
 
@@ -516,10 +516,10 @@ def fig_eda_adaptive() -> None:
     ax[0].scatter(x, y, s=8, c="0.7", label="samples")
     ax[0].plot(x, clean, "k--", lw=1, label="ground truth")
     ax[0].plot(x, yhat, "tab:green", lw=2,
-               label=f"adaptive EDA (k={res.params['k']:.2f}, x0={res.params['x0']:.2f})")
+               label=f"adaptive EAC (k={res.params['k']:.2f}, x0={res.params['x0']:.2f})")
     for xe in adaptive_x:
         ax[0].axvline(xe, color="tab:green", ls=":", lw=1, alpha=0.7)
-    ax[0].set_title("Adaptive EDA — sharp sigmoid step (curvature window edges)")
+    ax[0].set_title("Adaptive EAC — sharp sigmoid step (curvature window edges)")
     ax[0].set_xlabel("x"); ax[0].set_ylabel("y"); ax[0].legend(fontsize=8)
 
     ax[1].plot(x, cum[1:], "tab:green", lw=1.8, label="cumulative |curvature|")
@@ -534,14 +534,14 @@ def fig_eda_adaptive() -> None:
     ax[1].set_title("Edges at equal information, not equal x")
     ax[1].set_xlabel("x"); ax[1].set_ylabel("normalized cumulative curvature")
     ax[1].legend(fontsize=8, loc="upper left")
-    fig.tight_layout(); fig.savefig(FIG_DIR / "eda_adaptive.png"); plt.close(fig)
+    fig.tight_layout(); fig.savefig(FIG_DIR / "eac_adaptive.png"); plt.close(fig)
 
 
 def fig_lsi_filter() -> None:
     """LSIFilter's scenario: track a steady oscillation. The spectrum measurement
-    locks onto the cycle's frequency; the EDAFilter's *area* measurement nearly
+    locks onto the cycle's frequency; the EACFilter's *area* measurement nearly
     cancels over a cycle, so it cannot — the reason the LSIFilter exists."""
-    from dtfit.streaming import LSIFilter, EDAFilter
+    from dtfit.streaming import LSIFilter, EACFilter
 
     rng = np.random.default_rng(5)
     t = np.linspace(0, 50, 1200)
@@ -558,22 +558,22 @@ def fig_lsi_filter() -> None:
 
     w_lsi, p_lsi = run(LSIFilter("A*sin(w*t)", "t", p0=[1.0, 0.8],
                                  window_size=120, order=6, q_diag=[1e-3, 1e-3], r=1.5))
-    w_eda, p_eda = run(EDAFilter("A*sin(w*t)", "t", p0=[1.0, 0.8],
+    w_eac, p_eac = run(EACFilter("A*sin(w*t)", "t", p0=[1.0, 0.8],
                                  window_size=120, q_diag=[1e-3, 1e-3], r=1.5))
 
     fig, ax = plt.subplots(1, 2, figsize=(10, 3.8))
     sl = slice(int(t.size * 0.62), int(t.size * 0.74))   # zoom for the overlay
     ax[0].plot(t[sl], y[sl], "0.75", lw=1.2, label="signal")
     ax[0].plot(t[sl], p_lsi[sl], "tab:blue", lw=1.6, label="LSIFilter (spectrum)")
-    ax[0].plot(t[sl], p_eda[sl], "tab:orange", lw=1.6, ls="--", label="EDAFilter (area)")
+    ax[0].plot(t[sl], p_eac[sl], "tab:orange", lw=1.6, ls="--", label="EACFilter (area)")
     ax[0].set_title("Online 1-step prediction — A·sin(w·t)")
     ax[0].set_xlabel("t"); ax[0].set_ylabel("y"); ax[0].legend(fontsize=8)
 
     ax[1].axhline(w_t, color="k", ls="--", lw=1, label="true ω = 1.3")
     ax[1].plot(t, w_lsi, "tab:blue", lw=1.6,
                label=f"LSIFilter ω → {w_lsi[-1]:.2f} (locks on)")
-    ax[1].plot(t, w_eda, "tab:orange", lw=1.6,
-               label=f"EDAFilter ω → {w_eda[-1]:.2f} (area cancels)")
+    ax[1].plot(t, w_eac, "tab:orange", lw=1.6,
+               label=f"EACFilter ω → {w_eac[-1]:.2f} (area cancels)")
     ax[1].set_title("Spectrum measurement tracks the cycle; area does not")
     ax[1].set_xlabel("t"); ax[1].set_ylabel("ω estimate"); ax[1].legend(fontsize=8)
     fig.tight_layout(); fig.savefig(FIG_DIR / "lsi_filter.png"); plt.close(fig)
@@ -719,8 +719,8 @@ def main() -> None:
     print("Generating figures into", FIG_DIR)
     fig_lsi()
     fig_lsi_oscillatory()
-    fig_eda()
-    fig_eda_adaptive()
+    fig_eac()
+    fig_eac_adaptive()
     fig_filter()
     fig_lsi_filter()
     fig_filter_bank()

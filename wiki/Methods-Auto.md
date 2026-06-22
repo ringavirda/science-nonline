@@ -22,9 +22,9 @@ it selects the variant whose criterion suits the signal's shape:
 | detected/[requested] shape | routes to | why |
 |---|---|---|
 | **oscillatory** (`freq_param` given, or FFT power share > 0.10) | [`fit_lsi`](Methods-LSI) oscillatory recipe | the spectrum (not an area) observes a cycle |
-| **transient / peak** | [`fit_eda_adaptive`](Methods-EDA) (curvature windows) | windows concentrate on the bend |
-| **robust** (outliers) | [`fit_eda`](Methods-EDA) with `loss="soft_l1"` | area integration + window down-weighting |
-| **bulk** (default) | the better of `fit_lsi` / `fit_eda` by in-sample RMSE | smooth shapes; pick the lower-residual fit |
+| **transient / peak** | [`fit_eac_adaptive`](Methods-EAC) (curvature windows) | windows concentrate on the bend |
+| **robust** (outliers) | [`fit_eac`](Methods-EAC) with `loss="soft_l1"` | area integration + window down-weighting |
+| **bulk** (default) | the better of `fit_lsi` / `fit_eac` by in-sample RMSE | smooth shapes; pick the lower-residual fit |
 
 **Shape detection** (`shape="auto"`) is an FFT test: a linearly-detrended series is
 transformed, and if the dominant spectral peak carries more than 10 % of the
@@ -76,7 +76,7 @@ The return is the length-`horizon` forecast on the extrapolated grid.
 
 `auto_estimate` / `auto_forecast` are where the per-method math is *operationalized*
 into a usable default. They compose only stable pieces ([`fit_lsi`](Methods-LSI),
-[`fit_eda`](Methods-EDA), [`fit_eda_adaptive`](Methods-EDA),
+[`fit_eac`](Methods-EAC), [`fit_eac_adaptive`](Methods-EAC),
 [`fft_frequency_seed`](API-Fitting#fft_frequency_seed)) -- the conservative
 merges the domain studies validated -- and they preserve the honest negatives those
 studies reported:
@@ -102,7 +102,7 @@ back to persistence rather than chasing the noise with a polynomial.
 right-for-the-shape estimator without choosing it yourself; **use `auto_forecast`**
 for a structured, guarded forecast of a series with real extrapolable structure
 (growth, saturation, a clean cycle). For deliberate control over the estimator,
-call the individual methods ([LSI](Methods-LSI), [EDA](Methods-EDA)); for *model* inference
+call the individual methods ([LSI](Methods-LSI), [EAC](Methods-EAC)); for *model* inference
 (which family fits at all) use [`suggest_models`](API-Models). The honest
 ceilings above are the reason both functions exist as *conservative* composers
 rather than aggressive optimizers.

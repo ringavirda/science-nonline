@@ -52,7 +52,7 @@ def test_fit_display_from_estimator(arctan_data):
     from dtfit.diagnostics import FitDisplay
 
     x, y, _ = arctan_data
-    reg = NonlineRegressor("a*atan(w*x)", "x", method="eda", p0=[1, 1]).fit(x, y)
+    reg = NonlineRegressor("a*atan(w*x)", "x", method="eac", p0=[1, 1]).fit(x, y)
     disp = FitDisplay.from_estimator(reg, x, y)
     assert disp.ax_ is not None
     assert disp.figure_ is not None

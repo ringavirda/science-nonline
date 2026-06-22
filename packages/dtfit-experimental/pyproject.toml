@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "dtfit-experimental"
 version = "0.1.0"
-description = "Experimental EDA/LSI adaptations and the dtfit experiment suite (depends on dtfit)"
+description = "Experimental EAC/LSI adaptations and the dtfit experiment suite (depends on dtfit)"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
@@ -65,7 +65,10 @@ target-version = "py310"
 testpaths = ["tests"]
 
 [tool.mypy]
-python_version = "3.10"
+# No `python_version` pin: mypy targets each CI matrix interpreter (3.10-3.13).
+# Pinning to 3.10 forced mypy to reject PEP 695 `type` statements in the newer
+# numpy stubs that pip installs on the 3.12/3.13 runners; the 3.10 matrix job
+# still enforces the language floor.
 files = ["src/dtfit_experimental"]
 # The experiment suite (numeric-prefixed folders like ``01_control_systems`` are
 # imported by string via the runner, not as importable package names) is a

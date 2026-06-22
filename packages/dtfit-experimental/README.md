@@ -1,6 +1,6 @@
 # dtfit-experimental
 
-Experimental structural adaptations of the `dtfit` EDA / LSI methods, plus the
+Experimental structural adaptations of the `dtfit` EAC / LSI methods, plus the
 full experiment / validation suite. This is a **separate distribution** that
 depends on the stable [`dtfit`](../dtfit) package: it never ships inside the published
 `dtfit` wheel, so the public API stays lean while new method modifications are
@@ -19,9 +19,9 @@ prototyped and evaluated here.
 
 When an adaptation proves effective across enough domains it is **promoted into
 stable `dtfit`** and physically moved there; it is then imported from `dtfit`,
-not from here. Already promoted: `PartitionedLSI` / `PartitionedEDA` (#1), the
+not from here. Already promoted: `PartitionedLSI` / `PartitionedEAC` (#1), the
 GEMM-batched `fit_lsi_batched` / `project_spectra` and fused multi-channel
-`PartitionedBatchLSI`, the adaptive-window `fit_eda_adaptive` (#6), the LSI
+`PartitionedBatchLSI`, the adaptive-window `fit_eac_adaptive` (#6), the LSI
 **oscillatory recipe** (`dtfit.fit_lsi(oscillatory=…, freq_param=…)` +
 `dtfit.fft_frequency_seed`), and the multi-axis `FusedChiSquareDetector`.
 

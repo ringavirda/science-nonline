@@ -44,7 +44,7 @@ python build_native.py --clean    # remove the build artifacts
 It is entirely optional: without it the package falls back to NumPy/SciPy with
 identical results (`dtfit._kernels.HAVE_NATIVE` reports the active backend).
 Building it speeds up the area-based methods substantially — the streaming
-`EDAFilter` by roughly 6–13× and batch `EDA` by ~3× — while the
+`EACFilter` by roughly 6–13× and batch `EAC` by ~3× — while the
 already-vectorized Legendre/LSI paths are largely unchanged.
 
 ## Quick start
@@ -57,7 +57,7 @@ x = np.linspace(0, 10, 400)
 y = ...  # your observations
 
 # Batch fit, numeric (no polynomial pre-fit needed):
-result = dt.fit_eda(x, y, "a*atan(w*x)", "x")
+result = dt.fit_eac(x, y, "a*atan(w*x)", "x")
 print(result.params)
 
 # ...or through the scikit-learn compatible estimator:
@@ -69,7 +69,7 @@ y_hat = reg.predict(x)
 ### Real-time / streaming
 
 ```python
-flt = dt.EDAFilter("A*sin(w*t)", "t", p0=[1.0, 1.0], window_size=50)
+flt = dt.EACFilter("A*sin(w*t)", "t", p0=[1.0, 1.0], window_size=50)
 for t, y in stream:           # bounded-cost per-sample update
     flt.partial_fit(t, y)
 print(flt.params_)            # tracks time-varying parameters
@@ -125,13 +125,13 @@ FitDisplay.from_estimator(reg, x, y)  # data + fitted curve (needs the viz extra
 
 - **LSI** (`method="lsi"`) — least-squares integral; numeric integral-OLS in the
   differential-transformation scheme (successor to DSBI).
-- **EDA** (`method="eda"`) — equal differential areas / equal areas; numeric,
+- **EAC** (`method="eac"`) — equal-areas criterion; numeric,
   integration-based and noise-robust (successor to DSBE).
-- **EDAFilter** — recursive/online EDA with NIS drift detection for
+- **EACFilter** — recursive/online EAC with NIS drift detection for
   real-time tracking.
 - **DSB** (`method="dsb"`) — symbolic differential spectra balance; kept as the
   analytical reference (requires a polynomial fit first in the pipeline).
-- **PartitionedLSI / PartitionedEDA** — map-reduce LSI/EDA: because the
+- **PartitionedLSI / PartitionedEAC** — map-reduce LSI/EAC: because the
   empirical spectrum and the window areas are *integrals*, they are additive
   over a partition of the domain, so a stream of any length is fitted in one
   pass with O(order) state, and partitions reduce (sum) across workers. Use for

@@ -6,7 +6,7 @@ Per-problem independence makes dtfit embarrassingly parallel. Three tools:
   across CPU cores.
 - `fit_lsi_batched` / `project_spectra` - many channels' projections in one
   GEMM, on a pluggable backend (`numpy` / `cupy` / `torch`).
-- `PartitionedLSI` / `PartitionedEDA` / `PartitionedBatchLSI` - one-pass /
+- `PartitionedLSI` / `PartitionedEAC` / `PartitionedBatchLSI` - one-pass /
   distributed (map-reduce) estimators for streams too big for memory.
 
 

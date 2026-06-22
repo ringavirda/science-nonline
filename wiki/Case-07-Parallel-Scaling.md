@@ -28,7 +28,7 @@ Near-linear to the physical-core count (peak **7.6x** at P=8), tapering past 16 
 
 ## 2. fit_many -- independent fits across processes
 
-A batch of independent EDA fits fanned across loky workers. These are embarrassingly parallel, but each fit is short (~ms, with a SymPy lambdify) so on this platform the process dispatch/spawn overhead caps the practical speedup of fine-grained fits.
+A batch of independent EAC fits fanned across loky workers. These are embarrassingly parallel, but each fit is short (~ms, with a SymPy lambdify) so on this platform the process dispatch/spawn overhead caps the practical speedup of fine-grained fits.
 
 | workers P | time (s) | speedup |
 |---|---|---|

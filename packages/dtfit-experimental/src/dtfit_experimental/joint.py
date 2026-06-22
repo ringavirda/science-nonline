@@ -3,7 +3,7 @@
 When several channels share structure -- a common frequency across the x/y/z
 axes of a trajectory, a common growth rate across regions, a common time
 constant across a MIMO plant's outputs -- fitting them independently wastes the
-coupling. :func:`fit_joint` stacks all channels' EDA area equations into one
+coupling. :func:`fit_joint` stacks all channels' EAC area equations into one
 system with **shared** parameters (estimated jointly from every channel) and
 **per-channel private** parameters, solved in one least-squares pass. More
 equations per shared unknown means better observability than independent fits.

@@ -66,10 +66,10 @@ def dominant_period(y: np.ndarray, *, min_period: int = 4) -> tuple[float, float
 # --------------------------------------------------------------------------- #
 # embedded: the streaming filter's deployable, no-malloc state size.
 # --------------------------------------------------------------------------- #
-def embedded_footprint(n_params: int, window: int, kind: str = "eda") -> dict:
+def embedded_footprint(n_params: int, window: int, kind: str = "eac") -> dict:
     """Words / bytes of the fixed streaming-filter C struct (Exp 9 formula).
 
-    EDA filter state = window buffer (t, y) + covariance P (n^2) + estimate (n)
+    EAC filter state = window buffer (t, y) + covariance P (n^2) + estimate (n)
     + scratch (n) + bookkeeping (~8 words). A Legendre-spectrum filter adds a
     read-only projection table (lives in flash, not SRAM).
 

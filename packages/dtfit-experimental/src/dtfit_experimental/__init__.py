@@ -1,4 +1,4 @@
-"""dtfit-experimental -- experimental structural adaptations of EDA / LSI.
+"""dtfit-experimental -- experimental structural adaptations of EAC / LSI.
 
 These are new ways to *compose* the differential-transformation fitting methods
 of :mod:`dtfit`, grounded in the methods' own math (linearity of integration;
@@ -16,11 +16,11 @@ that prove effective across a range of applications are **promoted into the stab
 These APIs are experimental and may change until promoted. Several adaptations
 have already cleared the promotion gate and now live in :mod:`dtfit`:
 
-* #1 ``PartitionedLSI`` / ``PartitionedEDA`` -- one-pass / distributed map-reduce
-  (``from dtfit import PartitionedLSI, PartitionedEDA``);
+* #1 ``PartitionedLSI`` / ``PartitionedEAC`` -- one-pass / distributed map-reduce
+  (``from dtfit import PartitionedLSI, PartitionedEAC``);
 * the GEMM-batched projection ``fit_lsi_batched`` / ``project_spectra`` and the
   fused multi-channel ``PartitionedBatchLSI`` (``from dtfit import ...``);
-* #6 adaptive-window EDA ``fit_eda_adaptive`` (``from dtfit import fit_eda_adaptive``);
+* #6 adaptive-window EAC ``fit_eac_adaptive`` (``from dtfit import fit_eac_adaptive``);
 * the LSI **oscillatory recipe** is now built into ``dtfit.fit_lsi`` via
   ``oscillatory=True`` / ``freq_param=`` (plus ``dtfit.fft_frequency_seed``);
 * the fused multi-axis ``FusedChiSquareDetector`` for a streaming ``FilterBank``;

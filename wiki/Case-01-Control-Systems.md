@@ -4,11 +4,11 @@
 
 ## Intent
 
-Recover the physical parameters of dynamic systems from noisy responses and track a plant whose dynamics change online. dtfit's LSI/EDA target the transcendental, parameter-nonlinear forms these responses take, so we compare parameter-recovery accuracy against the NLLS gold standard (SciPy `curve_fit`) and a black-box neural net, and exercise the streaming filter under a regime change.
+Recover the physical parameters of dynamic systems from noisy responses and track a plant whose dynamics change online. dtfit's LSI/EAC target the transcendental, parameter-nonlinear forms these responses take, so we compare parameter-recovery accuracy against the NLLS gold standard (SciPy `curve_fit`) and a black-box neural net, and exercise the streaming filter under a regime change.
 
 ## Models fitted & why
 
-- **A (2nd-order):** `y = A.e^(-ζω.t).sin(ω√(1-ζ²).t)` -- the analytic free response of an underdamped second-order linear system. Chosen because its parameters *are* the physical quantities an engineer wants (amplitude A, damping ratio zeta, natural frequency omega), and a damped sinusoid is exactly the transcendental, non-Taylor form LSI/EDA target.
+- **A (2nd-order):** `y = A.e^(-ζω.t).sin(ω√(1-ζ²).t)` -- the analytic free response of an underdamped second-order linear system. Chosen because its parameters *are* the physical quantities an engineer wants (amplitude A, damping ratio zeta, natural frequency omega), and a damped sinusoid is exactly the transcendental, non-Taylor form LSI/EAC target.
 - **B (first-order):** `y = K.(1 - e^(-t/τ))` -- the textbook step response of a first-order plant / RC circuit / DC motor; chosen to recover the DC gain K and time constant tau.
 - **C (regime change) and MIMO:** the same 2nd-order damped model, tracked online by the filter (C) and fitted jointly with a *shared* omega across outputs (MIMO) -- chosen so the model is physically identical while the scenario stresses online adaptation and channel coupling.
 
@@ -18,14 +18,14 @@ Model `y = A.e^(-ζω t).sin(ω√(1-ζ²).t)`, truth A=2.0, omega=3.0, zeta=0.1
 
 | method | param err % | R^2 | RMSE | fit (ms) |
 |---|---|---|---|---|
-| EDA | 0.29 | 1.0000 | 0.003866 | 33 |
+| EAC | 0.29 | 1.0000 | 0.003866 | 33 |
 | LSI | 2.29 | 0.9963 | 0.03573 | 33 |
 | SciPy curve_fit | 0.38 | 1.0000 | 0.003355 | 2 |
 | sklearn MLP | -- | 0.9698 | 0.1025 | 246 |
 
-![EDA recovers the underdamped free response.](figures/damped_fit.png)
+![EAC recovers the underdamped free response.](figures/damped_fit.png)
 
-*EDA recovers the underdamped free response.*
+*EAC recovers the underdamped free response.*
 
 ![dtfit matches NLLS on parameter recovery.](figures/damped_param_err.png)
 
@@ -37,7 +37,7 @@ Model `y = K.(1 - e^(-t/τ))`, truth K=3.0, tau=1.2.
 
 | method | param err % | R^2 | RMSE | fit (ms) |
 |---|---|---|---|---|
-| EDA | 0.14 | 1.0000 | 0.002255 | 7 |
+| EAC | 0.14 | 1.0000 | 0.002255 | 7 |
 | LSI | 0.27 | 1.0000 | 0.0023 | 3 |
 | SciPy curve_fit | 0.27 | 1.0000 | 0.002292 | 0 |
 | sklearn MLP | -- | 0.9747 | 0.1189 | 58 |
@@ -48,7 +48,7 @@ Model `y = K.(1 - e^(-t/τ))`, truth K=3.0, tau=1.2.
 
 ## C. Regime change -- online tracking + drift detection
 
-The damping zeta jumps (0.08->0.30) at the midpoint. The `EDAFilter` tracks the parameters online with bounded per-sample cost and flagged **1** structural break(s) -- a sliding-window `curve_fit` refit or a batch NN cannot do this in a real-time loop.
+The damping zeta jumps (0.08->0.30) at the midpoint. The `EACFilter` tracks the parameters online with bounded per-sample cost and flagged **1** structural break(s) -- a sliding-window `curve_fit` refit or a batch NN cannot do this in a real-time loop.
 
 ![Online parameter tracking + drift flagging.](figures/regime_tracking.png)
 
@@ -61,10 +61,10 @@ A 3-output plant shares one natural frequency omega. `fit_joint` estimates the s
 | estimator | shared omega | omega err % | per-channel amplitudes |
 |---|---|---|---|
 | joint (fit_joint) | 3.329 | 10.98 | 1.08, 2.18, 3.29 |
-| independent EDA (mean) | 3.002 | 0.12 | --, --, -- |
+| independent EAC (mean) | 3.002 | 0.12 | --, --, -- |
 
 ## Reading it
 
-- dtfit's LSI/EDA recover the control parameters within tolerance of the NLLS gold standard, while the black-box MLP fits the curve but yields no physical parameters.
+- dtfit's LSI/EAC recover the control parameters within tolerance of the NLLS gold standard, while the black-box MLP fits the curve but yields no physical parameters.
 - The streaming filter tracks a mid-run dynamics change and flags it -- the real-time capability batch methods lack.
-- Adaptation #4 (joint MIMO): the dedicated bounded EDA solver already recovers omega almost exactly per channel (0.12% mean error), so the coarser joint area-matching (10.98%) does **not** improve accuracy on these cleanly-identifiable outputs -- its value here is parameter parsimony and an enforced single consistent omega. Whether coupling *helps accuracy* when per-channel data is genuinely weak is re-tested in the GPS experiment (Exp 5); on this experiment it does not clear the promotion gate.
+- Adaptation #4 (joint MIMO): the dedicated bounded EAC solver already recovers omega almost exactly per channel (0.12% mean error), so the coarser joint area-matching (10.98%) does **not** improve accuracy on these cleanly-identifiable outputs -- its value here is parameter parsimony and an enforced single consistent omega. Whether coupling *helps accuracy* when per-channel data is genuinely weak is re-tested in the GPS experiment (Exp 5); on this experiment it does not clear the promotion gate.

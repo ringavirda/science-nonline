@@ -8,7 +8,7 @@ Pick by your situation ([../guides/choosing-a-method.md Sec.3](Guides-Choosing-a
 |---|---|
 | many **independent** fits | [`fit_many`](#fit_many) |
 | many **channels on a shared grid** | [`fit_lsi_batched`](#fit_lsi_batched) / [`project_spectra`](#project_spectra) |
-| a dataset **too big for memory**, one pass | [`PartitionedLSI`](#partitioned) / [`PartitionedEDA`](#partitioned) |
+| a dataset **too big for memory**, one pass | [`PartitionedLSI`](#partitioned) / [`PartitionedEAC`](#partitioned) |
 | **distributed** workers, then combine | the same accumulators via `.merge()` |
 | many channels **and** streaming | [`PartitionedBatchLSI`](#partitionedbatch) |
 
@@ -54,7 +54,7 @@ A picklable spec for one fit (a dataclass):
 |---|---|---|
 | `x`, `y` | -- | observed samples |
 | `expr`, `var` | -- | model and main variable |
-| `method` | `"lsi"` | `"lsi"` or `"eda"` |
+| `method` | `"lsi"` | `"lsi"` or `"eac"` |
 | `kwargs` | `{}` | method-specific keywords (`p0`, `bounds`, ...) |
 | `label` | `None` | tag carried through to the result (channel name, etc.) |
 
@@ -113,14 +113,14 @@ use `"auto"`.
 ---
 
 <a name="partitioned"></a>
-## `PartitionedLSI` / `PartitionedEDA`
+## `PartitionedLSI` / `PartitionedEAC`
 
 Streaming / distributed estimators via an **additive** reduce -- fit a dataset too
 big for memory in one pass, or fan it across workers and combine.
 
 ```python
 PartitionedLSI(expr, var, *, domain, order=6, basis="legendre")
-PartitionedEDA(expr, var, *, domain, n_windows=8)   # area windows instead of a basis
+PartitionedEAC(expr, var, *, domain, n_windows=8)   # area windows instead of a basis
 ```
 
 The pattern (identical for both):

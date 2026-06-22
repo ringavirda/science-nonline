@@ -61,11 +61,17 @@ def fft_frequency_seed(x: np.ndarray, y: np.ndarray) -> float:
 
 
 def _osc_order(x: np.ndarray, y: np.ndarray, max_order: int = 200) -> int:
-    """Spectral order high enough to resolve the dominant cycle: ~1.4 cycles
-    over the window plus headroom (the recipe the domain studies validated)."""
+    """Spectral order high enough to resolve the dominant cycle. A degree-``k``
+    polynomial only starts to represent a sinusoid once ``k`` exceeds its mapped
+    wavenumber ``pi * cycles`` (the classical Legendre/Chebyshev resolution
+    threshold; below it the data and model spectra both collapse toward zero and
+    the amplitude is left under-constrained). The earlier ``1.4 * cycles``
+    heuristic fell under this threshold for mid-range cycle counts, leaving a
+    band of degraded amplitude recovery; ``pi * cycles`` plus headroom clears it
+    for every cycle count."""
     w0 = fft_frequency_seed(x, y)
     cycles = w0 * float(x[-1] - x[0]) / (2.0 * np.pi)
-    return min(int(1.4 * cycles) + 10, max_order)
+    return min(int(np.ceil(np.pi * cycles)) + 8, max_order)
 
 
 def _auto_order(x: np.ndarray, y: np.ndarray, max_order: int = 8) -> int:

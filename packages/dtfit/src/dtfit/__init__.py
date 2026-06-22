@@ -7,11 +7,11 @@ part of the author's PhD dissertation.
 
 Public interface:
     NonlineRegressor: scikit-learn compatible estimator (fit/predict/score)
-        wrapping the LSI/EDA/DSB methods; composes with sklearn Pipeline and
+        wrapping the LSI/EAC/DSB methods; composes with sklearn Pipeline and
         GridSearchCV.
-    EDAFilter / LSIFilter: online/streaming estimators (partial_fit) for
-        real-time parameter tracking (streaming twins of fit_eda / fit_lsi).
-    fit_lsi() / fit_eda() / fit_dsb(): the individual batch methods.
+    EACFilter / LSIFilter: online/streaming estimators (partial_fit) for
+        real-time parameter tracking (streaming twins of fit_eac / fit_lsi).
+    fit_lsi() / fit_eac() / fit_dsb(): the individual batch methods.
     ensemble_fit(): overlapping-window robust ensemble (outlier-prone data).
     find_degree(): polynomial-degree selection (DSB support).
     FittingResult: the self-describing fitted-model result type.
@@ -32,8 +32,8 @@ from dtfit.log import enable_logging, logger
 from dtfit.methods import (
     fit_lsi,
     fft_frequency_seed,
-    fit_eda,
-    fit_eda_adaptive,
+    fit_eac,
+    fit_eac_adaptive,
     fit_dsb,
     ensemble_fit,
     EnsembleResult,
@@ -41,7 +41,7 @@ from dtfit.methods import (
 )
 from dtfit.estimators import NonlineRegressor
 from dtfit.streaming import (
-    EDAFilter,
+    EACFilter,
     LSIFilter,
     FilterBank,
     FusedChiSquareDetector,
@@ -51,7 +51,7 @@ from dtfit.scale._parallel import fit_many, FittingProblem, BatchFittingResult
 # parallel workloads: the exact one-pass / distributed (map-reduce) estimators
 # and the GEMM-batched multi-channel projection. The remaining adaptations stay
 # experimental in the separate `dtfit-experimental` package.
-from dtfit.scale._partitioned import PartitionedLSI, PartitionedEDA, PartitionedBatchLSI
+from dtfit.scale._partitioned import PartitionedLSI, PartitionedEAC, PartitionedBatchLSI
 from dtfit.scale._batched import fit_lsi_batched, project_spectra
 # High-level "just fit it" entry points distilled from the domain merged
 # pipelines (shape-routed estimation; structured fit-then-extrapolate forecast).
@@ -68,19 +68,19 @@ __all__ = [
     "models",
     "Model",
     "suggest_models",
-    "EDAFilter",
+    "EACFilter",
     "LSIFilter",
     "FilterBank",
     "FusedChiSquareDetector",
     "PartitionedLSI",
-    "PartitionedEDA",
+    "PartitionedEAC",
     "PartitionedBatchLSI",
     "fit_lsi_batched",
     "project_spectra",
     "fit_lsi",
     "fft_frequency_seed",
-    "fit_eda",
-    "fit_eda_adaptive",
+    "fit_eac",
+    "fit_eac_adaptive",
     "fit_dsb",
     "ensemble_fit",
     "EnsembleResult",

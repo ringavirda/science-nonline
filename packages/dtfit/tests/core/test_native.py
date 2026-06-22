@@ -11,7 +11,7 @@ import pytest
 from scipy.integrate import simpson
 
 import dtfit._core._kernels as K
-from dtfit import EDAFilter, LSIFilter, fit_eda, fit_lsi
+from dtfit import EACFilter, LSIFilter, fit_eac, fit_lsi
 
 
 @pytest.fixture
@@ -89,12 +89,12 @@ def test_fallback_kernels_match_native():
         assert np.allclose(a, b, atol=1e-12)
 
 
-def test_fit_eda_backend_agnostic(arctan_data, force_fallback):
-    """fit_eda with the fallback recovers the same fit as the native backend."""
+def test_fit_eac_backend_agnostic(arctan_data, force_fallback):
+    """fit_eac with the fallback recovers the same fit as the native backend."""
     x, y, _ = arctan_data
-    fb = fit_eda(x, y, "a*atan(w*x)", "x", p0=[1.0, 1.0]).coeffs
+    fb = fit_eac(x, y, "a*atan(w*x)", "x", p0=[1.0, 1.0]).coeffs
     K.HAVE_NATIVE = True  # the fixture restores it after the test
-    nat = fit_eda(x, y, "a*atan(w*x)", "x", p0=[1.0, 1.0]).coeffs
+    nat = fit_eac(x, y, "a*atan(w*x)", "x", p0=[1.0, 1.0]).coeffs
     assert np.allclose(fb, nat, rtol=1e-9, atol=1e-9)
 
 
@@ -112,7 +112,7 @@ def test_equal_areas_filter_backend_agnostic(force_fallback):
     y = 3.0 * np.sin(1.5 * t) + rng.normal(0, 0.3, t.size)
 
     def run() -> np.ndarray:
-        flt = EDAFilter(
+        flt = EACFilter(
             "A*sin(w*t)", "t", p0=[1.0, 1.0], window_size=50,
             q_diag=[0.05, 0.001], r=20.0,
         )

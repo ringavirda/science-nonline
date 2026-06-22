@@ -115,7 +115,7 @@ exponential term cannot bend enough to follow the data.
 
 **Model data -- `y = a0 + a1.x + a2.exp(a3.x)`, xin[0,3], 5 % noise.** DSB is
 evaluated as a *curve fit* (R^2). Under noise it does **not** uniquely recover
-the four parameters -- which is precisely why the numeric LSI/EDA successors
+the four parameters -- which is precisely why the numeric LSI/EAC successors
 exist.
 
 | method | R^2 | RMSE | MAPE % | fit (ms) |
@@ -134,8 +134,8 @@ signals, and serving as the reference the numeric methods are checked against.
 path: `sympy.nonlinsolve` has unbounded, input-dependent latency, and the
 symbolic solve is sensitive to the polynomial pre-fit's high-order coefficients
 (which are ill-conditioned under noise). The numeric successors --
-[LSI](Methods-LSI) (batch accuracy) and [EDA](Methods-EDA) / the
-[EDAFilter](Methods-Equal-Areas-Filter) (robust / real-time) -- are the
+[LSI](Methods-LSI) (batch accuracy) and [EAC](Methods-EAC) / the
+[EACFilter](Methods-Equal-Areas-Filter) (robust / real-time) -- are the
 deployable methods.
 
 ### Generic-model support and limitations
@@ -157,4 +157,4 @@ Two intrinsic caveats remain (unchanged in character from before):
   polynomial pre-fit's high-order coefficients, which are ill-conditioned under
   noise. On clean/analytic data DSB identifies parameters well; on noisy data it
   is a *curve fit* and may land in an alternate basin. For real fitting use
-  [LSI](Methods-LSI) / [EDA](Methods-EDA), which fit the raw `(x, y)` directly.
+  [LSI](Methods-LSI) / [EAC](Methods-EAC), which fit the raw `(x, y)` directly.

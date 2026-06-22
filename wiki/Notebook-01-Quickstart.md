@@ -19,7 +19,7 @@ This notebook gets you to a first fit in a minute. The rest of the series:
 
 | # | Guide |
 |---|-------|
-| 02 | Fitting methods - LSI / EDA / DSB |
+| 02 | Fitting methods - LSI / EAC / DSB |
 | 03 | Model catalog, `suggest_models`, `auto_estimate` / `auto_forecast` |
 | 04 | scikit-learn `NonlineRegressor` |
 | 05 | Streaming / online trackers |

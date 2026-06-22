@@ -4,7 +4,7 @@ This is the *domain* study (broader than case Experiment 4, which hand-picked on
 dtfit form per series and compared a handful of baselines). Here we:
 
 * test **every dtfit forecasting method** that applies to each series — the two
-  base fitters (LSI, EDA) and the two structural adaptations (#2 Fourier-basis
+  base fitters (LSI, EAC) and the two structural adaptations (#2 Fourier-basis
   LSI, #5 stage-wise boosting), plus the auto-composed **merged** pipeline that
   picks the structure itself;
 * compare against the **standard forecasting toolkit** a practitioner would
@@ -27,7 +27,7 @@ METHODS UNDER TEST (dtfit) — what each one actually does
   Legendre basis (an *empirical spectrum*) and finds the model parameters whose
   analytic spectrum matches — a smoothing, noise-tolerant spectral fit. Used here
   with the series' structural model (exp for growth, sine for cycles).
-* **EDA** (`fit_eda`): the equal-areas criterion. It matches the *integrated
+* **EAC** (`fit_eac`): the equal-areas criterion. It matches the *integrated
   area* of the model to that of the data over a set of windows — an
   overdetermined system that averages noise. The streaming filter's batch twin.
 * **#2 Fourier-basis LSI** (`fit_lsi_basis`, `basis="fourier"`): the same LSI
@@ -466,14 +466,14 @@ def dtfit_lsi(cfg, t_tr, y_tr, t_all):
     return np.asarray(r.model(t_all)) * scale
 
 
-def dtfit_eda(cfg, t_tr, y_tr, t_all):
-    """Base EDA (equal-areas) on the series' structural model. The local-fit
-    kinds drop their bounds (EDA then refines locally from the seed)."""
+def dtfit_eac(cfg, t_tr, y_tr, t_all):
+    """Base EAC (equal-areas) on the series' structural model. The local-fit
+    kinds drop their bounds (EAC then refines locally from the seed)."""
     spec, scale = _trend_spec(cfg["trend"], y_tr, t_tr, cfg["period"])
     bnds = None if cfg["trend"] in LOCAL_FIT_KINDS else spec.get("bounds")
-    eda_b = ([b[0] for b in bnds], [b[1] for b in bnds]) if bnds else None
-    r = dt.fit_eda(t_tr, y_tr / scale, spec["expr"], spec["var"],
-                   p0=spec.get("p0"), bounds=eda_b)
+    eac_b = ([b[0] for b in bnds], [b[1] for b in bnds]) if bnds else None
+    r = dt.fit_eac(t_tr, y_tr / scale, spec["expr"], spec["var"],
+                   p0=spec.get("p0"), bounds=eac_b)
     return np.asarray(r.model(t_all)) * scale
 
 
@@ -623,7 +623,7 @@ def merged_forecaster(cfg, t_tr, y_tr, t_all):
 
 DTFIT_METHODS = {
     "dtfit LSI": dtfit_lsi,
-    "dtfit EDA": dtfit_eda,
+    "dtfit EAC": dtfit_eac,
     "dtfit Fourier-LSI (#2)": dtfit_fourier,
     "dtfit boosted (#5)": dtfit_boosted,
     "dtfit merged (auto)": merged_forecaster,
@@ -702,7 +702,7 @@ def main(quick: bool = False) -> str:
     rep = ReportWriter(
         EXP_DIR, "Domain — Forecasting (comprehensive cross-method study)",
         intent=(
-            "Test every applicable dtfit forecasting method (LSI, EDA, #2 "
+            "Test every applicable dtfit forecasting method (LSI, EAC, #2 "
             "Fourier-basis LSI, #5 boosting, and the auto-merged pipeline) "
             "against the standard forecasting toolkit (random walk, seasonal "
             "naïve, drift, polynomial extrapolation, Holt-Winters ETS, Theta, "
@@ -1003,7 +1003,7 @@ _METHODS_DOC = (
     "`(1+m·cos ω_m x)·sin(ω_c x+φ)` for the modulated carrier, and a **chirp** "
     "`A·sin(ω₀x + k x² + φ)` for the sweep — fitted at a Fourier-basis order high "
     "enough to resolve the highest harmonic.\n"
-    "- **EDA** (`fit_eda`) — the equal-areas criterion: matches the model's "
+    "- **EAC** (`fit_eac`) — the equal-areas criterion: matches the model's "
     "*integrated area* to the data's over a set of windows (overdetermined → "
     "noise-averaging). The batch twin of the streaming equal-areas filter.\n"
     "- **#2 Fourier-basis LSI** (`fit_lsi_basis`, `basis=\"fourier\"`) — the LSI "

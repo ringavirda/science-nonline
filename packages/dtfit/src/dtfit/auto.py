@@ -9,16 +9,16 @@ stable API:
 
 * :func:`auto_estimate` -- recover physical parameters, routing by signal *shape*
   to the estimator variant that fits it (oscillatory -> the LSI oscillatory
-  recipe; transient / peak -> adaptive-window EDA; outliers -> robust EDA; else
-  the better of LSI / EDA by in-sample fit).
+  recipe; transient / peak -> adaptive-window EAC; outliers -> robust EAC; else
+  the better of LSI / EAC by in-sample fit).
 * :func:`auto_forecast` -- a structured fit-then-extrapolate forecaster that
   routes the model class (saturating growth -> logistic; a detected cycle -> a
   joint linear+seasonal fit; otherwise a quadratic level), with a **no-structure
   guard** (persist when the fit cannot beat a random walk on a held-out training
   tail) and a **divergence guard** (drop a runaway quadratic to linear).
 
-Both compose only stable pieces (:func:`dtfit.fit_lsi`, :func:`dtfit.fit_eda`,
-:func:`dtfit.fit_eda_adaptive`, :func:`dtfit.fft_frequency_seed`); they are the
+Both compose only stable pieces (:func:`dtfit.fit_lsi`, :func:`dtfit.fit_eac`,
+:func:`dtfit.fit_eac_adaptive`, :func:`dtfit.fft_frequency_seed`); they are the
 conservative merges the studies validated, and they keep the honest ceilings:
 near-random-walk series fall back to persistence, and ``auto_estimate`` matches
 but does not beat a well-initialised NLLS on clean bulk shapes.
@@ -34,8 +34,8 @@ import sympy as sp
 from dtfit.types import FittingResult, InitialGuess
 from dtfit.methods import (
     fit_lsi,
-    fit_eda,
-    fit_eda_adaptive,
+    fit_eac,
+    fit_eac_adaptive,
     fft_frequency_seed,
     model_params,
 )
@@ -73,7 +73,7 @@ def _ordered(expr: str, var: str, pmap: dict[str, tuple]) -> tuple[list[float], 
     return p0, bounds
 
 
-def _eda_bounds(bounds):
+def _eac_bounds(bounds):
     return ([b[0] for b in bounds], [b[1] for b in bounds]) if bounds else None
 
 
@@ -100,8 +100,8 @@ def auto_estimate(
         x, y: Observed samples.
         expr, var: Model expression and main variable.
         shape: One of ``"auto"`` (detect oscillation, else bulk), ``"oscillatory"``,
-            ``"transient"`` / ``"peak"`` (adaptive-window EDA), ``"robust"``
-            (outlier-robust EDA), or ``"bulk"`` (the better of LSI / EDA by
+            ``"transient"`` / ``"peak"`` (adaptive-window EAC), ``"robust"``
+            (outlier-robust EAC), or ``"bulk"`` (the better of LSI / EAC by
             in-sample fit). The variant-follows-shape mapping the study validated.
         freq_param: Name of the angular-frequency parameter, forwarded to the LSI
             oscillatory recipe (:func:`fit_lsi`); implies an oscillatory shape.
@@ -125,9 +125,9 @@ def auto_estimate(
         return fit_lsi(x, y, expr, var, p0=p0, bounds=bounds, oscillatory=True,
                        freq_param=freq_param)
     if shape in ("transient", "peak"):
-        return fit_eda_adaptive(x, y, expr, var, window_mode="curvature", p0=p0)
+        return fit_eac_adaptive(x, y, expr, var, window_mode="curvature", p0=p0)
     if shape == "robust":
-        return fit_eda(x, y, expr, var, p0=p0, bounds=_eda_bounds(bounds),
+        return fit_eac(x, y, expr, var, p0=p0, bounds=_eac_bounds(bounds),
                        loss="soft_l1")
     if shape != "bulk":
         raise ValueError(
@@ -140,7 +140,7 @@ def auto_estimate(
     best_rmse = np.inf
     for fitter in (
         lambda: fit_lsi(x, y, expr, var, p0=p0, bounds=bounds),
-        lambda: fit_eda(x, y, expr, var, p0=p0, bounds=_eda_bounds(bounds)),
+        lambda: fit_eac(x, y, expr, var, p0=p0, bounds=_eac_bounds(bounds)),
     ):
         try:
             res = fitter()
@@ -150,7 +150,7 @@ def auto_estimate(
         if np.isfinite(r) and r < best_rmse:
             best, best_rmse = res, r
     if best is None:
-        raise RuntimeError("both base fits (LSI and EDA) failed for this series")
+        raise RuntimeError("both base fits (LSI and EAC) failed for this series")
     return best
 
 

@@ -6,8 +6,8 @@ The core batch fitters and their support functions. All return a
 [../methods/](Methods).
 
 - [`fit_lsi`](#fit_lsi) -- Least-Squares Integral (accurate, general default)
-- [`fit_eda`](#fit_eda) -- Equal Differential Areas (robust, fast)
-- [`fit_eda_adaptive`](#fit_eda_adaptive) -- EDA with curvature-placed windows
+- [`fit_eac`](#fit_eac) -- Equal-Areas Criterion (robust, fast)
+- [`fit_eac_adaptive`](#fit_eac_adaptive) -- EAC with curvature-placed windows
 - [`ensemble_fit`](#ensemble_fit) -- overlapping-window robust ensemble (outliers)
 - [`fit_dsb`](#fit_dsb) -- Differential Spectra Balance (symbolic reference)
 - [`find_degree`](#find_degree) -- polynomial degree selection (DSB support)
@@ -63,11 +63,11 @@ print({k: round(v, 3) for k, v in res.params.items()})
 
 ---
 
-<a name="fit_eda"></a>
-## `fit_eda`
+<a name="fit_eac"></a>
+## `fit_eac`
 
 ```python
-fit_eda(data_x, data_y, expr, var, *,
+fit_eac(data_x, data_y, expr, var, *,
         active_ratio=0.8, n_windows=None, bounds=None,
         loss="linear", f_scale=1.0, p0=None) -> FittingResult
 ```
@@ -101,21 +101,21 @@ transient/saturating shapes.
 **Example**
 
 ```python
-res = fit_eda(x, y, "a*atan(w*x)", "x",
+res = fit_eac(x, y, "a*atan(w*x)", "x",
               active_ratio=1.0, n_windows=60, loss="soft_l1", f_scale=0.05)
 ```
 
 ---
 
-<a name="fit_eda_adaptive"></a>
-## `fit_eda_adaptive`
+<a name="fit_eac_adaptive"></a>
+## `fit_eac_adaptive`
 
 ```python
-fit_eda_adaptive(data_x, data_y, expr, var, *,
+fit_eac_adaptive(data_x, data_y, expr, var, *,
                  n_windows=None, window_mode="curvature", p0=None) -> FittingResult
 ```
 
-EDA variant that places window edges by **curvature** -- narrow where the signal
+EAC variant that places window edges by **curvature** -- narrow where the signal
 bends, wide where it's smooth -- so each window carries roughly equal information.
 The best estimator for localized transients/peaks and rational-saturating shapes
 (Michaelis-Menten / Hill / `arctan`).
@@ -127,7 +127,7 @@ The best estimator for localized transients/peaks and rational-saturating shapes
 | `data_x`, `data_y` | array | -- | observed samples |
 | `expr`, `var` | str | -- | model and main variable |
 | `n_windows` | int \| None | `None` | number of area windows (default `2 × n_params`) |
-| `window_mode` | str | `"curvature"` | `"curvature"` (curvature-adaptive edges) or `"equal"` (uniform edges, the `fit_eda` placement) |
+| `window_mode` | str | `"curvature"` | `"curvature"` (curvature-adaptive edges) or `"equal"` (uniform edges, the `fit_eac` placement) |
 | `p0` | array \| None | `None` | initial guess (defaults to ones) |
 
 Uses the full data record (no `active_ratio` clipping), which is part of why it
@@ -140,7 +140,7 @@ suits saturating tails. Returns a `FittingResult` with covariance.
 
 ```python
 ensemble_fit(data_x, data_y, expr, var, *,
-             method="eda", n_windows=8, overlap=0.5,
+             method="eac", n_windows=8, overlap=0.5,
              aggregate="median", p0=None, **kwargs) -> EnsembleResult
 ```
 
@@ -151,7 +151,7 @@ spread is a cheap empirical uncertainty band.
 
 **Use it for outlier-contaminated data.** The median-of-windows aggregation
 rejects whole corrupted windows without the per-problem `f_scale` tuning that
-[`fit_eda(loss="soft_l1")`](#fit_eda) needs -- and stays stable where that robust
+[`fit_eac(loss="soft_l1")`](#fit_eac) needs -- and stays stable where that robust
 loss can diverge. On clean (Gaussian-noise) data prefer a single whole-record
 fit: the ensemble trades a little accuracy there for the outlier robustness, so
 it is a **specialised tool, not the default path**.
@@ -162,7 +162,7 @@ it is a **specialised tool, not the default path**.
 |---|---|---|---|
 | `data_x`, `data_y` | array | -- | observed samples |
 | `expr`, `var` | str | -- | model and main variable |
-| `method` | str | `"eda"` | underlying batch fitter, `"eda"` or `"lsi"` |
+| `method` | str | `"eac"` | underlying batch fitter, `"eac"` or `"lsi"` |
 | `n_windows` | int | `8` | target number of overlapping subwindows |
 | `overlap` | float | `0.5` | fractional overlap between consecutive windows (`0..0.9`) |
 | `aggregate` | str | `"median"` | `"median"` (robust) or `"mean"` |
@@ -178,7 +178,7 @@ the per-window `members` and their `spread` (which also fills the covariance).
 ```python
 from dtfit import ensemble_fit
 
-res = ensemble_fit(x, y, "a*exp(-b*x)", "x", method="eda", p0=[1.0, 1.0])
+res = ensemble_fit(x, y, "a*exp(-b*x)", "x", method="eac", p0=[1.0, 1.0])
 print(res.params, res.spread)   # robust estimate + per-parameter spread
 ```
 
@@ -202,7 +202,7 @@ fit_dsb(coeffs_poly, expr, var, *, rank=None, p0=None) -> FittingResult
 
 Symbolic **reference** method: balances the model's Maclaurin spectrum against a
 polynomial's, order by order, and solves symbolically. **Not for noisy production
-data** -- use LSI/EDA. Note it takes *polynomial coefficients*, not raw `(x, y)`:
+data** -- use LSI/EAC. Note it takes *polynomial coefficients*, not raw `(x, y)`:
 build them with [`find_degree`](#find_degree) + `np.polyfit`, or use
 `NonlineRegressor(method="dsb")` which does the pre-fit for you.
 

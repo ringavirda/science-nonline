@@ -3,7 +3,7 @@
 Many real-time problems are not a single stream but a *bank* of them: the
 pseudorange from each GPS satellite, the outputs of a MIMO plant, the channels
 of a sensor array, the axes of a trajectory. Each is tracked by its own
-:class:`~dtfit.streaming.EDAFilter` /
+:class:`~dtfit.streaming.EACFilter` /
 :class:`~dtfit.streaming.LSIFilter`, and -- because the streams are
 independent -- the whole bank fans across CPU cores.
 
@@ -23,7 +23,7 @@ from typing import Any, Sequence
 import numpy as np
 from scipy.stats import chi2
 
-from ._eda import EDAFilter
+from ._eac import EACFilter
 
 __all__ = ["FilterBank", "FusedChiSquareDetector"]
 
@@ -48,7 +48,7 @@ class FilterBank:
         var: str,
         n_streams: int,
         *,
-        filter_cls: type = EDAFilter,
+        filter_cls: type = EACFilter,
         **kwargs: Any,
     ) -> "FilterBank":
         """Build ``n_streams`` identically-configured filters for one model.
@@ -56,7 +56,7 @@ class FilterBank:
         Args:
             expr, var: Model expression and main variable (per stream).
             n_streams: Number of parallel streams (filters) in the bank.
-            filter_cls: ``EDAFilter`` (default) or
+            filter_cls: ``EACFilter`` (default) or
                 ``LSIFilter``.
             **kwargs: Forwarded to each filter's constructor.
         """
@@ -198,7 +198,7 @@ class FusedChiSquareDetector:
     filter's one-step residual (``last_residual_``) by an online EWMA estimate of
     its variance and sums the squares into a ``chi2(K)`` statistic; when it
     exceeds the ``alpha``-level threshold it flags a fault and (optionally)
-    re-arms each filter via :meth:`~dtfit.EDAFilter.inflate` so the bank
+    re-arms each filter via :meth:`~dtfit.EACFilter.inflate` so the bank
     re-adapts quickly. Validated in the embedded-control domain study (a 3-axis
     damping fault flagged within a window at zero false alarms, where the pooled
     chi2(3) has far higher SNR than any single axis).

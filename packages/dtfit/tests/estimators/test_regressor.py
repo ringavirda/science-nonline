@@ -11,7 +11,7 @@ from dtfit import NonlineRegressor
 
 
 def _reg():
-    return NonlineRegressor("a*atan(w*x)", "x", method="eda", p0=[1.0, 1.0])
+    return NonlineRegressor("a*atan(w*x)", "x", method="eac", p0=[1.0, 1.0])
 
 
 def test_fit_predict_score(arctan_data):
@@ -25,7 +25,7 @@ def test_fit_predict_score(arctan_data):
 
 def test_clone_and_get_params():
     reg = _reg()
-    assert reg.get_params()["method"] == "eda"
+    assert reg.get_params()["method"] == "eac"
     cloned = clone(reg)
     assert not hasattr(cloned, "coef_")
 

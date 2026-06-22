@@ -1,7 +1,7 @@
-# #1 — Map-reduce / partitioned LSI & EDA
+# #1 — Map-reduce / partitioned LSI & EAC
 
 **Verdict: WORKS. Promoted to the stable `dtfit` API** (`PartitionedLSI`,
-`PartitionedEDA`). The only adaptation that cleared the ≥2-domain gate, and the
+`PartitionedEAC`). The only adaptation that cleared the ≥2-domain gate, and the
 deepest result in the suite — it is not a heuristic but the linearity of
 integration turned into an architecture.
 
@@ -24,7 +24,7 @@ channel axis. **Full treatment, benchmarks and the surrogate-trap comparison:
 ## What it is
 
 LSI's empirical spectrum coefficient is an integral `β_j = ∫ y·φ_j dx`, and an
-EDA window area is `∫ y dx`. Both are accumulated chunk-by-chunk into an
+EAC window area is `∫ y dx`. Both are accumulated chunk-by-chunk into an
 `O(order)` state vector and reduced by **plain addition**:
 
 ```

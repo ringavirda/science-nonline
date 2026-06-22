@@ -1,6 +1,6 @@
 # scikit-learn estimator - `NonlineRegressor`
 
-`NonlineRegressor` wraps the LSI / EDA / DSB methods behind the standard
+`NonlineRegressor` wraps the LSI / EAC / DSB methods behind the standard
 estimator API (`fit` / `predict` / `score`), so it composes with `Pipeline`,
 `GridSearchCV` and `cross_val_score`. It takes a single input feature (the
 model's variable).
@@ -64,7 +64,7 @@ from sklearn.model_selection import GridSearchCV
 pipe = Pipeline([("fit", NonlineRegressor("a0 + a1*exp(a2*x)", "x"))])
 grid = GridSearchCV(
     pipe,
-    {"fit__method": ["lsi", "eda"], "fit__k_star": [4, 6]},
+    {"fit__method": ["lsi", "eac"], "fit__k_star": [4, 6]},
     cv=3, scoring="r2",
 )
 grid.fit(X, y)

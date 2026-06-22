@@ -11,7 +11,7 @@ real-time/streaming operation, change detection, and a tiny fixed footprint that
 fits a microcontroller (Exp 9) -- not raw accuracy superiority.
 
 Source: `../../src/dtfit/streaming/`
-(`EDAFilter`, `LSIFilter`, `FilterBank`).
+(`EACFilter`, `LSIFilter`, `FilterBank`).
 Tested in: [Control (1)](Case-01-Control-Systems),
 [Big-data (2)](Case-02-Big-Data-Streaming),
 [GPS (5)](Case-05-GPS-Trajectory),
@@ -30,7 +30,7 @@ detector that flags structural breaks. `FilterBank` runs K of them in parallel
 
 | updater | cost | scaling | memory |
 |---|---|---|---|
-| **EDAFilter (online)** | **103.1 us/sample** | **O(1)/sample** | **11.7 MB (bounded)** |
+| **EACFilter (online)** | **103.1 us/sample** | **O(1)/sample** | **11.7 MB (bounded)** |
 | batch re-fit, 10 k samples | 2.8 ms/refit | O(N) | O(N) |
 | batch re-fit, 50 k samples | 5.0 ms/refit | O(N) | O(N) |
 | batch re-fit, 250 k samples | 20.3 ms/refit | O(N) | O(N) |
@@ -84,8 +84,8 @@ In the GPS experiment (5) the `FilterBank` is used two ways:
   generating functions. Averaged over 12 noise realizations (a single seed proved
   unrepresentative): dtfit in-track smoothing **1.30 km** vs Kalman **1.18 km** --
   **dtfit on par with, slightly behind, the gold-standard Kalman; neither
-  dominates.** Both streaming measurements were tried: **EDA (area) and LSI
-  (Legendre spectrum) come out essentially tied** (EDA 1.30 vs LSI 1.33 km
+  dominates.** Both streaming measurements were tried: **EAC (area) and LSI
+  (Legendre spectrum) come out essentially tied** (EAC 1.30 vs LSI 1.33 km
   smoothing; LSI a touch better on detection, 1.4 vs 1.2/3). LSI's edge is
   resolving frequency/phase/shape, and a CA quadratic over a short window has none
   -- so the richer spectral measurement buys nothing here (it would help on an
@@ -153,7 +153,7 @@ wandered toward it, `exp(-t/τ)` overflowed, and the non-finite innovation was
 committed straight into the EKF state -- after which **every** later `predict()`
 returned `nan` (one bad sample permanently poisoned the filter).
 
-The **durable fix** (still in place, regression-tested): both `EDAFilter`
+The **durable fix** (still in place, regression-tested): both `EACFilter`
 and `LSIFilter` now **reject a non-finite update** -- if the
 innovation/Jacobian or the candidate `(p, P)` is not finite, the sample is skipped
 and the last good estimate kept. A streaming EKF should never be able to

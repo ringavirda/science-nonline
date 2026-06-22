@@ -1,6 +1,6 @@
 """Pluggable array backend for the GEMM-batched projection.
 
-The batched LSI/EDA projection is a single matrix product ``Dᵀ·(w⊙Y)`` (see
+The batched LSI/EAC projection is a single matrix product ``Dᵀ·(w⊙Y)`` (see
 :mod:`dtfit.scale._batched`). That primitive runs unchanged on NumPy/BLAS
 (CPU) or on a GPU array library, so we keep the math in one place and swap only
 *where the arrays live*:

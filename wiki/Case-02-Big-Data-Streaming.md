@@ -9,7 +9,7 @@ Show that dtfit's streaming/reduce path processes arbitrarily large volumes in *
 ## Models fitted & why
 
 - **Track 1 (volume):** `y = a.exp(b.t)` fitted by `PartitionedLSI`. A monotone exponential is chosen as a canonical nonlinear-in-parameters signal whose empirical spectrum is a genuine fit; the experiment measures throughput and memory, so the model only needs to exercise the real projection/solve path (not a degenerate constant).
-- **Track 2 (online):** `y = A.sin(w.t)` with a mid-stream frequency jump, tracked by `EDAFilter`. A sine with drifting frequency is chosen because tracking a time-varying oscillation online -- and detecting the regime change -- is a demanding real-time case.
+- **Track 2 (online):** `y = A.sin(w.t)` with a mid-stream frequency jump, tracked by `EACFilter`. A sine with drifting frequency is chosen because tracking a time-varying oscillation online -- and detecting the regime change -- is a demanding real-time case.
 
 ## Track 1 -- volume scaling (map-reduce LSI, adaptation #1)
 
@@ -33,7 +33,7 @@ A high-rate stream with a mid-run frequency change, tracked online.
 
 | updater | cost | scaling | memory |
 |---|---|---|---|
-| EDAFilter (online) | 124.5 us / sample | O(1) / sample | 2.0 MB (bounded) |
+| EACFilter (online) | 124.5 us / sample | O(1) / sample | 2.0 MB (bounded) |
 | batch re-fit on 10,000 samples | 2.4 ms / refit | O(N) / refit | O(N) in RAM |
 | batch re-fit on 50,000 samples | 4.3 ms / refit | O(N) / refit | O(N) in RAM |
 | batch re-fit on 250,000 samples | 19.7 ms / refit | O(N) / refit | O(N) in RAM |

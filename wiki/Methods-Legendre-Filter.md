@@ -7,8 +7,8 @@
 
 The LSIFilter runs [LSI](Methods-LSI)'s spectral identification **recursively**, one
 sample at a time, as an extended-Kalman estimator. It is the streaming twin of the
-[EDAFilter](Methods-Equal-Areas-Filter), differing in **what it measures**: where the
-EDAFilter corrects against a single integrated **area** over the sliding window,
+[EACFilter](Methods-Equal-Areas-Filter), differing in **what it measures**: where the
+EACFilter corrects against a single integrated **area** over the sliding window,
 the LSIFilter corrects against the window's **orthogonal Legendre spectrum** -- a
 richer, multi-component measurement. That extra structure is what lets it track
 **oscillatory** plants, whose cycle the scalar area criterion partly cancels.
@@ -70,13 +70,13 @@ of an oscillation is **near zero regardless of amplitude or phase** -- the posit
 and negative half-cycles cancel -- so an area measurement is nearly blind to an
 oscillatory model's parameters. The Legendre spectrum keeps the higher orders that
 *do* respond to a cycle, so the LSIFilter observes (and tracks) frequency,
-amplitude and phase where the EDAFilter cannot. The embedded-control domain study
-confirms this split: LSIFilter for oscillatory / sustained-cycle plants, EDAFilter
+amplitude and phase where the EACFilter cannot. The embedded-control domain study
+confirms this split: LSIFilter for oscillatory / sustained-cycle plants, EACFilter
 for monotone / polynomial ones.
 
 ## Guards -- drift detection
 
-Like the EDAFilter, the LSIFilter watches the innovation stream for **structural
+Like the EACFilter, the LSIFilter watches the innovation stream for **structural
 breaks** and re-arms on detection, with the same family of guards (self-calibrated
 scales, decimated non-overlapping testing, a warmup). Because the measurement is a
 vector, the detector uses two complementary, **self-normalizing** statistics:
@@ -128,12 +128,12 @@ re-adaptation). It exposes `n_drifts_`, `drift_flag_`, `last_drift_direction_` a
 
 A steady `A.sin(w.t)` (truth `w=1.3`) tracked online. **Left:** the LSIFilter's
 one-step prediction (spectrum measurement) locks onto the cycle, while the
-EDAFilter (area measurement) cannot follow it. **Right:** the tracked frequency --
-the LSIFilter converges to `w=1.30`, but the EDAFilter's estimate collapses away
+EACFilter (area measurement) cannot follow it. **Right:** the tracked frequency --
+the LSIFilter converges to `w=1.30`, but the EACFilter's estimate collapses away
 (`w>0.80`) because the window area nearly cancels over a cycle and carries almost
 no frequency information. This is the concrete reason the LSIFilter exists.
 
-![LSIFilter vs EDAFilter on a steady oscillation](figures/lsi_filter.png)
+![LSIFilter vs EACFilter on a steady oscillation](figures/lsi_filter.png)
 
 ## Where it is best applied
 
@@ -141,11 +141,11 @@ no frequency information. This is the concrete reason the LSIFilter exists.
 **sustained-cycle** plants (a resonating structure, an AC signal, a damped
 oscillator) and any stream where amplitude/frequency/phase drift and must be
 followed online with bounded per-sample cost and regime-change detection. It is
-the spectrum-measurement sibling of the [EDAFilter](Methods-Equal-Areas-Filter).
+the spectrum-measurement sibling of the [EACFilter](Methods-Equal-Areas-Filter).
 
-**Caveats.** It is heavier per sample than the EDAFilter (an $(L{+}1)$-vector
+**Caveats.** It is heavier per sample than the EACFilter (an $(L{+}1)$-vector
 update vs a scalar one), so for **monotone / saturating** plants the cheaper
-EDAFilter is preferable. Choose `order` to resolve the cycle (more orders =
+EACFilter is preferable. Choose `order` to resolve the cycle (more orders =
 richer observability, larger update); it is clamped so `order + 1 ≤ window_size`.
 Like all the methods it assumes a modest dynamic range over the window. For a
 static batch oscillatory fit use [LSI](Methods-LSI)'s oscillatory recipe.

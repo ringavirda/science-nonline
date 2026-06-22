@@ -1,6 +1,6 @@
 """scikit-learn compatible estimator wrapping the dtfit batch methods.
 
-``NonlineRegressor`` exposes the LSI / EDA / DSB fitters through the standard
+``NonlineRegressor`` exposes the LSI / EAC / DSB fitters through the standard
 ``fit`` / ``predict`` / ``score`` API with ``get_params``/``set_params`` from
 ``BaseEstimator``, so it composes with ``sklearn.pipeline.Pipeline``,
 ``GridSearchCV`` and ``cross_val_score``.
@@ -14,7 +14,7 @@ from sklearn.utils.validation import check_is_fitted, validate_data
 
 import sympy as sp
 
-from dtfit.methods import fit_lsi, fit_eda, fit_dsb, find_degree, model_params
+from dtfit.methods import fit_lsi, fit_eac, fit_dsb, find_degree, model_params
 
 
 class NonlineRegressor(RegressorMixin, BaseEstimator):
@@ -23,13 +23,13 @@ class NonlineRegressor(RegressorMixin, BaseEstimator):
     Args:
         expr: Model expression, e.g. ``"a0 + a1*x + a2*exp(a3*x)"``.
         var: Main variable name in ``expr`` (the single input feature).
-        method: ``"lsi"``, ``"eda"`` or ``"dsb"``.
+        method: ``"lsi"``, ``"eac"`` or ``"dsb"``.
         k_star: (LSI) number of spectral discretes to match.
         alpha: (LSI) discrete weight decay ``w_i = exp(-alpha*i)``.
         filter_data: (LSI) apply a Savitzky-Golay pre-filter.
         bounds: (LSI) optional per-parameter ``(min, max)`` bounds; enables a
             global search.
-        active_ratio: (EDA) leading fraction of data used for window placement.
+        active_ratio: (EAC) leading fraction of data used for window placement.
         poly_degree: (DSB) polynomial degree for the required pre-fit; if
             ``None`` it is selected automatically (BIC).
         p0: Optional initial guess for the parameters.
@@ -114,8 +114,8 @@ class NonlineRegressor(RegressorMixin, BaseEstimator):
                 bounds=self.bounds,
                 p0=self.p0,
             )
-        elif self.method == "eda":
-            result = fit_eda(
+        elif self.method == "eac":
+            result = fit_eac(
                 x,
                 y,
                 self.expr,

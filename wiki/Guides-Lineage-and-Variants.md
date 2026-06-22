@@ -43,7 +43,7 @@ rewritten as **numeric** methods for production, and finally extended to a
         |   rewritten        rewritten                                  |
         |   numerically      numerically                               DSB
         v        v               v                              (the only symbolic
-   (reference)  LSI             EDA                              method still shipped,
+   (reference)  LSI             EAC                              method still shipped,
                 |               |                                as a derivation tool)
                 |               |
         NUMERIC ERA (production: noise-tolerant, bounded latency)
@@ -53,17 +53,17 @@ rewritten as **numeric** methods for production, and finally extended to a
                         v
         STREAMING TIER (online, real-time, drift-aware)
                    +----+----+
-               LSIFilter   EDAFilter
+               LSIFilter   EACFilter
 ```
 
 - **DSB / DSBI / DSBE** are the original *symbolic* methods (the "differential
   spectra balance" family): DSB balances spectra and solves exactly, DSBI is the
   integral-least-squares variant, DSBE the equal-areas variant.
-- **LSI** is the numeric successor of **DSBI**; **EDA** is the numeric successor
+- **LSI** is the numeric successor of **DSBI**; **EAC** is the numeric successor
   of **DSBE**. These are what you use in production.
 - **DSB** survives as the lone symbolic method, kept as the analytical *reference*
   the numeric methods are checked against (not for fitting noisy data).
-- **LSIFilter / EDAFilter** are the streaming twins of LSI / EDA -- the same
+- **LSIFilter / EACFilter** are the streaming twins of LSI / EAC -- the same
   matching run recursively per sample.
 
 ---
@@ -82,7 +82,7 @@ and compile a fast callable); after that, every fit is pure NumPy/SciPy with
 bounded cost. So:
 
 - the symbolic **DSB** stays a reference/derivation tool;
-- the numeric **LSI / EDA** do the actual batch fitting;
+- the numeric **LSI / EAC** do the actual batch fitting;
 - the **filters** do the real-time work, compiling once in `__init__` and then
   running fixed-cost updates.
 
@@ -125,9 +125,9 @@ In short, the original LSI spent effort *fighting* a bad basis; the current LSI
 *changes the basis* so the problem is well-posed to begin with. That is why
 `alpha` defaults to 0 today. Details: [../methods/lsi.md](Methods-LSI).
 
-### EDA -- from exactly-determined to overdetermined to adaptive
+### EAC -- from exactly-determined to overdetermined to adaptive
 
-| | original EDA (~= DSBE) | current EDA | adaptive EDA |
+| | original EAC (~= DSBE) | current EAC | adaptive EAC |
 |---|---|---|---|
 | **Windows** | exactly $m$ (one per parameter) | $2m$ by default (**overdetermined**) | $2m$, but **placed by curvature** |
 | **Noise** | no redundancy -> throws away the averaging that integration buys | extra equations average out per-window noise (~15% lower variance) | windows concentrate where the signal bends (most information) |
@@ -135,9 +135,9 @@ In short, the original LSI spent effort *fighting* a bad basis; the current LSI
 | **Jacobian** | -- | analytic **integrated** Jacobian (exact, smooth) | same |
 | **Best for** | -- | transients, saturating shapes, few params | peaks & rational-saturating rises (Michaelis-Menten, Hill, `arctan`) |
 
-The three EDA generations are all shipped: `fit_eda` (equal, overdetermined
-windows) and `fit_eda_adaptive` (curvature windows). Details:
-[../methods/eda.md](Methods-EDA).
+The three EAC generations are all shipped: `fit_eac` (equal, overdetermined
+windows) and `fit_eac_adaptive` (curvature windows). Details:
+[../methods/eac.md](Methods-EAC).
 
 ---
 
@@ -153,17 +153,17 @@ the complete list across the stable API.
 | **LSI, auto order** | `fit_lsi(..., k_star="auto")` | pick the spectral order by BIC |
 | **LSI, global search** | `fit_lsi(..., bounds=...)` | differential-evolution -> L-BFGS-B, escapes bad local minima |
 | **LSI oscillatory recipe** | `fit_lsi(..., freq_param="w")` or `oscillatory=True` | smoothing off, order raised to resolve a cycle, frequency seeded from the FFT -- recovers sinusoids to <1% |
-| **EDA (default)** | `fit_eda(...)` | overdetermined equal-areas, most robust/fastest |
-| **EDA, robust loss** | `fit_eda(..., loss="soft_l1", f_scale=...)` | down-weights outlier-contaminated windows |
-| **EDA, bounded** | `fit_eda(..., bounds=...)` | constrained trust-region fit |
-| **Adaptive EDA** | `fit_eda_adaptive(...)` | curvature-placed windows for peaks/saturating shapes |
+| **EAC (default)** | `fit_eac(...)` | overdetermined equal-areas, most robust/fastest |
+| **EAC, robust loss** | `fit_eac(..., loss="soft_l1", f_scale=...)` | down-weights outlier-contaminated windows |
+| **EAC, bounded** | `fit_eac(..., bounds=...)` | constrained trust-region fit |
+| **Adaptive EAC** | `fit_eac_adaptive(...)` | curvature-placed windows for peaks/saturating shapes |
 | **Ensemble** | `ensemble_fit(...)` | overlapping-window median + spread -- outlier-robust, no `f_scale` tuning |
 | **DSB** | `fit_dsb(...)` | symbolic exact balance (reference only) |
-| **EDAFilter** | `EDAFilter(...)` | streaming EDA (area measurement) |
+| **EACFilter** | `EACFilter(...)` | streaming EAC (area measurement) |
 | **LSIFilter** | `LSIFilter(...)` | streaming LSI (spectrum measurement) -- for oscillatory plants |
 | **Filter bank** | `FilterBank.from_model(...)` | many streams in lockstep |
 | **Fused detector** | `bank.fused_detector(...)` | pool stream innovations for a shared-fault test |
-| **sklearn estimator** | `NonlineRegressor(..., method=)` | LSI/EDA/DSB behind `fit`/`predict`/`score` |
+| **sklearn estimator** | `NonlineRegressor(..., method=)` | LSI/EAC/DSB behind `fit`/`predict`/`score` |
 | **Auto-estimate** | `auto_estimate(...)` | routes to the variant matching the signal's shape |
 | **Auto-forecast** | `auto_forecast(...)` | structured fit-then-extrapolate, with guards |
 | **Model catalog** | `models.<family>()` | self-seeding named families; `+` to compose |
@@ -186,9 +186,9 @@ kept experimental until it proves itself. Here is the complete list with status.
 
 | # | adaptation | now in `dtfit` as | what it is & how it works |
 |---|---|---|---|
-| **#1** | one-pass / distributed map-reduce | `PartitionedLSI`, `PartitionedEDA` | the empirical fingerprint is **additive over the domain** (a sum of per-chunk integrals), so a dataset too big for memory is reduced chunk-by-chunk in one pass, and distributed workers' partial sums `merge()` exactly. -> [../api/scaling.md](API-Scaling) |
+| **#1** | one-pass / distributed map-reduce | `PartitionedLSI`, `PartitionedEAC` | the empirical fingerprint is **additive over the domain** (a sum of per-chunk integrals), so a dataset too big for memory is reduced chunk-by-chunk in one pass, and distributed workers' partial sums `merge()` exactly. -> [../api/scaling.md](API-Scaling) |
 | **--** | GEMM-batched projection | `fit_lsi_batched`, `project_spectra`, `PartitionedBatchLSI` | the fingerprint is **linear across channels**, so `B` channels' spectra are one matrix multiply `Dᵀ.(w⊙Y)` -- runnable on CPU/GPU by swapping only *where the arrays live*. -> [../api/scaling.md](API-Scaling) |
-| **#6** | curvature-adaptive windows | `fit_eda_adaptive` | place EDA's windows by cumulative curvature -- narrow where the signal bends -- so each window carries equal information. Best for peaks/saturating shapes. -> [../api/fitting.md#fit_eda_adaptive](API-Fitting#fit_eda_adaptive) |
+| **#6** | curvature-adaptive windows | `fit_eac_adaptive` | place EAC's windows by cumulative curvature -- narrow where the signal bends -- so each window carries equal information. Best for peaks/saturating shapes. -> [../api/fitting.md#fit_eac_adaptive](API-Fitting#fit_eac_adaptive) |
 | **--** | LSI oscillatory recipe | `fit_lsi(oscillatory=..., freq_param=...)`, `fft_frequency_seed` | smoothing off + high order + FFT-seeded frequency, so a cycle isn't erased. -> [../api/fitting.md#fit_lsi](API-Fitting#fit_lsi) |
 | **--** | fused multi-axis detection | `FusedChiSquareDetector` | pool a filter bank's per-stream innovations into one `chi2(K)` statistic to catch a fault too weak in any single stream. -> [../api/streaming.md#fused](API-Streaming#fused) |
 | **#3** | overlapping-window ensemble | `ensemble_fit`, `EnsembleResult` | fit on many overlapping sub-windows and take the **median** of the per-window estimates -- bagging over time; rejects outlier windows and yields a spread. Outlier-robust without `f_scale` tuning. -> [../methods/ensemble.md](Methods-Ensemble) |
@@ -199,7 +199,7 @@ kept experimental until it proves itself. Here is the complete list with status.
 |---|---|---|---|
 | **#2** | pluggable basis LSI | `fit_lsi_basis` | keep LSI's criterion but choose the basis -- **Fourier** for periodic signals (a wiggle is 2-3 harmonics, not many polynomial orders), **Laguerre** for decays, Chebyshev/Legendre otherwise |
 | **#4** | joint shared-parameter fit | `fit_joint` | stack several channels' area equations into one system with **shared** parameters (a common frequency/rate) plus per-channel **private** ones -- more equations per shared unknown |
-| **#5** | stage-wise residual boosting | `boosted_fit` | fit stage 1 (e.g. an LSI trend), subtract it, fit stage 2 (e.g. an EDA cycle) on the residual; the sum is more expressive than either alone (the fingerprint is linear, so component fits add up) |
+| **#5** | stage-wise residual boosting | `boosted_fit` | fit stage 1 (e.g. an LSI trend), subtract it, fit stage 2 (e.g. an EAC cycle) on the residual; the sum is more expressive than either alone (the fingerprint is linear, so component fits add up) |
 
 Full signatures and usage for the experimental four:
 [../experimental/adaptations-api.md](Experimental-Adaptations-API). The
@@ -222,14 +222,14 @@ adaptation is measured against are in
 
 ```
 dtfit (stable, public)
-+-- batch fitting          fit_lsi . fit_eda . fit_eda_adaptive . fit_dsb . ensemble_fit
++-- batch fitting          fit_lsi . fit_eac . fit_eac_adaptive . fit_dsb . ensemble_fit
 |   support                find_degree . fft_frequency_seed
 +-- result type            FittingResult
 +-- sklearn estimator      NonlineRegressor
 +-- one-call entry points  auto_estimate . auto_forecast
 +-- model framework        models.<family> . Model . suggest_models
-+-- streaming / online     EDAFilter . LSIFilter . FilterBank . FusedChiSquareDetector
-+-- scaling backends       fit_many . Partitioned{LSI,EDA,BatchLSI}
++-- streaming / online     EACFilter . LSIFilter . FilterBank . FusedChiSquareDetector
++-- scaling backends       fit_many . Partitioned{LSI,EAC,BatchLSI}
 |                          fit_lsi_batched . project_spectra
 +-- diagnostics            fit_report . residual_diagnostics . FitDisplay . ResidualsDisplay
 

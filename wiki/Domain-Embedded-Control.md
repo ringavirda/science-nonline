@@ -8,7 +8,7 @@ Identify and track a plant online with bounded per-sample cost and a fixed memor
 
 ## Methods under test (dtfit streaming)
 
-- **EDAFilter** -- recursive estimator measuring the **area innovation** (data-model integrated over a sliding window); vector sub-area measurement (`n_sub=2`) + online noise adaptation (`adapt_r`). O(window*params)/sample, no SymPy on the hot path. The lean integral filter.
+- **EACFilter** -- recursive estimator measuring the **area innovation** (data-model integrated over a sliding window); vector sub-area measurement (`n_sub=2`) + online noise adaptation (`adapt_r`). O(window*params)/sample, no SymPy on the hot path. The lean integral filter.
 - **LSIFilter** -- same recursion measuring the window's **Legendre spectrum** (its first orthonormal coefficients) -- a richer, noise-weighted measurement; the safer default, especially on saturating/polynomial shapes (costs read-only flash projection tables).
 - **FilterBank + fused chi^2 detector** -- a bank of per-axis filters whose one-step innovations pool into a chi^2(n_axes) fault statistic, acted on via the `inflate` covariance re-arm; each filter also runs a NIS + CUSUM drift test.
 
@@ -38,7 +38,7 @@ Each estimator runs sample-by-sample on a 5%-noise stream. **RMSE vs clean** is 
 
 | estimator | RMSE vs clean | param err % | physical params? | latency (us) |
 |---|---|---|---|---|
-| dtfit EDAFilter | 0.0065 | 0.6 | yes | 59.8 |
+| dtfit EACFilter | 0.0065 | 0.6 | yes | 59.8 |
 | dtfit LSIFilter | 0.0045 | 0.8 | yes | 60.6 |
 | EKF (params-as-state) | 0.0046 | 0.7 | yes | 14.7 |
 | RLS (AR predictor) | 0.0286 | -- | no | 5.7 |
@@ -48,7 +48,7 @@ Each estimator runs sample-by-sample on a 5%-noise stream. **RMSE vs clean** is 
 
 | estimator | RMSE vs clean | param err % | physical params? | latency (us) |
 |---|---|---|---|---|
-| dtfit EDAFilter | 0.0340 | 0.3 | yes | 38.3 |
+| dtfit EACFilter | 0.0340 | 0.3 | yes | 38.3 |
 | dtfit LSIFilter | 0.0311 | 1.2 | yes | 39.1 |
 | EKF (params-as-state) | 0.0191 | 0.8 | yes | 11.1 |
 | RLS (AR predictor) | 0.0754 | -- | no | 5.6 |
@@ -58,7 +58,7 @@ Each estimator runs sample-by-sample on a 5%-noise stream. **RMSE vs clean** is 
 
 | estimator | RMSE vs clean | param err % | physical params? | latency (us) |
 |---|---|---|---|---|
-| dtfit EDAFilter | 0.0363 | 19.0 | yes | 37.3 |
+| dtfit EACFilter | 0.0363 | 19.0 | yes | 37.3 |
 | dtfit LSIFilter | 0.0163 | 3.8 | yes | 37.6 |
 | EKF (params-as-state) | 0.0249 | 0.4 | yes | 10.7 |
 | RLS (AR predictor) | 0.0236 | -- | no | 5.6 |
@@ -68,7 +68,7 @@ Each estimator runs sample-by-sample on a 5%-noise stream. **RMSE vs clean** is 
 
 | estimator | RMSE vs clean | param err % | physical params? | latency (us) |
 |---|---|---|---|---|
-| dtfit EDAFilter | 0.1486 | 19.0 | yes | 35.2 |
+| dtfit EACFilter | 0.1486 | 19.0 | yes | 35.2 |
 | dtfit LSIFilter | 0.1139 | 16.0 | yes | 37.1 |
 | EKF (params-as-state) | 0.1426 | 2.7 | yes | 10.7 |
 | RLS (AR predictor) | 0.2351 | -- | no | 5.6 |
@@ -76,12 +76,12 @@ Each estimator runs sample-by-sample on a 5%-noise stream. **RMSE vs clean** is 
 
 ### Best filter per plant -- and the reasoning
 
-Honest, and data-driven (not the cliche): on **clean** data neither dtfit filter dominates. The **LSIFilter** is the **safer default** -- its multi-coefficient spectral measurement matches or beats the area filter on every plant and is markedly better on the **saturating / polynomial** shapes (first-order 3.8% vs ~19% param error), where a single area leaves a parameter weakly constrained. The **EDAFilter** is the **lean option** (no read-only projection tables -> less flash) and is competitive -- even marginally better on params -- on the **clean oscillations**, which the intuition that 'an oscillation's area cancels' would wrongly rule out. The decisive differences are not here on clean data but under **stress** (Part 2): the EKF is the clean-Gaussian gold standard yet the one that breaks under outliers, where the integral filters hold.
+Honest, and data-driven (not the cliche): on **clean** data neither dtfit filter dominates. The **LSIFilter** is the **safer default** -- its multi-coefficient spectral measurement matches or beats the area filter on every plant and is markedly better on the **saturating / polynomial** shapes (first-order 3.8% vs ~19% param error), where a single area leaves a parameter weakly constrained. The **EACFilter** is the **lean option** (no read-only projection tables -> less flash) and is competitive -- even marginally better on params -- on the **clean oscillations**, which the intuition that 'an oscillation's area cancels' would wrongly rule out. The decisive differences are not here on clean data but under **stress** (Part 2): the EKF is the clean-Gaussian gold standard yet the one that breaks under outliers, where the integral filters hold.
 
 | plant | best dtfit filter | why |
 |---|---|---|
-| damped_osc | EDAFilter ~= Legendre | A clean damped oscillation is easy for both -- param error <1% each (EAF marginally better on params, Legendre better on tracking RMSE). Use the lean EAF unless you need the robustness. |
-| ac_sine | EDAFilter ~= Legendre | A sustained sinusoid -- both recover it within ~1%; the EAF is leaner and slightly more accurate on the parameters here. The filters separate under stress, not on this clean cycle. |
+| damped_osc | EACFilter ~= Legendre | A clean damped oscillation is easy for both -- param error <1% each (EAF marginally better on params, Legendre better on tracking RMSE). Use the lean EAF unless you need the robustness. |
+| ac_sine | EACFilter ~= Legendre | A sustained sinusoid -- both recover it within ~1%; the EAF is leaner and slightly more accurate on the parameters here. The filters separate under stress, not on this clean cycle. |
 | first_order | LSIFilter | A saturating exponential is where the spectrum clearly helps: its several orthogonal coefficients pin (K, tau) far better than a single area, which leaves tau weakly constrained (3.8% vs ~19% param error). |
 | ca_traj | LSIFilter | A polynomial trajectory -- the multi-coefficient measurement edges the single area (16% vs 19%); both find the trajectory parameters harder than the EKF, though they track the path itself well. |
 
@@ -100,7 +100,7 @@ On clean Gaussian noise the **EKF wins** -- it is the pointwise maximum-likeliho
 | noise % | 2% | 10% | 20% | 40% |
 |---|---|---|---|---|
 | LSIFilter | 0.3 | 1.0 | 2.4 | 5.3 |
-| EDAFilter | 0.2 | 1.6 | 3.9 | 8.0 |
+| EACFilter | 0.2 | 1.6 | 3.9 | 8.0 |
 | EKF | 0.8 | 1.3 | 2.2 | 4.9 |
 
 ### 2b. Outliers / glitches (the integral measurement's win)
@@ -110,7 +110,7 @@ With gross outliers (sensor spikes, GPS multipath) the picture **inverts**: a si
 | outliers % | 0% | 5% | 10% | 20% |
 |---|---|---|---|---|
 | LSIFilter | 0.5 | 14.1 | 30.6 | 62.5 |
-| EDAFilter | 0.6 | 34.5 | 43.7 | 47.5 |
+| EACFilter | 0.6 | 34.5 | 43.7 | 47.5 |
 | EKF | 0.9 | 249.5 | 603.3 | 697.3 |
 
 ### 2c. Sample dropout / irregular sampling
@@ -148,7 +148,7 @@ Live, no-malloc state per estimator (does **not** grow with the stream). NumPy d
 
 | estimator | state words | float32 B | window buffer? | params? | latency us (n=3,W=60) |
 |---|---|---|---|---|---|
-| dtfit EDAFilter | 143 | 572 | yes (W=60) | yes | 59.8 |
+| dtfit EACFilter | 143 | 572 | yes (W=60) | yes | 59.8 |
 | dtfit LSIFilter | 143 | 572 +960B flash | yes (W=60) | yes | 60.6 |
 | EKF (params-as-state) | 23 | 92 | no | yes | 14.7 |
 | RLS (AR predictor) | 24 | 96 | no | no | 5.7 |
@@ -188,7 +188,7 @@ Daily FX is near a random walk -- no online estimator beats persistence one step
 
 ## Reading it
 
-- **An applicability map for the filters (data-driven).** On clean data neither dtfit filter dominates: the **LSIFilter** is the safer default (matches or beats the area filter everywhere, and is markedly better on the saturating/polynomial shapes -- first-order 3.8% vs ~19% param error, where a single area leaves a parameter weakly constrained), while the lean **EDAFilter** (no flash tables) is competitive -- even marginally better on params -- on the clean oscillations. All estimators, including the EKF and a sliding-window refit, recover the parameters well on clean data; the filters separate under stress.
+- **An applicability map for the filters (data-driven).** On clean data neither dtfit filter dominates: the **LSIFilter** is the safer default (matches or beats the area filter everywhere, and is markedly better on the saturating/polynomial shapes -- first-order 3.8% vs ~19% param error, where a single area leaves a parameter weakly constrained), while the lean **EACFilter** (no flash tables) is competitive -- even marginally better on params -- on the clean oscillations. All estimators, including the EKF and a sliding-window refit, recover the parameters well on clean data; the filters separate under stress.
 - **The honest robustness trade (the heart of it).** On **Gaussian noise** the pointwise **EKF wins** (it is the ML update); the dtfit filters are competitive but do not beat it. On **outliers/glitches** the picture inverts decisively: a single spike is a huge pointwise innovation that throws the EKF (error explodes ~250% at 5% outliers), while the integral filters average it over the window and stay usable (~14-35%). Dropouts, by contrast, are tolerated by **all** the recursive estimators (a missing sample is just a skipped update). For real embedded sensing with multipath and spikes, the outlier robustness is the case for an integral measurement.
 - **Fault detection + on-device adaptation.** The fused chi^2 detector flags a multi-axis fault within a window at low false-alarm rate (pooling axes raises the SNR), and the `inflate` re-arm measurably speeds recovery -- online adaptation a fixed-gain filter or an offline-trained net cannot do.
 - **Deployable.** Fixed sub-KiB no-malloc state, O(1)/sample, O(1)-memory in stream length -- fits an M0+/M4/ESP32. The windowless EKF/Kalman/RLS are leaner; dtfit pays one window buffer for the integral robustness. A batch fit / full-history NN is O(N) and never fits.

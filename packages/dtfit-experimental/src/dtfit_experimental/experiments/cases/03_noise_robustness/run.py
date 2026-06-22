@@ -3,7 +3,7 @@
 How does fitting accuracy hold up as noise grows, outliers appear, and samples
 get scarce -- across different model families -- relative to the popular
 methods? We sweep Gaussian noise, outlier fraction and sample size for four
-model families and compare LSI / EDA against SciPy `curve_fit`, `numpy.polyfit`
+model families and compare LSI / EAC against SciPy `curve_fit`, `numpy.polyfit`
 and a scikit-learn MLP, scoring against the *clean* signal.
 
 Architecture adaptation: the overlapping-window ensemble (#3) is pitted against
@@ -69,16 +69,16 @@ def r2_clean(clean, pred):
 
 def noise_sweep(fam, noises, n=120, seeds=4):
     """R2-vs-clean for each method across noise levels (averaged over seeds)."""
-    out = {m: [] for m in ["EDA", "LSI", "curve_fit", "polyfit", "MLP"]}
+    out = {m: [] for m in ["EAC", "LSI", "curve_fit", "polyfit", "MLP"]}
     for noise in noises:
         acc = {m: [] for m in out}
         for s in range(seeds):
             x, y, clean = _noisy(fam, n, noise, s)
             try:
-                acc["EDA"].append(r2_clean(clean, np.asarray(
-                    dt.fit_eda(x, y, fam["expr"], fam["var"], p0=fam["p0"]).model(x))))
+                acc["EAC"].append(r2_clean(clean, np.asarray(
+                    dt.fit_eac(x, y, fam["expr"], fam["var"], p0=fam["p0"]).model(x))))
             except Exception:
-                acc["EDA"].append(np.nan)
+                acc["EAC"].append(np.nan)
             try:
                 acc["LSI"].append(r2_clean(clean, np.asarray(
                     dt.fit_lsi(x, y, fam["expr"], fam["var"], p0=fam["p0"]).model(x))))
@@ -97,18 +97,18 @@ def noise_sweep(fam, noises, n=120, seeds=4):
 
 
 def outlier_sweep(fam, fracs, n=120, seeds=5):
-    """R2-vs-clean under outliers: stock EDA vs the robust ensemble (#3)."""
-    methods = ["EDA", "LSI", "curve_fit", "EDA-ensemble", "EDA-softl1"]
+    """R2-vs-clean under outliers: stock EAC vs the robust ensemble (#3)."""
+    methods = ["EAC", "LSI", "curve_fit", "EAC-ensemble", "EAC-softl1"]
     out = {m: [] for m in methods}
     for fr in fracs:
         acc = {m: [] for m in methods}
         for s in range(seeds):
             x, y, clean = _noisy(fam, n, 0.05, s, outlier_frac=fr)
             try:
-                acc["EDA"].append(r2_clean(clean, np.asarray(
-                    dt.fit_eda(x, y, fam["expr"], fam["var"], p0=fam["p0"]).model(x))))
+                acc["EAC"].append(r2_clean(clean, np.asarray(
+                    dt.fit_eac(x, y, fam["expr"], fam["var"], p0=fam["p0"]).model(x))))
             except Exception:
-                acc["EDA"].append(np.nan)
+                acc["EAC"].append(np.nan)
             try:
                 acc["LSI"].append(r2_clean(clean, np.asarray(
                     dt.fit_lsi(x, y, fam["expr"], fam["var"], p0=fam["p0"]).model(x))))
@@ -120,25 +120,25 @@ def outlier_sweep(fam, fracs, n=120, seeds=5):
             except Exception:
                 acc["curve_fit"].append(np.nan)
             try:
-                e = ensemble_fit(x, y, fam["expr"], fam["var"], method="eda",
+                e = ensemble_fit(x, y, fam["expr"], fam["var"], method="eac",
                                  n_windows=10, overlap=0.5, p0=fam["p0"])
-                acc["EDA-ensemble"].append(r2_clean(clean, e.predict(x)))
+                acc["EAC-ensemble"].append(r2_clean(clean, e.predict(x)))
             except Exception:
-                acc["EDA-ensemble"].append(np.nan)
+                acc["EAC-ensemble"].append(np.nan)
             try:
-                r = dt.fit_eda(x, y, fam["expr"], fam["var"], p0=fam["p0"],
+                r = dt.fit_eac(x, y, fam["expr"], fam["var"], p0=fam["p0"],
                                loss="soft_l1", bounds=([-10] * len(fam["p0"]),
                                                        [10] * len(fam["p0"])))
-                acc["EDA-softl1"].append(r2_clean(clean, np.asarray(r.model(x))))
+                acc["EAC-softl1"].append(r2_clean(clean, np.asarray(r.model(x))))
             except Exception:
-                acc["EDA-softl1"].append(np.nan)
+                acc["EAC-softl1"].append(np.nan)
         for m in methods:
             out[m].append(np.nanmean(acc[m]))
     return out
 
 
 def param_grid_parallel(fam, noises, sizes, seeds=3):
-    """EDA param-recovery error over a (noise × size) grid, fanned via fit_many."""
+    """EAC param-recovery error over a (noise × size) grid, fanned via fit_many."""
     names = list(fam["true"])
     tv = np.array([fam["true"][k] for k in names])
     grid = np.full((len(noises), len(sizes)), np.nan)
@@ -148,7 +148,7 @@ def param_grid_parallel(fam, noises, sizes, seeds=3):
             for s in range(seeds):
                 x, y, _ = _noisy(fam, n, noise, s)
                 probs.append(FittingProblem(x=x, y=y, expr=fam["expr"],
-                                        var=fam["var"], method="eda",
+                                        var=fam["var"], method="eac",
                                         kwargs={"p0": fam["p0"]}))
                 coord.append((i, j))
     results = fit_many(probs, n_jobs=-1, backend="loky")
@@ -176,7 +176,7 @@ def main(quick: bool = False) -> str:
     rep.section(
         "Models fitted & why",
         "Four model families are fitted, each with a known ground truth so the "
-        "error is true parameter recovery, chosen to span the classes LSI/EDA "
+        "error is true parameter recovery, chosen to span the classes LSI/EAC "
         "target:\n"
         "- **exponential** `a·exp(b·x)` — monotone growth/decay (the canonical "
         "nonlinear-in-parameters case);\n"
@@ -199,7 +199,7 @@ def main(quick: bool = False) -> str:
                              squeeze=False)
     for ax, fname in zip(axes[0], fams):
         sweep = noise_sweep(FAMILIES[fname], noises, seeds=seeds)
-        for m, style in [("EDA", "tab:green"), ("LSI", "tab:blue"),
+        for m, style in [("EAC", "tab:green"), ("LSI", "tab:blue"),
                          ("curve_fit", "0.4"), ("polyfit", "tab:orange"),
                          ("MLP", "tab:red")]:
             ax.plot(noises, sweep[m], "o-", color=style, ms=3, label=m)
@@ -217,9 +217,9 @@ def main(quick: bool = False) -> str:
     fracs = [0.0, 0.05, 0.1, 0.15, 0.2]
     osw = outlier_sweep(FAMILIES["exponential"], fracs, seeds=seeds)
     fig, ax = plt.subplots(figsize=(7.5, 4))
-    for m, style in [("EDA", "tab:green"), ("LSI", "tab:blue"),
-                     ("curve_fit", "0.4"), ("EDA-ensemble", "tab:purple"),
-                     ("EDA-softl1", "tab:olive")]:
+    for m, style in [("EAC", "tab:green"), ("LSI", "tab:blue"),
+                     ("curve_fit", "0.4"), ("EAC-ensemble", "tab:purple"),
+                     ("EAC-softl1", "tab:olive")]:
         ax.plot([f * 100 for f in fracs], osw[m], "o-", color=style, ms=4, label=m)
     ax.set_title("Robustness to outliers (exponential)")
     ax.set_xlabel("outlier fraction (%)"); ax.set_ylabel("R² vs clean")
@@ -227,14 +227,14 @@ def main(quick: bool = False) -> str:
     ax.legend(fontsize=8)
     rep.figure(fig, "outlier_sweep", "Robust variants degrade more gracefully.")
     rep.table(
-        ["outlier %"] + ["EDA", "LSI", "curve_fit", "EDA-ensemble", "EDA-softl1"],
+        ["outlier %"] + ["EAC", "LSI", "curve_fit", "EAC-ensemble", "EAC-softl1"],
         [[fmt(f * 100, "{:.0f}")] + [fmt(osw[m][i], "{:.3f}")
-         for m in ["EDA", "LSI", "curve_fit", "EDA-ensemble", "EDA-softl1"]]
+         for m in ["EAC", "LSI", "curve_fit", "EAC-ensemble", "EAC-softl1"]]
          for i, f in enumerate(fracs)])
 
     # --- parallel param-recovery grid (noise x size) -------------------- #
     rep.section("Parameter-recovery error grid (parallel via fit_many)",
-                "Median EDA parameter-recovery error (%) over a noise×size grid "
+                "Median EAC parameter-recovery error (%) over a noise×size grid "
                 "for the exponential family, the whole grid fitted in parallel "
                 "across cores with `fit_many`.")
     g_noises = [0.02, 0.1, 0.2, 0.3]
@@ -246,7 +246,7 @@ def main(quick: bool = False) -> str:
     ax.set_xticks(range(len(g_sizes))); ax.set_xticklabels(g_sizes)
     ax.set_yticks(range(len(g_noises))); ax.set_yticklabels(g_noises)
     ax.set_xlabel("sample size n"); ax.set_ylabel("noise level")
-    ax.set_title("EDA param-recovery error % (lower better)")
+    ax.set_title("EAC param-recovery error % (lower better)")
     for i in range(len(g_noises)):
         for j in range(len(g_sizes)):
             if np.isfinite(grid[i, j]):
@@ -257,14 +257,14 @@ def main(quick: bool = False) -> str:
 
     rep.section("Reading it", level=2)
     rep.text(
-        "- LSI/EDA stay close to the NLLS `curve_fit` across noise and clearly "
+        "- LSI/EAC stay close to the NLLS `curve_fit` across noise and clearly "
         "beat the `polyfit` surrogate and the black-box MLP on the structured "
         "families (the integral criterion averages noise).\n"
         "- Under outliers **LSI is the standout**: its Savitzky-Golay pre-filter "
         "plus integral projection reject gross outliers, so it holds R²≈0.9 even "
-        "at 20% contamination — matching or beating `curve_fit`, while stock EDA "
+        "at 20% contamination — matching or beating `curve_fit`, while stock EAC "
         "collapses.\n"
-        "- Adaptation #3 (overlapping-window ensemble) helps EDA at low "
+        "- Adaptation #3 (overlapping-window ensemble) helps EAC at low "
         "contamination (≤10%) but its median-of-coefficients aggregation becomes "
         "unstable once many windows are corrupted; the soft-L1 robust loss gave "
         "little benefit here. So #3 shows only a *partial* outlier-robustness "

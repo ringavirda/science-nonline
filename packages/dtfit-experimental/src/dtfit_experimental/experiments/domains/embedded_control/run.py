@@ -19,7 +19,7 @@ against the **established online toolkit** an engineer would otherwise reach for
 ------------------------------------------------------------------------------
 METHODS UNDER TEST (dtfit streaming)
 ------------------------------------------------------------------------------
-* **EDAFilter** -- a Kalman-style recursive estimator whose *measurement*
+* **EACFilter** -- a Kalman-style recursive estimator whose *measurement*
   is the **area innovation** (data minus model integrated over a sliding window).
   Cheapest integral filter; adequate for monotone/polynomial plants.
 * **LSIFilter** -- the same recursion measuring the window's
@@ -37,7 +37,7 @@ import time
 
 import numpy as np
 
-from dtfit.streaming import EDAFilter, LSIFilter, FilterBank
+from dtfit.streaming import EACFilter, LSIFilter, FilterBank
 
 from dtfit_experimental.experiments.common import ReportWriter, fmt, metrics
 from dtfit_experimental.experiments.common.plotting import plt
@@ -116,10 +116,10 @@ class _Ad:
 
 
 class EAAd(_Ad):
-    name = "dtfit EDAFilter"
+    name = "dtfit EACFilter"
 
     def __init__(self, plant, window=None):
-        self.f = EDAFilter(plant["expr"], "t", p0=list(plant["p0"]),
+        self.f = EACFilter(plant["expr"], "t", p0=list(plant["p0"]),
                                   window_size=window or plant["window"], n_sub=2,
                                   q_diag=list(plant["q"]), r=0.5, adapt_r=True)
 
@@ -279,7 +279,7 @@ def part_accuracy(rep, plants, rng, quick):
         # record for the per-plant table
         p["_rows"] = rows_dt
         # best dtfit filter by param err (or rmse if no params)
-        dt_names = ["dtfit EDAFilter", "dtfit LSIFilter"]
+        dt_names = ["dtfit EACFilter", "dtfit LSIFilter"]
         bestf = min(dt_names, key=lambda nshape: rows_dt[nshape][1])
         best_map[p["key"]] = bestf
         overlay.append((p, t, y, clean, warm, rows_dt[bestf][4],
@@ -322,7 +322,7 @@ def part_accuracy(rep, plants, rng, quick):
 # 2. robustness: Gaussian noise, outliers, dropouts
 # --------------------------------------------------------------------------- #
 def _sweep_perr(plant, kind, levels, seeds):
-    methods = ["dtfit LSIFilter", "dtfit EDAFilter",
+    methods = ["dtfit LSIFilter", "dtfit EACFilter",
                "EKF (params-as-state)"]
     out = {m: [] for m in methods}
     for lv in levels:
@@ -410,7 +410,7 @@ def part_robustness(rep, plants, quick):
     # figures
     fig, ax = plt.subplots(1, 2, figsize=(11, 3.8))
     for m, col in [("dtfit LSIFilter", "tab:blue"),
-                   ("dtfit EDAFilter", "tab:green"),
+                   ("dtfit EACFilter", "tab:green"),
                    ("EKF (params-as-state)", "tab:orange")]:
         ax[0].plot([v * 100 for v in nz], noise[m], "o-", color=col, lw=1.4,
                    label=m.replace("dtfit ", "").replace(" (params-as-state)", ""))
@@ -561,7 +561,7 @@ def part_footprint(rep, plants):
         "of a hand-coded C struct (`2W + n² + 2n + 8` words for the area filter); "
         "latency is the per-sample desktop reference from Part 1.")
     W, n = 60, 3
-    ea = embedded_footprint(n, W, kind="eda")
+    ea = embedded_footprint(n, W, kind="eac")
     leg = embedded_footprint(n, W, kind="legendre")
     ekf_words = n * n + 2 * n + 8
     rls_words = 4 * 4 + 4 + 4
@@ -571,8 +571,8 @@ def part_footprint(rep, plants):
     rep.table(
         ["estimator", "state words", "float32 B", "window buffer?", "params?",
          "latency µs (n=3,W=60)"],
-        [["dtfit EDAFilter", str(ea["sram_words"]), str(ea["sram_bytes_f32"]),
-          f"yes (W={W})", "yes", fmt(lat["dtfit EDAFilter"], "{:.1f}")],
+        [["dtfit EACFilter", str(ea["sram_words"]), str(ea["sram_bytes_f32"]),
+          f"yes (W={W})", "yes", fmt(lat["dtfit EACFilter"], "{:.1f}")],
          ["dtfit LSIFilter", str(leg["sram_words"]),
           f"{leg['sram_bytes_f32']} +{leg['flash_bytes_f32']}B flash",
           f"yes (W={W})", "yes", fmt(lat["dtfit LSIFilter"], "{:.1f}")],
@@ -608,7 +608,7 @@ def part_footprint(rep, plants):
     ax[0].set_title("Resident state vs window size (float32)")
     ax[0].set_xlabel("window W"); ax[0].set_ylabel("state bytes"); ax[0].legend(fontsize=8)
     names = ["EqualAreas", "Legendre", "EKF", "RLS"]
-    vals = [lat["dtfit EDAFilter"], lat["dtfit LSIFilter"],
+    vals = [lat["dtfit EACFilter"], lat["dtfit LSIFilter"],
             lat["EKF (params-as-state)"], lat["RLS (AR predictor)"]]
     ax[1].bar(names, vals, color=["tab:green", "tab:blue", "tab:orange", "0.5"])
     ax[1].set_ylabel("µs / update"); ax[1].set_title("Per-sample latency (desktop ref)")
@@ -632,7 +632,7 @@ def part_realdata(rep):
         "Stream the daily hryvnia rate and track a local exponential `a·exp(b·t)` "
         "online; one-step-ahead error vs the random-walk benchmark — the honest "
         "test for a near-random-walk series.")
-    ea = EDAFilter("a*exp(b*t)", "t", p0=[1.0, 0.5], window_size=40,
+    ea = EACFilter("a*exp(b*t)", "t", p0=[1.0, 0.5], window_size=40,
                           n_sub=2, q_diag=[1e-4, 1e-4], r=0.5, adapt_r=True)
     ekf = EKFParam("a*exp(b*t)", "t", [1.0, 0.5], q=1e-5, r=0.1)
     rls = RLSPredictor(order=2, lam=1.0, delta=1e3)
@@ -709,11 +709,11 @@ def main(quick: bool = False) -> str:
 
 # --------------------------------------------------------------------------- #
 FILTER_REASON = {
-    "damped_osc": ("EDAFilter ≈ Legendre",
+    "damped_osc": ("EACFilter ≈ Legendre",
                    "A clean damped oscillation is easy for both — param error <1% "
                    "each (EAF marginally better on params, Legendre better on "
                    "tracking RMSE). Use the lean EAF unless you need the robustness."),
-    "ac_sine": ("EDAFilter ≈ Legendre",
+    "ac_sine": ("EACFilter ≈ Legendre",
                 "A sustained sinusoid — both recover it within ~1%; the EAF is "
                 "leaner and slightly more accurate on the parameters here. The "
                 "filters separate under stress, not on this clean cycle."),
@@ -734,7 +734,7 @@ _APPLICABILITY_DOC = (
     "its multi-coefficient spectral measurement matches or beats the area filter "
     "on every plant and is markedly better on the **saturating / polynomial** "
     "shapes (first-order 3.8% vs ~19% param error), where a single area leaves a "
-    "parameter weakly constrained. The **EDAFilter** is the **lean option** "
+    "parameter weakly constrained. The **EACFilter** is the **lean option** "
     "(no read-only projection tables → less flash) and is competitive — even "
     "marginally better on params — on the **clean oscillations**, which the "
     "intuition that 'an oscillation's area cancels' would wrongly rule out. The "
@@ -748,7 +748,7 @@ _READING_DOC = (
     "default (matches or beats the area filter everywhere, and is markedly better "
     "on the saturating/polynomial shapes — first-order 3.8% vs ~19% param error, "
     "where a single area leaves a parameter weakly constrained), while the lean "
-    "**EDAFilter** (no flash tables) is competitive — even marginally better "
+    "**EACFilter** (no flash tables) is competitive — even marginally better "
     "on params — on the clean oscillations. All estimators, including the EKF and a "
     "sliding-window refit, recover the parameters well on clean data; the filters "
     "separate under stress.\n"
@@ -774,7 +774,7 @@ _READING_DOC = (
     "SNR — the same honest limits the case studies drew.")
 
 _METHODS_DOC = (
-    "- **EDAFilter** — recursive estimator measuring the **area innovation** "
+    "- **EACFilter** — recursive estimator measuring the **area innovation** "
     "(data−model integrated over a sliding window); vector sub-area measurement "
     "(`n_sub=2`) + online noise adaptation (`adapt_r`). O(window·params)/sample, "
     "no SymPy on the hot path. The lean integral filter.\n"
