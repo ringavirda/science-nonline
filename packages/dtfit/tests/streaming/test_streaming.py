@@ -270,3 +270,68 @@ def test_inflate_scales_covariance_for_both_filters():
         assert np.allclose(flt.P, p0 * 7.0)
         flt.inflate()  # defaults to drift_inflation
         assert np.allclose(flt.P, p0 * 7.0 * 50.0)
+
+
+# --------------------------------------------------------------------------- #
+# Robust mode -- in-window residual winsorization rejects gross outliers
+# --------------------------------------------------------------------------- #
+def _outlier_sine(seed, frac):
+    rng = np.random.default_rng(seed)
+    t = np.linspace(0, 40, 1600)
+    y = 3.0 * np.sin(1.5 * t) + rng.normal(0, 0.15, t.size)
+    mask = rng.random(t.size) < frac
+    y[mask] += rng.normal(0, 24.0, int(mask.sum()))  # gross spikes (~8x amplitude)
+    return t, y
+
+
+def test_robust_mode_resists_outliers_both_filters():
+    """With 10% gross outliers the robust filter must stay far closer to the truth
+    than the non-robust one, for both the area and the spectrum filter."""
+    for cls, kw in [(EACFilter, dict(window_size=60, n_sub=2)),
+                    (LSIFilter, dict(window_size=60, order=5))]:
+        t, y = _outlier_sine(0, 0.10)
+
+        def err(robust):
+            flt = cls("A*sin(w*t)", "t", p0=[1.0, 1.0],
+                      q_diag=[1e-3, 1e-3], adapt_r=True, robust=robust, **kw)
+            for ti, yi in zip(t, y):
+                flt.partial_fit(ti, yi)
+            p = flt.params_
+            return abs(p["A"] - 3.0) / 3.0 + abs(p["w"] - 1.5) / 1.5
+
+        assert err(True) < 0.5 * err(False)   # robust at least halves the error
+        assert err(True) < 0.20                # and lands close to the truth
+
+
+def test_robust_mode_clean_signal_matches_default():
+    """On a clean signal the robust gate is inactive, so it must not degrade the
+    estimate relative to the non-robust filter."""
+    rng = np.random.default_rng(1)
+    t = np.linspace(0, 40, 1600)
+    y = 3.0 * np.sin(1.5 * t) + rng.normal(0, 0.15, t.size)
+    out = {}
+    for robust in (False, True):
+        flt = LSIFilter("A*sin(w*t)", "t", p0=[1.0, 1.0], window_size=60, order=5,
+                        q_diag=[1e-3, 1e-3], robust=robust)
+        for ti, yi in zip(t, y):
+            flt.partial_fit(ti, yi)
+        out[robust] = abs(flt.params_["A"] - 3.0)
+    assert out[True] < 0.3
+    assert out[True] <= out[False] + 0.1   # no meaningful degradation
+
+
+def test_robust_mode_still_detects_drift():
+    """Winsorizing the residual around its MEDIAN preserves a sustained shift, so a
+    genuine regime change is still detected under robust mode."""
+    rng = np.random.default_rng(0)
+    levels = np.r_[np.full(120, 1.0), np.full(120, 3.0)] + rng.normal(0, 0.02, 240)
+    x = np.linspace(0, 1.0, levels.size)
+    flt = EACFilter("a*exp(b*x)", "x", p0=[1.0, 0.0], window_size=20,
+                    q_diag=[1e-3, 1e-3], r=0.2, robust=True)
+    direction = 0
+    for xi, yi in zip(x, levels):
+        flt.partial_fit(xi, yi)
+        if flt.drift_flag_:
+            direction = flt.last_drift_direction_
+    assert flt.n_drifts_ >= 1
+    assert direction == 1

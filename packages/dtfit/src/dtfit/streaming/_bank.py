@@ -17,7 +17,7 @@ processes). This is the streaming counterpart of :func:`dtfit.fit_many`.
 
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from typing import Any, Sequence
 
 import numpy as np
@@ -26,6 +26,47 @@ from scipy.stats import chi2
 from ._eac import EACFilter
 
 __all__ = ["FilterBank", "FusedChiSquareDetector"]
+
+
+def _drive_streams(
+    recipe: tuple[Any, str, str, dict[str, Any]],
+    t_seq: np.ndarray,
+    y_cols: list[np.ndarray],
+    track: bool,
+) -> tuple[list[np.ndarray], list[int], list[list[float]]]:
+    """Process-pool worker: rebuild a filter per assigned stream from the picklable
+    ``recipe`` (the compiled SymPy callables are *not* pickled -- they are
+    recompiled in the worker), drive it over its column, and return final params,
+    drift counts and optional per-step tracks. Module-level so it is picklable.
+
+    This is what lets the bank parallelize across **processes**: each worker holds
+    the GIL of its own interpreter, so the Python-level per-sample work (model
+    evaluation, Kalman update) of different streams runs genuinely concurrently --
+    unlike the thread backend, where one GIL serializes that work.
+    """
+    filter_cls, expr, var, kwargs = recipe
+    params: list[np.ndarray] = []
+    drifts: list[int] = []
+    tracks: list[list[float]] = []
+    for col in y_cols:
+        flt = filter_cls(expr, var, **kwargs)
+        nd = 0
+        th: list[float] = []
+        for s in range(t_seq.size):
+            flt.partial_fit(float(t_seq[s]), float(col[s]))
+            if getattr(flt, "drift_flag_", False):
+                nd += 1
+            if track:  # full-length column (NaN where no prediction), so the
+                # parent can assign it by position without index drift
+                if len(getattr(flt, "_t", [1])) > 0:
+                    th.append(float(flt.predict(np.array([t_seq[s]]))[0]))
+                else:
+                    th.append(float("nan"))
+        params.append(np.asarray(flt.p, dtype=float))
+        drifts.append(nd)
+        if track:
+            tracks.append(th)
+    return params, drifts, tracks
 
 
 class FilterBank:
@@ -40,6 +81,10 @@ class FilterBank:
         self.filters: list[Any] = list(filters)
         if not self.filters:
             raise ValueError("FilterBank needs at least one filter.")
+        # Construction recipe for the process backend; set by ``from_model`` (only
+        # there are all streams identically configured and picklable). ``None`` for
+        # banks built from explicit, possibly heterogeneous filter objects.
+        self._recipe: tuple[Any, str, str, dict[str, Any]] | None = None
 
     @classmethod
     def from_model(
@@ -60,7 +105,9 @@ class FilterBank:
                 ``LSIFilter``.
             **kwargs: Forwarded to each filter's constructor.
         """
-        return cls([filter_cls(expr, var, **kwargs) for _ in range(n_streams)])
+        bank = cls([filter_cls(expr, var, **kwargs) for _ in range(n_streams)])
+        bank._recipe = (filter_cls, expr, var, dict(kwargs))
+        return bank
 
     def __len__(self) -> int:
         return len(self.filters)
@@ -107,20 +154,30 @@ class FilterBank:
         *,
         n_jobs: int = 1,
         track: bool = False,
+        backend: str = "thread",
     ) -> dict[str, Any]:
         """Drive every stream over a whole block of samples.
 
-        Streams are independent, so each worker thread takes a disjoint subset
-        of streams and runs it to completion -- no per-step synchronization,
-        which is what makes the bank scale. This is the throughput primitive
-        used by the parallel-scaling experiment.
+        Streams are independent, so each worker takes a disjoint subset of streams
+        and runs it to completion -- no per-step synchronization, which is what
+        makes the bank scale.
 
         Args:
             t_seq: Time stamps, shape ``(n_steps,)`` (shared by all streams).
             Y: Observations, shape ``(n_steps, K)`` -- column k feeds filter k.
-            n_jobs: Worker threads (``1`` = serial).
+            n_jobs: Worker count (``1`` = serial).
             track: If True, also return the per-stream, per-step prediction of
                 the current sample (``(n_steps, K)``); costs O(n_steps*K) memory.
+            backend: ``"thread"`` (default) fans the K streams across worker
+                threads; this only speeds up the GIL-released native kernel work,
+                so for the (Python-level) recursive filter loop it is usually no
+                faster than serial. ``"process"`` instead runs disjoint stream
+                subsets in separate interpreters -- each holding its own GIL -- so
+                the per-sample Python work runs genuinely concurrently; it wins for
+                large workloads (many streams x long records) where the per-process
+                compute dwarfs the spawn/pickling overhead. Requires a bank built
+                via :meth:`from_model` (so the filters are reconstructable in the
+                workers); falls back to threads otherwise.
 
         Returns:
             ``params``: ``(K, n_params)`` final estimates; ``n_drifts``:
@@ -131,6 +188,10 @@ class FilterBank:
         n_steps, K = Y.shape
         if K != len(self.filters):
             raise ValueError(f"Y has {K} columns but bank holds {len(self.filters)} filters.")
+
+        if backend == "process" and n_jobs > 1 and self._recipe is not None:
+            return self._run_process(t_seq, Y, n_jobs=n_jobs, track=track)
+
         track_hist = np.full((n_steps, K), np.nan) if track else None
         drifts = np.zeros(K, dtype=int)
 
@@ -155,6 +216,35 @@ class FilterBank:
             "params": self.params_array(),
             "n_drifts": drifts,
         }
+        if track_hist is not None:
+            out["track"] = track_hist
+        return out
+
+    def _run_process(
+        self, t_seq: np.ndarray, Y: np.ndarray, *, n_jobs: int, track: bool
+    ) -> dict[str, Any]:
+        """Process-pool backend for :meth:`run` (see its ``backend`` docs)."""
+        n_steps, K = Y.shape
+        groups = [g.tolist() for g in np.array_split(np.arange(K), n_jobs) if len(g)]
+        n_params = self.filters[0].p.size
+        params = np.zeros((K, n_params))
+        drifts = np.zeros(K, dtype=int)
+        track_hist = np.full((n_steps, K), np.nan) if track else None
+        with ProcessPoolExecutor(max_workers=n_jobs) as ex:
+            futs = {
+                ex.submit(_drive_streams, self._recipe, t_seq,
+                          [Y[:, k] for k in g], track): g
+                for g in groups
+            }
+            for fut, g in futs.items():
+                ps, ds, ths = fut.result()
+                for local, k in enumerate(g):
+                    params[k] = ps[local]
+                    drifts[k] = ds[local]
+                    self.filters[k].p = ps[local]  # keep bank readout consistent
+                    if track_hist is not None:
+                        track_hist[:, k] = ths[local]
+        out: dict[str, Any] = {"params": params, "n_drifts": drifts}
         if track_hist is not None:
             out["track"] = track_hist
         return out

@@ -66,6 +66,8 @@ class LSIFilter:
         cusum_k: float = 0.5,
         cusum_h: float = 5.0,
         adapt_r: bool = False,
+        robust: bool = False,
+        huber_c: float = 3.0,
         drift_reset: str = "full",
         drift_inflation: float = 100.0,
     ) -> None:
@@ -91,6 +93,15 @@ class LSIFilter:
             cusum_h: CUSUM decision threshold in accumulated standard deviations.
             adapt_r: If True, adapt ``r`` online from an EWMA of the normalized
                 innovation power (Mehra-style).
+            robust: If True, gate each Kalman update by the normalized innovation:
+                a window whose per-dof Mahalanobis innovation exceeds ``huber_c``
+                has its (diagonal) measurement-noise inflated -- shrinking the gain
+                -- so an outlier-corrupted window cannot yank the estimate. The
+                drift detector still sees the raw spectral innovation, so a genuine
+                regime shift is detected and re-armed (the inflated covariance then
+                disables the gate during re-adaptation).
+            huber_c: Robust gate threshold in innovation standard deviations
+                (per degree of freedom); ~3 keeps clean windows unweighted.
             drift_reset: On a detected drift, ``"full"`` resets the covariance to
                 its large initial value and clears the window; ``"inflate"``
                 instead multiplies the covariance by ``drift_inflation`` and
@@ -143,6 +154,8 @@ class LSIFilter:
         self.cusum_k = float(cusum_k)
         self.cusum_h = float(cusum_h)
         self.adapt_r = bool(adapt_r)
+        self.robust = bool(robust)
+        self._huber_c = float(huber_c)
         self.drift_reset = drift_reset
         self.drift_inflation = float(drift_inflation)
         self._r_scale = 1.0  # adaptive multiplier on R when adapt_r
@@ -223,8 +236,24 @@ class LSIFilter:
         y_arr = np.asarray(self._y)
         t0, tn = float(t_arr[0]), float(t_arr[-1])
 
+        # Robust measurement: winsorize the model residual within the window before
+        # projecting. Each sample's residual deviation beyond huber_c robust sigmas
+        # (MAD) from the window's MEDIAN residual is clipped, so outlier spikes are
+        # de-weighted at the sample level (they can no longer dominate the high-order
+        # Legendre coefficients), while the median residual -- holding any genuine
+        # sustained shift -- passes through, so drift detection still works.
+        y_eff = y_arr
+        if self.robust:
+            m_win = self._eval(self._f, t_arr)
+            resid = y_arr - m_win
+            med = float(np.median(resid))
+            sigma = 1.4826 * float(np.median(np.abs(resid - med)))
+            if sigma > 0.0:
+                c = self._huber_c * sigma
+                y_eff = m_win + (med + np.clip(resid - med, -c, c))
+
         # Empirical spectrum (cached projection) vs model spectrum (quadrature).
-        beta_data = self._proj @ y_arr
+        beta_data = self._proj @ y_eff
         beta_model, h_mat = self._model_spectrum(t0, tn)
         e_vec = beta_data - beta_model
 

@@ -51,6 +51,8 @@ class EACFilter:
         cusum_h: float = 5.0,
         n_sub: int = 1,
         adapt_r: bool = False,
+        robust: bool = False,
+        huber_c: float = 3.0,
         drift_reset: str = "full",
         drift_inflation: float = 100.0,
     ) -> None:
@@ -79,6 +81,16 @@ class EACFilter:
             adapt_r: If True, adapt the measurement-noise variance ``R`` online
                 from an EWMA of the squared innovation (Mehra-style), instead of
                 trusting the fixed ``r``.
+            robust: If True, gate each Kalman update by the normalized innovation:
+                a window whose per-dof Mahalanobis innovation exceeds ``huber_c``
+                has its measurement-noise inflated (gain shrunk) by a Huber weight,
+                so an outlier-corrupted window cannot yank the estimate. The drift
+                detector still sees the *raw* innovation, so a genuine regime shift
+                is detected and re-armed (the inflated covariance then disables the
+                gate during re-adaptation) -- transients are rejected, sustained
+                changes are not.
+            huber_c: Robust gate threshold in innovation standard deviations
+                (per degree of freedom); ~3 keeps clean windows unweighted.
             drift_reset: On a detected drift, ``"full"`` resets the covariance to
                 its large initial value and clears the window (original
                 behaviour); ``"inflate"`` instead multiplies the covariance by
@@ -109,6 +121,8 @@ class EACFilter:
 
         self.n_sub = max(1, int(n_sub))
         self.adapt_r = bool(adapt_r)
+        self.robust = bool(robust)
+        self._huber_c = float(huber_c)
         self.drift_reset = drift_reset
         self.drift_inflation = float(drift_inflation)
         self._r_ewma = float(r)  # adaptive measurement-noise estimate
@@ -195,7 +209,22 @@ class EACFilter:
         starts = np.array([a for a, _ in sub], dtype=np.intp)
         stops = np.array([b for _, b in sub], dtype=np.intp)
 
-        e_vec = simpson_windows(y_arr, t_arr, starts, stops) - simpson_windows(
+        # Robust measurement: winsorize the model residual within the window before
+        # integrating. Each sample's residual deviation beyond huber_c robust sigmas
+        # (MAD) from the window's MEDIAN residual is clipped, so outlier spikes are
+        # de-weighted at the sample level (the integral can no longer carry them),
+        # while the median residual -- which holds any genuine sustained shift --
+        # passes through untouched, so drift detection still works.
+        y_eff = y_arr
+        if self.robust:
+            resid = y_arr - m_func
+            med = float(np.median(resid))
+            sigma = 1.4826 * float(np.median(np.abs(resid - med)))
+            if sigma > 0.0:
+                c = self._huber_c * sigma
+                y_eff = m_func + (med + np.clip(resid - med, -c, c))
+
+        e_vec = simpson_windows(y_eff, t_arr, starts, stops) - simpson_windows(
             m_func, t_arr, starts, stops
         )
         jac_rows = np.vstack(

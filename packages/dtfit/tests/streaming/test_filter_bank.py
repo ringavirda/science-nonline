@@ -38,6 +38,23 @@ def test_filter_bank_threaded_matches_serial():
     np.testing.assert_allclose(a["params"], b["params"], rtol=1e-9, atol=1e-9)
 
 
+def test_filter_bank_process_backend_matches_serial():
+    """The process backend (separate interpreters, true GIL-free parallelism) must
+    return bit-identical results to the serial driver, with tracking aligned."""
+    t, Y, bs = _streams(K=4, n=300)
+    kw: dict[str, Any] = dict(
+        p0=[1.0, 0.3], window_size=40, q_diag=[1e-4, 1e-3], r=0.3
+    )
+    a = FilterBank.from_model("a*exp(b*t)", "t", len(bs), **kw).run(
+        t, Y, n_jobs=1, track=True)
+    b = FilterBank.from_model("a*exp(b*t)", "t", len(bs), **kw).run(
+        t, Y, n_jobs=2, backend="process", track=True)
+    np.testing.assert_allclose(a["params"], b["params"], rtol=1e-12, atol=1e-12)
+    np.testing.assert_array_equal(a["n_drifts"], b["n_drifts"])
+    np.testing.assert_allclose(
+        np.nan_to_num(a["track"]), np.nan_to_num(b["track"]), rtol=1e-12, atol=1e-12)
+
+
 def test_filter_bank_matches_standalone_filters():
     t, Y, bs = _streams(K=3)
     kw: dict[str, Any] = dict(
