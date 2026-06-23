@@ -95,3 +95,21 @@ def main() -> None:
 if __name__ == "__main__":
     main()
 ```
+
+## Output (`python examples/05_streaming.py`)
+
+```text
+== EACFilter: track a mid-stream step ==
+final b estimate: 0.55  (true 0.55)
+drifts detected : 1
+
+== EACFilter.tracking() preset ==
+params: {'A': 1.998, 'w': 1.499}
+
+== FilterBank: many streams at once ==
+recovered b: [0.3   0.501 0.7   0.9  ]
+true b     : [0.3 0.5 0.7 0.9]
+
+== FusedChiSquareDetector: shared-fault detection ==
+flags raised: 1  first flag at t = 20.0 (fault at 20)
+```

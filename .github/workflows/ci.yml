@@ -13,6 +13,10 @@ concurrency:
 jobs:
   test:
     runs-on: ${{ matrix.os }}
+    # Enforce the optional native build only where CI actually builds it (Linux);
+    # Windows/macOS run the pure-Python fallback, so native-required tests skip.
+    env:
+      DTFIT_REQUIRE_NATIVE: ${{ startsWith(matrix.os, 'ubuntu') && '1' || '' }}
     strategy:
       fail-fast: false
       matrix:

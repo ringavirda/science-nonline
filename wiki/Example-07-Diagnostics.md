@@ -74,3 +74,23 @@ def main() -> None:
 if __name__ == "__main__":
     main()
 ```
+
+## Output (`python examples/07_diagnostics.py`)
+
+```text
+== fit_report ==
+  n             : 250
+  rmse          : 0.2006
+  r2            : 0.9969
+  aic           : -797.2346
+  bic           : -786.6703
+  durbin_watson : 2.1299
+
+== residual_diagnostics ==
+  durbin_watson : 2.13
+  lag1_autocorr : -0.067
+  normality_p   : 0.835
+
+== to_dict / from_dict round-trip ==
+  params: {'a0': 0.494, 'a1': 2.008, 'a2': 0.499}
+```

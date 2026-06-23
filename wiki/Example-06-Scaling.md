@@ -46,7 +46,10 @@ def batched(rng) -> None:
     b_true = [0.4, 0.6, 0.8, 1.0]
     Y = np.column_stack([np.exp(b * x) + rng.normal(0, 0.03, x.size) for b in b_true])
     spectra = project_spectra(x, Y, order=6)           # (B, n_coef), one GEMM
+    # Multi-channel Y returns one FittingResult per channel; a single channel
+    # would return one result, so normalize to a list.
     fits = fit_lsi_batched(x, Y, "a*exp(b*t)", "t", order=6, p0=[1.0, 1.0])
+    fits = fits if isinstance(fits, list) else [fits]
     print("\n== project_spectra / fit_lsi_batched ==")
     print("spectra shape:", spectra.shape)
     print("recovered b  :", [round(f.params["b"], 3) for f in fits])
@@ -95,4 +98,26 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+```
+
+## Output (`python examples/06_scaling.py`)
+
+```text
+== fit_many: independent fits ==
+  ch0: coeffs=[1.005 0.398]
+  ch1: coeffs=[1.195 0.601]
+  ch2: coeffs=[1.404 0.799]
+  ch3: coeffs=[1.601 1.   ]
+  ch4: coeffs=[1.798 1.2  ]
+
+== project_spectra / fit_lsi_batched ==
+spectra shape: (4, 7)
+recovered b  : [0.4, 0.6, 0.8, 1.0]
+true b       : [0.4, 0.6, 0.8, 1.0]
+
+== PartitionedLSI: one pass, fixed memory ==
+params: {'a': 1.3, 'b': 0.7}  n_samples: 5000
+
+== map-reduce with merge() ==
+params: {'a': 1.297, 'b': 0.7}
 ```

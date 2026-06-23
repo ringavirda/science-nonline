@@ -91,3 +91,23 @@ def main() -> None:
 if __name__ == "__main__":
     main()
 ```
+
+## Output (`python examples/02_fitting_methods.py`)
+
+```text
+== LSI: offset + exponential ==
+params: {'a0': 0.5193, 'a1': 1.9956, 'a2': 0.4993}
+
+== LSI oscillatory recipe: A*sin(w*x + p) ==
+FFT frequency seed: 1.8802
+params: {'A': 1.992, 'p': 0.505, 'w': 1.699}
+
+== EAC robust (loss=soft_l1) ==
+truth a=3.0 w=1.5 -> {'a': 2.846, 'w': 1.634}
+
+== EAC curvature windows on a transient peak ==
+params: {'a': 4.998, 'b': 1.199}
+
+== DSB (polynomial degree 4) ==
+params: {'a': 1.496, 'b': 1.106}
+```

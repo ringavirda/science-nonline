@@ -41,6 +41,7 @@ from __future__ import annotations
 import argparse
 import re
 import shutil
+import subprocess
 import sys
 import unicodedata
 from pathlib import Path
@@ -356,12 +357,35 @@ def _figure_dest(rp: str, figures: dict[str, Path]) -> str:
 # --------------------------------------------------------------------------- #
 # Examples
 # --------------------------------------------------------------------------- #
+def _run_example(path: Path) -> str | None:
+    """Execute an example headless and return its captured output.
+
+    The examples are deterministic (fixed RNG seeds) and print their results, so
+    the captured stdout is a stable snapshot to embed under the source. Returns
+    ``None`` if the script could not be run (e.g. the package is not installed in
+    this environment); a non-zero exit appends stderr so failures are visible.
+    """
+    try:
+        proc = subprocess.run(
+            [sys.executable, str(path)],
+            capture_output=True, text=True, timeout=300,
+            cwd=str(path.parent.parent),  # so "python examples/<f>.py" paths read
+        )
+    except Exception:
+        return None
+    out = proc.stdout.rstrip()
+    if proc.returncode != 0:
+        out = (out + "\n--- stderr ---\n" + proc.stderr).strip()
+    return out
+
+
 def render_example(path: Path, page: str, out_dir: Path, unknown: set[str]) -> None:
     """Render a runnable example script as a markdown guide page.
 
-    The module docstring becomes the page intro; the rest of the source is
-    embedded verbatim in a ``python`` code fence with a link to the file on
-    GitHub. Examples are authored ASCII-only, so ``to_ascii`` is a safety net.
+    The module docstring becomes the page intro; the source is embedded in a
+    ``python`` fence (with a GitHub link), followed by the example's captured
+    output so the page shows what running it produces. Examples are authored
+    ASCII-only, so ``to_ascii`` is a safety net.
     """
     src = path.read_text(encoding="utf-8")
     mo = re.match(r'\s*(?:"""(.*?)"""|\'\'\'(.*?)\'\'\')', src, re.DOTALL)
@@ -372,12 +396,19 @@ def render_example(path: Path, page: str, out_dir: Path, unknown: set[str]) -> N
         doc, body_src = "", src
     rel = path.relative_to(REPO).as_posix()
     title = page.replace("Example-", "").replace("-", " ")
+    run_cmd = f"python examples/{path.name}"
 
     parts = [f"# Example {title}", ""]
     if doc:
         parts += [doc, ""]
     parts += [f"Source: [`{rel}`]({GH_BLOB}{rel})", "", "```python",
               body_src.rstrip(), "```"]
+
+    output = _run_example(path)
+    if output:
+        parts += ["", f"## Output (`{run_cmd}`)", "", "```text",
+                  output.rstrip(), "```"]
+
     text = to_ascii("\n".join(parts), unknown)
     (out_dir / f"{page}.md").write_text(text.rstrip() + "\n", encoding="utf-8")
 

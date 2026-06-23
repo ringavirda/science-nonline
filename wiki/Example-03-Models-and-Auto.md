@@ -84,3 +84,36 @@ def main() -> None:
 if __name__ == "__main__":
     main()
 ```
+
+## Output (`python examples/03_models_and_auto.py`)
+
+```text
+== catalog (24 families) ==
+  trend      : linear, quadratic, cubic, power_law, logarithmic, sqrt_law
+  growth     : exponential, exp_growth_offset
+  decay      : exp_decay, exp_decay_offset, first_order, biexponential, stretched_exponential
+  sigmoid    : logistic, gompertz, weibull_cdf, tanh_step
+  saturating : michaelis_menten, hill
+  peak       : gaussian, lorentzian, double_gaussian
+  oscillatory: sine, damped_oscillation
+
+== models.logistic().fit (self-seeded) ==
+params: {'L': 7.993, 'k': 0.887, 'x0': 4.989}
+
+== models.linear() + models.sine() ==
+model: Model('linear+sine', expr='(a0 + a1*x) + (A*sin(p + w*x) + c)', shape='composite')
+rmse: 0.2081
+
+== suggest_models (ranked by AIC) ==
+  double_gaussian          r2=0.9985  aic= -1282.5
+  gaussian                 r2=0.9983  aic= -1265.0
+  quadratic                r2=0.5217  aic=  -134.8
+  cubic                    r2=0.5217  aic=  -132.8
+  lorentzian               r2=0.3000  aic=   -58.7
+
+== auto_estimate (oscillatory route) ==
+params: {'A': 1.505, 'w': 2.099}
+
+== auto_forecast (saturating growth -> logistic) ==
+forecast end: 9.99  actual end: 9.95
+```

@@ -63,3 +63,19 @@ def main() -> None:
 if __name__ == "__main__":
     main()
 ```
+
+## Output (`python examples/04_sklearn_estimator.py`)
+
+```text
+== fit / predict / score ==
+coef_: [1.4081 0.7974]
+R2   : 0.9986
+
+== GridSearchCV ==
+best params: {'fit__k_star': 4, 'fit__method': 'lsi'}
+best CV R2 : 0.9674
+
+== cross_val_score ==
+per-fold R2: [0.885 0.936 0.983 0.995]
+mean R2    : 0.9498
+```
