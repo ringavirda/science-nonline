@@ -43,6 +43,41 @@ def taylor_coeffs(f_sym: sp.Expr, t: sp.Symbol, order: int) -> list[sp.Expr]:
     return coeffs
 
 
+# input validation (shared by the batch fitters)
+def _validate_xy(
+    data_x: np.ndarray,
+    data_y: np.ndarray,
+    *,
+    min_size: int = 2,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Coerce and validate a 1-D ``(x, y)`` sample pair.
+
+    Returns float arrays. Raises :class:`ValueError` with a clear message on a
+    shape mismatch, a non-1-D input, fewer than ``min_size`` samples, or
+    non-finite values -- so every batch fitter (``fit_lsi`` / ``fit_eac``)
+    rejects malformed input the same way instead of failing obscurely deeper in.
+    """
+    x = np.asarray(data_x, dtype=float)
+    y = np.asarray(data_y, dtype=float)
+    if x.ndim != 1 or y.ndim != 1:
+        raise ValueError(
+            f"data_x and data_y must be 1-D; got shapes {x.shape} and {y.shape}."
+        )
+    if x.size != y.size:
+        raise ValueError(
+            f"data_x and data_y must have the same length; got {x.size} and {y.size}."
+        )
+    if x.size < min_size:
+        raise ValueError(
+            f"need at least {min_size} samples to fit; got {x.size}."
+        )
+    if not np.all(np.isfinite(x)):
+        raise ValueError("data_x contains non-finite values (NaN/inf).")
+    if not np.all(np.isfinite(y)):
+        raise ValueError("data_y contains non-finite values (NaN/inf).")
+    return x, y
+
+
 # numeric statistics
 def _covariance(
     jac: np.ndarray, res: np.ndarray, n_params: int

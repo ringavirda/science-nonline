@@ -17,7 +17,7 @@ import numpy as np
 import sympy as sp
 
 from dtfit.types import FittingResult
-from dtfit.methods import fit_lsi, fit_eac, fit_eac_adaptive
+from dtfit.methods import fit_lsi, fit_eac
 from dtfit.auto import auto_estimate
 
 # A seeder reads (x, y) and returns ``{param_name: (p0, lo, hi)}``.
@@ -145,7 +145,7 @@ class Model:
             eb = ([b[0] for b in bounds], [b[1] for b in bounds]) if bounds else None
             return fit_eac(x, y, self.expr, self.var, p0=p0, bounds=eb)
         if method == "adaptive":
-            return fit_eac_adaptive(x, y, self.expr, self.var, p0=p0)
+            return fit_eac(x, y, self.expr, self.var, window_mode="curvature", p0=p0)
         raise ValueError(
             f"unknown method {method!r}; expected auto/lsi/eac/adaptive"
         )

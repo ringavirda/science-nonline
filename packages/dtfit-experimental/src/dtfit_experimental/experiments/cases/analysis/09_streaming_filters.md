@@ -12,10 +12,10 @@ fits a microcontroller (Exp 9) — not raw accuracy superiority.
 
 Source: [`../../src/dtfit/streaming/`](../../src/dtfit/streaming/)
 (`EACFilter`, `LSIFilter`, `FilterBank`).
-Tested in: [Control (1)](../01_control_systems/report.md),
-[Big-data (2)](../02_big_data_streaming/report.md),
-[GPS (5)](../05_gps_trajectory/report.md),
-[Embedded footprint (9)](../09_embedded_footprint/report.md).
+Tested in: [Control (1)](../01_control_systems/01_control_systems.ipynb),
+[Big-data (2)](../02_big_data_streaming/02_big_data_streaming.ipynb),
+[GPS (5)](../05_gps_trajectory/05_gps_trajectory.ipynb),
+[Embedded footprint (9)](../09_embedded_footprint/09_embedded_footprint.ipynb).
 
 ## What it is
 

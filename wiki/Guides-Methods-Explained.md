@@ -222,17 +222,18 @@ lowering the variance of the estimate -- and it lets EAC report a parameter
   saturating shape whose asymptote lives in the tail** (e.g. `arctan`), or the
   fit will be biased.
 - `loss` + `f_scale` -- a robust loss (`"soft_l1"`, `"cauchy"`) down-weights
-  windows an outlier has corrupted. Important caveat: the loss acts at the
-  *window* level, and only "bites" when `f_scale` is set near the size of a clean
-  window's area residual (the default `1.0` usually dwarfs them, silently
-  behaving like plain least squares). See the worked discussion in
-  [notebook 02](Notebook-02-Fitting-Methods).
+  windows an outlier has corrupted. This is the *single-fit* robustness path;
+  for densely contaminated records prefer the `ensemble_fit` path below. Important
+  caveat: the loss acts at the *window* level, and only "bites" when `f_scale` is
+  set near the size of a clean window's area residual (the default `1.0` usually
+  dwarfs them, silently behaving like plain least squares). See the worked
+  discussion in [example 02](Example-02-Fitting-Methods).
 - `bounds` -- constrained fits (switches to a trust-region solver).
-- **Adaptive windows** (`fit_eac_adaptive`): instead of equal windows, place
-  window edges by **curvature** -- narrow where the signal bends, wide where it's
-  flat -- so each window carries roughly equal information. This is the best
-  estimator for localized transients and saturating (Michaelis-Menten / Hill)
-  shapes. -> [api/fitting.md#fit_eac_adaptive](API-Fitting#fit_eac_adaptive)
+- **Curvature windows** (`fit_eac(..., window_mode="curvature")`): instead of the
+  default uniform windows, place window edges by **curvature** -- narrow where the
+  signal bends, wide where it's flat -- so each window carries roughly equal
+  information. This is the best estimator for localized transients and saturating
+  (Michaelis-Menten / Hill) shapes. -> [api/fitting.md#fit_eac](API-Fitting#fit_eac)
 - **Overlapping-window ensemble** (`ensemble_fit`): when *outliers* contaminate
   the record, fit many overlapping sub-windows and take the **median** of the
   per-window estimates -- whole corrupted windows are simply outvoted, with no
@@ -296,6 +297,10 @@ are detailed in [../methods/equal_areas_filter.md](Methods-Equal-Areas-Filter).
 
 ### Knobs & adaptations
 
+- **Presets** -- rather than set the knobs below by hand, start from a curated
+  classmethod: `EACFilter.tracking(...)` / `LSIFilter.tracking(...)` favors fast
+  re-adaptation, and `.robust(...)` favors stability under outliers/dropouts. The
+  individual knobs below still override anything a preset sets.
 - `window_size` -- smoothing vs responsiveness (bigger = smoother, slower to react).
 - `q_diag` -- how fast you allow each parameter to drift.
 - `r` -- how much you trust each measurement.

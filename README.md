@@ -35,9 +35,9 @@ pip install -e 'packages/dtfit-experimental[bench]'    # + suite baselines/plott
 
 ```
 packages/
-  dtfit/                     # stable library (pyproject, src/dtfit, tests, build_native.py)
+  dtfit/                     # stable library (pyproject, src/dtfit, tests, examples, build_native.py)
+  dtfit/examples/            # runnable, headless example scripts (the guides)
   dtfit-experimental/        # experimental package (pyproject, src/dtfit_experimental, tests)
-docs/guides/notebooks/       # runnable tutorial notebooks
 ```
 
 See each package's README for details:

@@ -60,6 +60,10 @@ target-version = "py310"
 # Experiment/benchmark scripts: allow compact one-line matplotlib axis setup
 # (`ax.set_xlabel(...); ax.set_ylabel(...)`), a script convention only.
 "src/dtfit_experimental/experiments/**" = ["E702"]
+# Research notebooks legitimately import after a markdown/setup cell (E402),
+# use short throwaway names in plotting (E741), and write compact one-line
+# control flow / lambdas (E701/E731) -- conventions, not defects.
+"src/dtfit_experimental/experiments/**/*.ipynb" = ["E402", "E701", "E741", "E731"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -75,6 +79,15 @@ files = ["src/dtfit_experimental"]
 # research/script tree and is not type-checked; only the adaptation modules are.
 exclude = "/experiments/"
 ignore_missing_imports = true
+
+[tool.pyright]
+# Type-check the adaptation modules; the experiment suite (numeric-prefixed
+# folders imported by string via the runner) is a research/script tree, excluded
+# here exactly as it is from mypy.
+include = ["src"]
+exclude = ["src/dtfit_experimental/experiments"]
+pythonVersion = "3.10"
+typeCheckingMode = "standard"
 
 [tool.coverage.run]
 source = ["dtfit_experimental"]

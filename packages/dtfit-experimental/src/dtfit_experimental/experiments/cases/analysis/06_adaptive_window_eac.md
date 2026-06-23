@@ -5,7 +5,7 @@ localized-transient parameters that equal-span windows smear, but only one signa
 class has been demonstrated, so the evidence base is too narrow to promote.
 
 Source: [`../../src/dtfit/adaptations/multiresolution.py`](../../src/dtfit/adaptations/multiresolution.py).
-Tested in: [Noise & robustness (3)](../03_noise_robustness/report.md) (transient class).
+Tested in: [Noise & robustness (3)](../03_noise_robustness/03_noise_robustness.ipynb) (transient class).
 
 ## What it is
 

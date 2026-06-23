@@ -5,7 +5,8 @@
 > [`scale/_batched.py`](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit/src/dtfit/scale/_batched.py),
 > [`scale/_parallel.py`](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit/src/dtfit/scale/_parallel.py).
 > `PartitionedLSI`, `PartitionedEAC`, `PartitionedBatchLSI`, `fit_lsi_batched`,
-> `project_spectra`, `fit_many`. API: [../api/scaling.md](API-Scaling).
+> `fit_many` (top-level); `project_spectra` via `from dtfit.scale import
+> project_spectra`. API: [../api/scaling.md](API-Scaling).
 
 The fitting *math* of [LSI](Methods-LSI)/[EAC](Methods-EAC) is unchanged here; these are
 alternative **execution backends** that run those methods on data too big for
@@ -111,15 +112,17 @@ models), `fit_many(problems, n_jobs=...)` fans the fits across a `joblib` pool
 (`"loky"` processes, `"threading"`, or `"multiprocessing"`). Each
 [`FittingProblem`](API-Scaling#fittingproblem) is picklable and a failed fit
 is captured per-problem (its `error` set) rather than aborting the batch; results
-come back in input order as lightweight, picklable
-[`BatchFittingResult`](API-Scaling#batchfittingresult)s.
+come back in input order as ordinary picklable
+[`FittingResult`](API-Types)s, each carrying the problem's `.label` (and `.error`
+when it failed). `BatchFittingResult` remains a back-compat alias of
+`FittingResult`.
 
 ## Optimizations and guards
 
 - **Exact additive reduce** -- boundary-sample carrying makes chunked `update`s and
   `merge`s equal to a single whole-domain projection (validated in the big-data
   domain study across order-independent, variable-chunk and missing-data reduces).
-- **Weights folded into the small design** -- `(w⊙D)ᵀ.Y` avoids materializing an
+- **Weights folded into the small design** -- `(w*D)^T.Y` avoids materializing an
   $(n,B)$ temporary; the only large array touched is $Y$.
 - **Pluggable backend** -- the GEMM dispatches to NumPy/BLAS, CuPy or Torch by name
   (`"auto"` prefers a GPU); the math is written once with `@`/`*`/`.T`.
@@ -132,7 +135,7 @@ come back in input order as lightweight, picklable
 ## Worked example
 
 **Left:** a `PartitionedLSI` reduce over 8 chunks recovers the *identical* fit to
-whole-batch LSI -- the growth rate matches to `max|Δcoef| ≈ 5×10⁻⁷`, the only
+whole-batch LSI -- the growth rate matches to `max|Deltacoef| ~= 5x10^-^7`, the only
 difference being trapezoid boundary terms; the map-reduce is exact, not
 approximate. **Right:** `fit_lsi_batched` recovers the per-channel growth rate of
 **300 channels in one GEMM**, each landing on the truth diagonal.

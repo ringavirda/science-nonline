@@ -469,3 +469,120 @@ class EKFParam:
 
     def predict(self, x):
         return self._f(np.asarray(x, dtype=float), *self.p)
+
+
+class CTEKFGyro:
+    """Gyro-aided coordinated-turn EKF -- the fair GPS+IMU recursive baseline.
+
+    Planar state ``[x, vx, y, vy, omega]`` propagated by the *coordinated-turn*
+    motion model (the velocity vector rotates at turn-rate ``omega``); the vertical
+    channel ``z`` is a constant-acceleration sub-filter. GPS supplies the position
+    ``(x, y, z)``; the **gyro supplies a direct measurement of** ``omega`` -- so the
+    filter fuses exactly the same information (GPS + yaw-rate) as the windowed
+    gyro dead-reckoning fit, but recursively, and is the EKF a tracking
+    practitioner would actually deploy. The transition is nonlinear in ``omega``
+    (the rotation depends on the state), hence EKF: its Jacobian is formed by
+    finite differences for robustness. Exposes the same ``update`` / ``forecast`` /
+    ``inflate`` / ``last_residuals_`` surface as :class:`KalmanCA`, so the identical
+    adaptive maneuver detector drives both -- a like-for-like comparison.
+    """
+
+    def __init__(self, dt=0.1, r_gps=2.25, r_gyro=9e-4, q_acc=3.0, q_w=0.8,
+                 q_z=5e-2, r_z=2.25):
+        self.dt = float(dt)
+        self.r_gps = float(r_gps)
+        self.r_gyro = float(r_gyro)
+        self.x = np.zeros(5)
+        self.P = np.diag([10.0, 10.0, 10.0, 10.0, 1.0])
+        qb = np.array([[dt**4 / 4, dt**3 / 2], [dt**3 / 2, dt**2]]) * float(q_acc)
+        Q = np.zeros((5, 5))
+        Q[0:2, 0:2] = qb
+        Q[2:4, 2:4] = qb
+        Q[4, 4] = float(q_w) * dt
+        self.Q = Q
+        self._z = KalmanCA(dim=1, dt=dt, q=q_z, r=r_z)   # vertical CA sub-filter
+        self._init = False
+        self.last_residuals_ = np.zeros(3)
+        self.last_nis_ = 0.0
+
+    def _prop(self, s, dt=None):
+        """Coordinated-turn propagation of ``[x, vx, y, vy, omega]`` over ``dt``."""
+        dt = self.dt if dt is None else dt
+        x, vx, y, vy, w = s
+        th = w * dt
+        if abs(w) < 1e-6:                                # constant-velocity limit
+            return np.array([x + vx * dt, vx, y + vy * dt, vy, w])
+        s_, c_ = np.sin(th), np.cos(th)
+        a, b = s_ / w, (1.0 - c_) / w
+        return np.array([x + a * vx - b * vy, c_ * vx - s_ * vy,
+                         y + b * vx + a * vy, s_ * vx + c_ * vy, w])
+
+    def _jac(self, s):
+        """Finite-difference Jacobian d(prop)/ds at ``s`` (5x5)."""
+        F = np.zeros((5, 5))
+        f0 = self._prop(s)
+        for j in range(5):
+            sp_ = s.copy()
+            h = 1e-6 * max(1.0, abs(s[j]))
+            sp_[j] += h
+            F[:, j] = (self._prop(sp_) - f0) / h
+        return F
+
+    def update(self, fix, omega):
+        """Ingest a GPS fix ``[x, y, z]`` and a gyro yaw-rate ``omega``."""
+        fix = np.asarray(fix, dtype=float)
+        zpos = self._z.update(fix[2:3])[0]
+        if not self._init:
+            self.x = np.array([fix[0], 0.0, fix[1], 0.0, float(omega)])
+            self._init = True
+            self.last_residuals_ = np.zeros(3)
+            return np.array([self.x[0], self.x[2], zpos])
+        F = self._jac(self.x)
+        xp = self._prop(self.x)
+        Pp = F @ self.P @ F.T + self.Q
+        # measure (x, y, omega): GPS position + direct gyro yaw-rate
+        H = np.array([[1.0, 0, 0, 0, 0], [0, 0, 1.0, 0, 0], [0, 0, 0, 0, 1.0]])
+        R = np.diag([self.r_gps, self.r_gps, self.r_gyro])
+        z = np.array([fix[0], fix[1], float(omega)])
+        y = z - H @ xp
+        S = H @ Pp @ H.T + R
+        K = Pp @ H.T @ np.linalg.inv(S)
+        self.x = xp + K @ y
+        self.P = (np.eye(5) - K @ H) @ Pp
+        # position innovations (x, y, z) for the shared maneuver detector
+        zres = float(fix[2] - zpos)
+        self.last_residuals_ = np.array([y[0], y[1], zres])
+        self.last_nis_ = float(y @ np.linalg.solve(S, y))
+        return np.array([self.x[0], self.x[2], zpos])
+
+    def coast(self, omega):
+        """Time-update with the gyro but *no* GPS (a dropout): dead-reckon one step.
+        The measured yaw-rate keeps steering the velocity; the vertical CA coasts on
+        its own dynamics. This is the IMU-aided coasting a real INS/GPS rig does in a
+        tunnel -- far better than holding position. Returns the new ``[x, y, z]``."""
+        if not self._init:
+            return self.position()
+        self.x[4] = float(omega)               # gyro pins the turn-rate
+        F = self._jac(self.x)
+        self.x = self._prop(self.x)
+        self.P = F @ self.P @ F.T + self.Q
+        self._z.x[0] = self._z.F @ self._z.x[0]            # CA time-update of z
+        self._z.P[0] = self._z.F @ self._z.P[0] @ self._z.F.T + self._z.Q
+        return self.position()
+
+    def inflate(self, factor):
+        self.P = self.P * float(factor)
+        self._z.inflate(factor)
+
+    def position(self):
+        return np.array([self.x[0], self.x[2], self._z.position()[0]])
+
+    def forecast(self, horizon):
+        """Roll the CT state (and the vertical CA) forward ``horizon`` steps."""
+        s = self.x.copy()
+        zf = self._z.forecast(horizon)
+        out = np.zeros((horizon, 3))
+        for k in range(horizon):
+            s = self._prop(s)
+            out[k] = [s[0], s[2], zf[k, 0]]
+        return out

@@ -115,7 +115,7 @@ the forecasting and parameter-estimation domain studies (see
 [../experimental/](Experimental)).
 
 **Left:** the default (smoothed, low-order) LSI flattens the cycle to a wrong
-low-frequency wobble (`w≈0.9`), while the recipe recovers `w=1.70` and overlays
+low-frequency wobble (`w~=0.9`), while the recipe recovers `w=1.70` and overlays
 the truth. **Right:** the FFT peak the recipe seeds the frequency from.
 
 ![LSI oscillatory recipe](figures/lsi_oscillatory.png)

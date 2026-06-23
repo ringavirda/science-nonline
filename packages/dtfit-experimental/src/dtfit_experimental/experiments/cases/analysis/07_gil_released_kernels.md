@@ -6,7 +6,7 @@ efficiency.
 
 Source: [`../../src/dtfit/_native.c`](../../src/dtfit/_native.c)
 (`simpson_windows`, `simpson_windows_rows`, `legendre_project`).
-Tested in: [Parallel scaling (7)](../07_parallel_scaling/report.md).
+Tested in: [Parallel scaling (7)](../07_parallel_scaling/07_parallel_scaling.ipynb).
 
 ## What it is
 

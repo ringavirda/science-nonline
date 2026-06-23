@@ -64,7 +64,7 @@ y = 1.4 * np.exp(0.8 * x) + np.random.default_rng(0).normal(0, 0.15, x.size)
 
 reg = NonlineRegressor("a*exp(b*x)", "x", method="lsi").fit(x, y)
 print(reg.coef_)          # [a, b]
-print(reg.score(x, y))    # R²
+print(reg.score(x, y))    # R^2
 ```
 
 In a cross-validation / grid search:

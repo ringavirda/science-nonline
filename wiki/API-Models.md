@@ -46,7 +46,7 @@ seeder unless you override them.
 | `"auto"` (default) | routes by `shape` through [`auto_estimate`](API-Auto#auto_estimate) |
 | `"lsi"` | [`fit_lsi`](API-Fitting#fit_lsi) (passing `freq_param`) |
 | `"eac"` | [`fit_eac`](API-Fitting#fit_eac) |
-| `"adaptive"` | [`fit_eac_adaptive`](API-Fitting#fit_eac_adaptive) |
+| `"adaptive"` | [`fit_eac`](API-Fitting#fit_eac) with `window_mode="curvature"` |
 
 ### `seed(x, y) -> dict`
 The data-driven `{name: (p0, lo, hi)}` seed map (empty if the family has no
@@ -155,7 +155,7 @@ on *a* curve that matches, not on the true parameters:
 | `double_gaussian` | overlapping peaks can swap labels / trade width for amplitude | curve quality (R^2) |
 | `fourier_series` | individual harmonic amplitudes/phases are weakly constrained | curve quality (R^2) |
 
-For these, trust the **fitted curve** (`R²`, prediction) rather than the
+For these, trust the **fitted curve** (`R^2`, prediction) rather than the
 individual coefficients, and prefer extra data / lower noise / bounds if you need
 the parameters themselves.
 

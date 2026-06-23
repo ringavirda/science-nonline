@@ -104,10 +104,10 @@ methods go further and replace the monomial spectrum with a better-conditioned
    +--------------+---------------+----------------+------------------+
    |              |               |                |                  |
  exact balance  weighted-L2    integral / area   additive over       compose /
- F(k;θ)=Z(k)    of spectra     matching          domain & channels   route
+ F(k;theta)=Z(k)    of spectra     matching          domain & channels   route
    |              |               |                |                  |
   DSB            LSI             EAC            Partitioned* /        auto_estimate
- (symbolic     (∫ recon.      (∫ over          fit_lsi_batched       auto_forecast
+ (symbolic     (integral recon.      (integral over          fit_lsi_batched       auto_forecast
   solve)        error)         windows)         (map-reduce, GEMM)    (shape routing)
                   |               |
           run recursively, one sample at a time

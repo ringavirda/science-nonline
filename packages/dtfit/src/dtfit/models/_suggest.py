@@ -52,7 +52,9 @@ def _detect_categories(x: np.ndarray, y: np.ndarray) -> set[str]:
     # ~0.98; a sine ~0). A strongly monotone series is *never* oscillatory,
     # however many times a line-detrended S-curve jitters across zero under
     # noise -- so monotonicity vetoes the (crossing-based) oscillatory tag.
-    rho = (spearmanr(x, y).statistic
+    # scipy's typed stub returns a private result class whose ``statistic``
+    # attribute it does not expose; the access is valid at runtime.
+    rho = (spearmanr(x, y).statistic  # pyright: ignore[reportAttributeAccessIssue]
            if n > 2 and float(np.std(y)) > 0 else 0.0)
     monotone = abs(float(np.nan_to_num(rho))) > 0.85
     oscillatory = (not monotone) and strength > 0.12 and crossings >= 4

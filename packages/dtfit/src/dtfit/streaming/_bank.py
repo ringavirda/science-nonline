@@ -224,6 +224,10 @@ class FilterBank:
         self, t_seq: np.ndarray, Y: np.ndarray, *, n_jobs: int, track: bool
     ) -> dict[str, Any]:
         """Process-pool backend for :meth:`run` (see its ``backend`` docs)."""
+        # Only reached from ``run`` when a recipe is set (it is what the workers
+        # rebuild the filters from); bind it locally so it is non-Optional.
+        recipe = self._recipe
+        assert recipe is not None
         n_steps, K = Y.shape
         groups = [g.tolist() for g in np.array_split(np.arange(K), n_jobs) if len(g)]
         n_params = self.filters[0].p.size
@@ -232,7 +236,7 @@ class FilterBank:
         track_hist = np.full((n_steps, K), np.nan) if track else None
         with ProcessPoolExecutor(max_workers=n_jobs) as ex:
             futs = {
-                ex.submit(_drive_streams, self._recipe, t_seq,
+                ex.submit(_drive_streams, recipe, t_seq,
                           [Y[:, k] for k in g], track): g
                 for g in groups
             }

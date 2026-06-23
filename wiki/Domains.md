@@ -30,19 +30,22 @@ domain-standard methods compared against, and includes **real-data** tests.
 ## Run
 
 ```bash
-pip install -e '.[bench]'              # matplotlib, torch, statsmodels, pandas
+pip install -e '.[bench]'              # matplotlib, torch, statsmodels, pandas, jupyter
 python build_native.py                 # build the GIL-released C kernels
 
-python -m experiments.domains.run_domains          # full run -> reports + DOMAINS.md
-python -m experiments.domains.run_domains --quick  # fast smoke run
+# each domain is a backend.py (compute) + a notebook (report); open and re-run it
+jupyter lab experiments/domains/forecasting/forecasting.ipynb
 
-python -m experiments.domains.forecasting.run      # a single domain (also: --quick)
+# or execute headless (writes outputs + figures in place)
+jupyter nbconvert --to notebook --execute --inplace \
+    experiments/domains/forecasting/forecasting.ipynb
 ```
 
-Reuses `experiments/common` (ReportWriter, metrics, baselines, plotting) and the
-real datasets in `experiments/data/`, so the reports are consistent with the
-experiment suite. The index and per-merge table are regenerated into
-[`DOMAINS.md`](Domains-Reports) on every suite run.
+Each notebook carries a config block of knobs near the top (sized for a few-minute
+run by default; comments show how to scale up). The backends reuse
+`experiments/common` (metrics, baselines, datasets, plotting) and the real
+datasets in `experiments/data/`. [`DOMAINS.md`](Domains-Reports) indexes the
+notebooks.
 
 ## Reporting tone
 

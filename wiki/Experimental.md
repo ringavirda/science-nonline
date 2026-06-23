@@ -42,8 +42,8 @@ went):
 | was experimental | now in `dtfit` as |
 |---|---|
 | #1 one-pass / distributed map-reduce | `PartitionedLSI`, `PartitionedEAC` |
-| GEMM-batched multi-channel projection | `fit_lsi_batched`, `project_spectra`, `PartitionedBatchLSI` |
-| #6 curvature-adaptive windows | `fit_eac_adaptive` |
+| GEMM-batched multi-channel projection | `fit_lsi_batched`, `PartitionedBatchLSI` (low-level `dtfit.scale.project_spectra`) |
+| #6 curvature-adaptive windows | folded into `dtfit.fit_eac` as `window_mode="curvature"` |
 | the LSI oscillatory recipe | `fit_lsi(oscillatory=..., freq_param=...)`, `fft_frequency_seed` |
 | fused multi-axis fault detection | `FusedChiSquareDetector` |
 | #3 overlapping-window ensemble | `ensemble_fit`, `EnsembleResult` |
@@ -132,8 +132,9 @@ GPS trajectory, an LTSF deep-learning benchmark, parallel scaling, GPU-batched
 projection, embedded footprint, fused partitioned-batched). The point is to
 measure each lever cleanly, on its own.
 
-Run: `python -m dtfit_experimental.experiments.cases.run_suite`
-(index: `cases/REPORTS.md`).
+Each case is a self-contained folder with a `backend.py` (the compute) and a
+Jupyter notebook (the report); open/run the notebook directly (index:
+`cases/REPORTS.md`).
 
 ### `domains/` -- the levers together, against the real toolkit
 
@@ -149,8 +150,9 @@ adaptation earns promotion. The four domains and their honest headline results:
 | **Big-data processing** | GEMM batch, fused streaming, distributed merge, streaming filter -- multi-channel panels + a real 321-channel set -- exactness, memory/throughput scaling, numerical stability, mergeability, online cost -- vs per-channel NLLS, vectorized poly lstsq, SGD `partial_fit`, RLS | the additive projection is exact across batch/streaming/distributed routes and scales with bounded memory; trades peak throughput for that bounded memory |
 | **Embedded control** | EACFilter, LSIFilter, FilterBank + fused chi^2 detector -- 4 plant shapes, robustness profile, multi-axis fault detection, sub-KiB footprint, real streaming -- vs EKF, RLS, constant-accel Kalman, sliding-window refit | the *integral* measurement wins under outliers/dropouts at fixed O(1)/sample cost; online fault detection is SNR-limited (and reported as such) |
 
-Run: `python -m dtfit_experimental.experiments.domains.run_domains`
-(index: `domains/DOMAINS.md`).
+Each domain is a self-contained folder with a `backend.py` (the compute) and a
+Jupyter notebook (the report); open/run the notebook directly (index:
+`domains/DOMAINS.md`).
 
 Every report keeps an **honest-negative tone**: where dtfit trails the classical
 toolkit, the report says so and explains why (near-random-walk series, weakly
@@ -168,10 +170,13 @@ pip install -e packages/dtfit-experimental          # this package
 pip install -e "packages/dtfit-experimental[bench]" # + matplotlib/torch/statsmodels/pandas
 
 python -m dtfit_experimental.experiments.download_data       # fetch real datasets
-python -m dtfit_experimental.experiments.cases.run_suite     # per-adaptation cases
-python -m dtfit_experimental.experiments.domains.run_domains # per-domain validation
+
+# the experiments are Jupyter notebooks -- open one and re-run it, or headless:
+jupyter nbconvert --to notebook --execute --inplace \
+    packages/dtfit-experimental/src/dtfit_experimental/experiments/cases/01_control_systems/01_control_systems.ipynb
 ```
 
-Pass `--quick` for a smoke run and `--jobs N` to cap workers. Next:
+Each notebook has a config block of knobs near the top (sized for a few-minute run
+by default; comments show how to scale up). Next:
 **[baselines.md](Experimental-Baselines)** -- what every comparison method is and why it was
 chosen.

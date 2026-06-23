@@ -16,7 +16,7 @@ This folder is the documentation. Pick the door that matches what you need:
 | **See the full map** -- every method, version, variant and adaptation | [guides/lineage-and-variants.md](Guides-Lineage-and-Variants) -- the complete atlas of where each approach came from and how it relates |
 | **Look up a function or class** -- signatures, arguments, return types | [api/](API) -- complete reference for the public `dtfit` API |
 | **See the rigorous math** -- the formal derivations and proofs | [methods/](Methods) -- the mathematical reference, one file per method |
-| **Learn by running code** -- copy-paste notebooks | [guides/notebooks/](Notebooks) -- quickstart -> methods -> models -> sklearn -> streaming -> scaling -> diagnostics |
+| **Learn by running code** -- copy-paste examples | [examples/](Examples) -- quickstart -> methods -> models -> sklearn -> streaming -> scaling -> diagnostics |
 | **Understand the research** -- the experimental adaptations and how they were validated | [experimental/](Experimental) -- the `dtfit-experimental` package, the experiment suite, and every baseline it is compared against |
 
 ## The shortest possible introduction

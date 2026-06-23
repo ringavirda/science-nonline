@@ -1,9 +1,11 @@
-"""Shared helpers for the domain validation suite.
+"""Shared compute helpers for the domain notebooks' backends.
 
-Thin layer on top of ``dtfit_experimental.experiments.common`` (which owns the ReportWriter,
-metric, baseline and plotting helpers) plus a few domain-suite-specific
-utilities: peak-memory measurement for the big-data domain, a dominant-period
-detector for the forecasting domain, and the embedded footprint formula.
+Thin layer on top of ``dtfit_experimental.experiments.common`` (which owns the
+metric, baseline, dataset and plotting helpers) plus a few domain-specific
+utilities the ``backend.py`` modules import: peak-memory measurement for the
+big-data domain, a dominant-period detector for the forecasting domain, and the
+embedded footprint formula. (Notebooks locate their own ``figures/`` directory
+via ``Path(backend.__file__).parent`` — there is no longer a ``run.py``.)
 """
 
 from __future__ import annotations
@@ -12,11 +14,6 @@ import tracemalloc
 from typing import Callable
 
 import numpy as np
-
-
-def exp_dir(run_file: str) -> str:
-    """The folder of a domain ``run.py`` (where its report/figures land)."""
-    return run_file.rsplit("run.py", 1)[0]
 
 
 # --------------------------------------------------------------------------- #

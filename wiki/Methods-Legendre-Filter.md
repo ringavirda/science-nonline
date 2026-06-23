@@ -146,6 +146,6 @@ the spectrum-measurement sibling of the [EACFilter](Methods-Equal-Areas-Filter).
 **Caveats.** It is heavier per sample than the EACFilter (an $(L{+}1)$-vector
 update vs a scalar one), so for **monotone / saturating** plants the cheaper
 EACFilter is preferable. Choose `order` to resolve the cycle (more orders =
-richer observability, larger update); it is clamped so `order + 1 ≤ window_size`.
+richer observability, larger update); it is clamped so `order + 1 <= window_size`.
 Like all the methods it assumes a modest dynamic range over the window. For a
 static batch oscillatory fit use [LSI](Methods-LSI)'s oscillatory recipe.

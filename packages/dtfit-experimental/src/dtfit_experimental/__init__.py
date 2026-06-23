@@ -20,12 +20,22 @@ have already cleared the promotion gate and now live in :mod:`dtfit`:
   (``from dtfit import PartitionedLSI, PartitionedEAC``);
 * the GEMM-batched projection ``fit_lsi_batched`` / ``project_spectra`` and the
   fused multi-channel ``PartitionedBatchLSI`` (``from dtfit import ...``);
-* #6 adaptive-window EAC ``fit_eac_adaptive`` (``from dtfit import fit_eac_adaptive``);
+* #6 adaptive-window EAC, now folded into stable ``dtfit.fit_eac`` as
+  ``window_mode="curvature"``;
 * the LSI **oscillatory recipe** is now built into ``dtfit.fit_lsi`` via
   ``oscillatory=True`` / ``freq_param=`` (plus ``dtfit.fft_frequency_seed``);
 * the fused multi-axis ``FusedChiSquareDetector`` for a streaming ``FilterBank``;
 * #3 the overlapping-window **ensemble** ``ensemble_fit`` / ``EnsembleResult``
   (``from dtfit import ensemble_fit``) -- robust to outliers on contaminated data.
+
+The three adaptations below remain here on purpose. #2 ``fit_lsi_basis`` was
+evaluated as a *vocabulary* (it makes periodic/decay models expressible) but **not
+a source of predictive power** -- it did not improve accuracy and lost on the LTSF
+benchmark, so it stays experimental rather than being folded into ``fit_lsi``. #5
+``boosted_fit`` is a genuine win but on **one domain only** (additive trend+season,
+e.g. CO2); it needs a confirming second domain to clear the ``>=2 domains`` gate.
+#4 ``fit_joint`` is the substantial new solver still under evaluation. See the
+``experiments/cases/analysis`` notes for the measured verdicts.
 
 The shared spectral/backend machinery (``dtfit._core._spectral`` / ``dtfit._core._backend``)
 moved to stable with the map-reduce estimators and is reused by the adaptations

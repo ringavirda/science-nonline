@@ -9,7 +9,8 @@ channels; and shape/validation behaviour.
 import numpy as np
 import pytest
 
-from dtfit import PartitionedLSI, PartitionedBatchLSI, project_spectra
+from dtfit import PartitionedLSI, PartitionedBatchLSI
+from dtfit.scale import project_spectra
 
 
 @pytest.fixture

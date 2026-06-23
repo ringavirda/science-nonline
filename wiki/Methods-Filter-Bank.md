@@ -93,8 +93,8 @@ maneuver-detection comparison is driven by identical machinery (see
 
 Three oscillatory channels with a **damping (amplitude) fault shared across all
 axes** at the midpoint. **Top:** the three signals collapse in amplitude together.
-**Bottom:** the pooled `χ²(3)` statistic stays low under normal noise, then spikes
-far above the `α=10⁻³` threshold at the fault and is flagged once -- the shared
+**Bottom:** the pooled `chi^2(3)` statistic stays low under normal noise, then spikes
+far above the `alpha=10^-^3` threshold at the fault and is flagged once -- the shared
 change that is weak in any single axis is unmistakable in the sum.
 
 ![Filter bank with a fused fault detector](figures/filter_bank.png)

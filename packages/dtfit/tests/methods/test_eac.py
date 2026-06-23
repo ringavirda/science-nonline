@@ -39,9 +39,47 @@ def test_eac_bounds_and_robust_loss(arctan_data):
     assert abs(a - true["a"]) < 0.5
 
 
+def test_eac_curvature_window_mode(arctan_data):
+    x, y, true = arctan_data
+    result = fit_eac(x, y, "a*atan(w*x)", "x", window_mode="curvature",
+                     p0=[1.0, 1.0])
+    a, _ = result.coeffs
+    assert abs(a - true["a"]) < 0.5
+    assert result.cov is not None and result.cov.shape == (2, 2)
+
+
 def test_eac_regressor_needs_no_polyfit(arctan_data):
     # EAC fits raw data, so no polynomial pre-fit stage is required.
     x, y, _ = arctan_data
     reg = NonlineRegressor("a*atan(w*x)", "x", method="eac").fit(x, y)
     assert reg.coef_.shape == (2,)
     assert reg.predict(x).shape == x.shape
+
+
+def test_validation_rejects_malformed_input():
+    import pytest
+    from dtfit import fit_lsi
+    x = np.linspace(0, 1, 40)
+    y = np.exp(0.7 * x)
+    # length mismatch
+    with pytest.raises(ValueError, match="same length"):
+        fit_eac(x, y[:-1], "a*exp(b*x)", "x", p0=[1.0, 1.0])
+    # non-finite
+    yb = y.copy()
+    yb[5] = np.nan
+    with pytest.raises(ValueError, match="non-finite"):
+        fit_lsi(x, yb, "a*exp(b*x)", "x")
+    # 2-D input
+    with pytest.raises(ValueError, match="1-D"):
+        fit_lsi(x.reshape(-1, 1), y, "a*exp(b*x)", "x")
+
+
+def test_fit_lsi_random_state_is_reproducible():
+    from dtfit import fit_lsi
+    rng = np.random.default_rng(0)
+    x = np.linspace(0.1, 3, 120)
+    y = 2.0 * np.exp(0.5 * x) + rng.normal(0, 0.05, x.size)
+    bounds = [(0.1, 5.0), (0.1, 2.0)]
+    a = fit_lsi(x, y, "a*exp(b*x)", "x", bounds=bounds, random_state=7).coeffs
+    b = fit_lsi(x, y, "a*exp(b*x)", "x", bounds=bounds, random_state=7).coeffs
+    np.testing.assert_allclose(a, b)  # same seed -> identical global search

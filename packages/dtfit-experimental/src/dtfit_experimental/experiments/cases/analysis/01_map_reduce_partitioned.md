@@ -6,10 +6,10 @@ deepest result in the suite — it is not a heuristic but the linearity of
 integration turned into an architecture.
 
 Source: [`../../src/dtfit/adaptations/partitioned.py`](../../src/dtfit/adaptations/partitioned.py).
-Tested in: [Big-data (2)](../02_big_data_streaming/report.md),
-[Parallel (7)](../07_parallel_scaling/report.md),
-[GPU (8)](../08_gpu_batched_projection/report.md),
-[Fused multi-channel (10)](../10_fused_partitioned_batched/report.md).
+Tested in: [Big-data (2)](../02_big_data_streaming/02_big_data_streaming.ipynb),
+[Parallel (7)](../07_parallel_scaling/07_parallel_scaling.ipynb),
+[GPU (8)](../08_gpu_batched_projection/08_gpu_batched_projection.ipynb),
+[Fused multi-channel (10)](../10_fused_partitioned_batched/10_fused_partitioned_batched.ipynb).
 
 ## The fused multi-channel extension (`PartitionedBatchLSI`, Exp 10)
 

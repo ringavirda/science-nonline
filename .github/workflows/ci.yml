@@ -5,12 +5,21 @@ on:
     branches: [main]
   pull_request:
 
+# Cancel superseded runs on the same ref (a new push to a PR voids the old run).
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        # The package claims Windows/Linux/macOS parity (see the README's MKL
+        # note) and the native kernels have a pure-Python fallback -- exercise
+        # all three OSes so that parity is actually tested, not just asserted.
+        os: [ubuntu-latest, windows-latest, macos-latest]
         python-version: ["3.10", "3.11", "3.12", "3.13"]
 
     steps:
@@ -27,7 +36,11 @@ jobs:
           pip install -e "packages/dtfit[viz,dev]"
           pip install -e "packages/dtfit-experimental[dev]"
 
+      # The optional C kernels need clang; only the Linux runner builds them.
+      # Windows/macOS deliberately run on the NumPy/SciPy fallback, so CI also
+      # covers the no-native code path.
       - name: Build native extension (dtfit)
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq clang
@@ -46,14 +59,28 @@ jobs:
         run: pytest -q tests/validation
         working-directory: packages/dtfit
 
+      # ``--python-version`` is passed explicitly so mypy targets the matrix
+      # interpreter: without it mypy resolves a lower target and rejects the
+      # PEP 695 ``type`` statements in the numpy stubs that ship for Python
+      # 3.12+ (``numpy/__init__.pyi: Type statement is only supported in 3.12+``).
       - name: Type check + test — dtfit
         run: |
-          mypy
-          pytest --cov --cov-report=term-missing
+          mypy --python-version ${{ matrix.python-version }}
+          pytest --cov --cov-report=term-missing --cov-report=xml
         working-directory: packages/dtfit
 
       - name: Type check + test — dtfit-experimental
         run: |
-          mypy
+          mypy --python-version ${{ matrix.python-version }}
           pytest
         working-directory: packages/dtfit-experimental
+
+      # Publish the coverage report once (one OS/interpreter) as a build
+      # artifact, so the number is visible/trendable without an external service.
+      - name: Upload coverage report
+        if: runner.os == 'Linux' && matrix.python-version == '3.12'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: packages/dtfit/coverage.xml
+          if-no-files-found: error

@@ -35,7 +35,9 @@ class JointResult:
         f_sym = sp.sympify(self.expr)
         subs = {sp.Symbol(k): v for k, v in self.shared.items()}
         subs.update({sp.Symbol(k): v for k, v in self.private[channel].items()})
-        model = sp.lambdify(t, f_sym.subs(subs), "numpy")
+        # sympy's stub types subs() as an iterable of pairs; a {sym: val} dict is
+        # accepted at runtime.
+        model = sp.lambdify(t, f_sym.subs(subs), "numpy")  # pyright: ignore[reportCallIssue, reportArgumentType]
         v = model(np.asarray(x, dtype=float))
         return np.full(np.shape(x), float(v)) if np.ndim(v) == 0 else np.asarray(v, float)
 

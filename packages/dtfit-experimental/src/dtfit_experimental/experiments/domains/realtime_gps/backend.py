@@ -1,0 +1,505 @@
+"""Backend infrastructure for the real-time GPS/inertial trajectory experiment.
+
+This module is the **single source of truth for the simulation and estimation
+code** behind ``realtime_gps.ipynb``; the notebook imports it and does all the
+presentation (tables, figures, narrative). Keeping the infra here means the
+filters/trajectory/baselines are defined once and the notebook stays a thin,
+rerunnable layer over them.
+
+It provides, for a simulated maneuvering 3-D target tracked from a noisy GPS fix
+stream and a 9-DOF IMU (3-axis gyro + accelerometer), with realistic dropouts and
+multipath glitches:
+
+* the **trajectory / rig generator** -- :func:`trajectory`, :func:`random_plan`,
+  :func:`build_rig`, :func:`build_imu`;
+* the **dtfit (integral) trackers** -- :func:`dtfit_track` (streaming LSI/EAC) and
+  the full-IMU strapdown :func:`imu_lsi_track` (external-regressor LSI), plus the
+  :class:`FusedCUSUM` maneuver detector;
+* the **established baselines** -- :func:`kalman_track` (constant-accel Kalman),
+  :func:`ekf_track` (gyro-aided coordinated-turn EKF);
+* **scoring / batch** helpers -- :func:`rmse3`, :func:`roll_rmse`,
+  :func:`match_onsets`, :func:`_run_batch`, and a re-exported
+  :func:`embedded_footprint` for the on-MCU budget.
+
+The GPS is modelled at the **fix** level (truth + noise), matching what a NEO-M9N
+outputs over NMEA, so this mirrors the real device.
+"""
+
+from __future__ import annotations
+
+import numpy as np
+
+from dtfit.streaming import EACFilter, LSIFilter
+
+from dtfit_experimental.experiments.common import baselines as bl
+from dtfit_experimental.experiments.domains.common import embedded_footprint
+
+__all__ = [
+    "DURATION", "MANEUVERS", "ONSETS", "GPS_SIGMA", "GYRO_SIGMA", "IMU_GYRO_SIGMA",
+    "IMU_ACC_SIGMA", "IMU_WASH_TAU", "GRAVITY", "WARMUP", "MODELS",
+    "trajectory", "random_plan", "rmse3", "build_rig", "build_imu",
+    "dtfit_track", "kalman_track", "ekf_track",
+    "strapdown_basis", "imu_lsi_track", "FusedCUSUM", "roll_rmse", "match_onsets",
+    "embedded_footprint",
+]
+
+# --- flight plan: coordinated turns (piecewise-constant turn-rate / speed / climb) --
+# heading psi integrates turn-rate; (x,y) integrate speed*(cos,sin psi); z integrates
+# climb-rate. So heading, speed and climb all change at the onsets -- a *maneuvering*
+# target with no closed-form per-axis formula (the honest, hard case). A long, fully
+# 3-D plan (60 s, nine segments): sweeping and hard turns of varied rate, accelerations
+# from 8->16 m/s, and climbs/descents from +3 to -2.5 m/s -- a genuine stress test.
+DURATION = 60.0     # seconds (10 Hz GPS -> 600 epochs)
+MANEUVERS = [
+    (0.0,   0.00,  8.0,  2.0),   # straight climb-out
+    (6.0,   0.45,  9.0,  2.0),   # sweeping left turn, accelerating, climbing
+    (14.0,  0.00, 14.0,  0.0),   # roll out, level cruise
+    (20.0, -0.60, 14.0, -2.5),   # hard right descending turn
+    (28.0, -0.60, 10.0, -2.5),   # tighten and slow inside the turn
+    (34.0,  0.00, 16.0,  1.0),   # roll out, accelerate, gentle climb
+    (42.0,  0.80, 16.0,  0.0),   # hard left turn (high rate)
+    (48.0,  0.00, 12.0,  3.0),   # roll out, steep climb
+    (54.0, -0.35, 12.0, -1.5),   # final easing right turn, descend
+]
+ONSETS = [m[0] for m in MANEUVERS[1:]]    # true regime-change times
+GPS_SIGMA = 1.5     # per-axis fix noise, m (~2.5 m CEP, realistic for a NEO-M9N)
+GYRO_SIGMA = 0.03   # gyro yaw-rate noise, rad/s
+# Full 9-DOF IMU (the Nano 33 BLE Sense carries one): a dedicated 3-axis MEMS gyro
+# (better than the crude yaw channel above) + 3-axis accelerometer.
+IMU_GYRO_SIGMA = 0.015   # 3-axis gyro noise, rad/s (~0.9 deg/s, IMU-grade)
+IMU_ACC_SIGMA = 0.05     # 3-axis accelerometer noise, m/s^2
+IMU_WASH_TAU = 100.0     # accel washout time-constant (steps/dt): a longer (gentler)
+# washout keeps more of the low-frequency trajectory arc in the accel basis instead of
+# handing it to the drift polynomial. Loosening 60 -> 100 (the maneuvers live on a
+# 6-8 s scale, so tau=60 steps = 6 s was cutting into the maneuver band) keeps more of
+# that arc, lowering RMSE while staying numerically bounded on random plans.
+GRAVITY = np.array([0.0, 0.0, -9.81])    # world-frame gravity (ENU, z up)
+WARMUP = 35         # skip the fill-window transient when scoring
+
+
+def _cumtrapz(f, t):
+    out = np.zeros_like(f, dtype=float)
+    out[1:] = np.cumsum(0.5 * (f[1:] + f[:-1]) * np.diff(t))
+    return out
+
+
+def _controls(t, plan=None):
+    plan = MANEUVERS if plan is None else plan
+    t = np.asarray(t, float)
+    om, v, zd = (np.zeros_like(t) for _ in range(3))
+    for ts, o, s, z in plan:
+        m = t >= ts
+        om[m], v[m], zd[m] = o, s, z
+    return om, v, zd
+
+
+def trajectory(t, plan=None):
+    om, v, zd = _controls(t, plan)
+    psi = _cumtrapz(om, t)
+    x = 2.0 + _cumtrapz(v * np.cos(psi), t)
+    y = 0.0 + _cumtrapz(v * np.sin(psi), t)
+    z = 5.0 + _cumtrapz(zd, t)
+    return np.stack([x, y, z], axis=-1)
+
+
+def random_plan(seed, duration=DURATION):
+    """Generate a random but realistic coordinated-turn flight plan from a seed: a
+    sequence of ``(onset, turn-rate, speed, climb)`` segments covering ``duration``.
+    Segments alternate stochastically between straight legs and left/right turns of
+    varied rate, with random speed (8-16 m/s) and climb/descent (+/-2.5 m/s). Lets
+    the batch test (E6) score the approach on many distinct trajectories rather than
+    the one hand-built path, so no value can be silently tuned to a single track."""
+    rng = np.random.default_rng(seed)
+    plan, ts = [], 0.0
+    while ts < duration - 1e-9:
+        if not plan or rng.random() < 0.45:
+            om = 0.0                                   # straight leg
+        else:
+            om = float(rng.choice([-1.0, 1.0]) * rng.uniform(0.25, 0.8))  # turn
+        v = float(rng.uniform(8.0, 16.0))
+        zd = float(rng.uniform(-2.5, 2.5)) if rng.random() < 0.7 else 0.0
+        plan.append((round(ts, 3), om, v, zd))
+        ts += float(rng.uniform(4.0, 9.0))             # segment length
+    return plan
+
+
+def rmse3(a, b):
+    return float(np.sqrt(np.mean(np.sum((a - b) ** 2, axis=1))))
+
+
+def build_rig(n, seed=0, *, plan=None, gps_sigma=GPS_SIGMA, gyro_sigma=GYRO_SIGMA,
+              glitch_frac=0.0, glitch_mag=12.0):
+    """Simulate one pass of the rig: truth, GPS fixes (fix-level noise), gyro rate.
+
+    ``plan`` selects the flight plan (defaults to the hand-built canonical
+    ``MANEUVERS``; pass a :func:`random_plan` output for the batch test).
+    ``gps_sigma`` / ``gyro_sigma`` set the baseline noise; ``glitch_frac`` injects
+    multipath **anomalies** (a fraction of fixes corrupted by N(0, ``glitch_mag``)
+    spikes) -- used to build the separate *harsh* scenario for the robustness test."""
+    rng = np.random.default_rng(seed)
+    t = np.linspace(0, DURATION, n)
+    truth = trajectory(t, plan)
+    fixes = truth + rng.normal(0, gps_sigma, truth.shape)
+    if glitch_frac > 0:
+        k = int(glitch_frac * (n - WARMUP))
+        idx = rng.choice(np.arange(WARMUP, n), k, replace=False)
+        fixes[idx] += rng.normal(0, glitch_mag, (k, 3))
+    om, _, _ = _controls(t, plan)
+    gyro = om + rng.normal(0, gyro_sigma, t.shape)
+    return t, truth, fixes, gyro, rng
+
+
+# --------------------------------------------------------------------------- #
+# trackers: dtfit per-axis CA-quadratic bank, and the constant-accel Kalman.
+# Both are handed only a generic local model (no maneuver knowledge) -- equal footing.
+# --------------------------------------------------------------------------- #
+# Local models the filter fits over the window. A constant-acceleration *quadratic*
+# is the same class as the Kalman-CA baseline, so it can only match it -- and it
+# corner-cuts fast turns (the late divergence). A **cubic** carries the extra
+# curvature term that the turn needs (robust all-round default). The **coordinated-
+# turn** model `c0+c1·t+c2·sin(c3·t+c4)` is *nonlinear in parameters* -- a circular
+# arc is sinusoidal in time -- which a linear Kalman-CA cannot represent at all; it
+# is dtfit's differentiator and wins on the maneuvering segment (at the cost of
+# slight overfit on straight runs).
+MODELS = {
+    "poly": dict(expr="c0 + c1*t + c2*t**2 + c3*t**3", rest=[0.0, 0.0, 0.0], order=4),
+    "turn": dict(expr="c0 + c1*t + c2*sin(c3*t + c4)", rest=[0.0, 8.0, 0.6, 0.0], order=5),
+}
+
+
+def _axis_filters(fixes, kind="lsi", model="poly", robust=False, off=None):
+    off = off or {}
+    m = MODELS[model]
+    nq = len(m["rest"]) + 1
+
+    def p0(ax):
+        return [float(fixes[0, ax])] + list(m["rest"])
+
+    if kind == "lsi":   # Legendre spectrum -- the right measurement for trajectories
+        # adapt_noise: set the measurement noise from the data (R = v * proj-diag, v an
+        # online residual-variance EWMA) instead of a fixed r. The gain then self-tunes
+        # to the local noise -- responsive on clean fixes, automatically damped (smooth)
+        # on the noisy/anomaly-heavy harsh stream -- with no per-regime hand-tuning.
+        return [LSIFilter(m["expr"], "t", p0=p0(ax), window_size=15, order=m["order"],
+                          q_diag=[1e-2] * nq, adapt_noise=True,
+                          robust=robust, drift_reset="inflate", **off) for ax in range(3)]
+    return [EACFilter(m["expr"], "t", p0=p0(ax), window_size=15, n_sub=2,
+                      q_diag=[1e-2] * nq, r=0.5, adapt_r=True,
+                      robust=robust, drift_reset="inflate", **off) for ax in range(3)]
+
+
+class FusedCUSUM:
+    """Pool K streams' one-step residuals into a chi^2(K) NIS and CUSUM it.
+
+    A maneuver moves several axes at once, so the fused statistic has far higher SNR
+    than any single axis -- the reason a per-axis test misses subtle coordinated
+    turns. Residuals are standardized by a running EWMA scale (dtfit exposes no
+    innovation covariance), then the CUSUM accumulates surprise above the dof."""
+
+    def __init__(self, k, *, ewma=0.05, slack=1.5, h=10.0, warmup=60):
+        self.k, self.ewma, self.slack, self.h, self.warmup = k, ewma, slack, h, warmup
+        self._sc2 = np.zeros(k)
+        self._g = 0.0
+        self._n = 0
+
+    def update(self, residuals):
+        r = np.asarray(residuals, float)
+        if not np.all(np.isfinite(r)):
+            return False
+        z2 = np.where(self._sc2 > 0, r * r / np.where(self._sc2 > 0, self._sc2, 1.0), 0.0)
+        self._sc2 = (1 - self.ewma) * self._sc2 + self.ewma * r * r
+        self._n += 1
+        if self._n <= self.warmup:
+            return False
+        self._g = max(0.0, self._g + float(z2.sum()) - self.k - self.slack)
+        if self._g > self.h:
+            self._g = 0.0
+            return True
+        return False
+
+
+def dtfit_track(t, fixes, horizons=(10,), *, kind="lsi", model="poly", robust=False,
+                fused=False, gyro=None):
+    """Online per-axis tracking + rolling h-step forecasts. Missing fixes (NaN rows)
+    are coasted (no update; the local model extrapolates). Returns
+    ``(smoothed, pred, drift_times)``."""
+    n = t.size
+    sm = np.zeros((n, 3))
+    pred = {h: np.full((n, 3), np.nan) for h in horizons}
+    drift: set[float] = set()
+    off = dict(alpha=1e-12, cusum_h=float("inf")) if fused else {}
+    flts = _axis_filters(fixes, kind, model, robust, off)
+    det = FusedCUSUM(3 + (gyro is not None)) if fused else None
+    g_prev = None
+    for i in range(n):
+        miss = np.any(np.isnan(fixes[i]))
+        for ax in range(3):
+            if not miss:
+                flts[ax].partial_fit(t[i], fixes[i, ax])
+                if not fused and flts[ax].drift_flag_:
+                    drift.add(round(float(t[i]), 2))
+            sm[i, ax] = float(flts[ax].predict(np.array([t[i]]))[0])
+        if det is not None and not miss:
+            res = [flts[ax].last_residual_ for ax in range(3)]
+            if gyro is not None:                 # add the gyro-rate change channel
+                res.append((gyro[i] - g_prev) if g_prev is not None else 0.0)
+                g_prev = gyro[i]
+            if det.update(res):
+                drift.add(round(float(t[i]), 2))
+                for ax in range(3):
+                    flts[ax].inflate(3.0)
+        for h in horizons:
+            if i + h < n:
+                for ax in range(3):
+                    pred[h][i + h, ax] = float(flts[ax].predict(np.array([t[i + h]]))[0])
+    return sm, pred, sorted(drift)
+
+
+def kalman_track(t, fixes, horizons=(10,), *, q=5e-2, adaptive=False):
+    kf = bl.KalmanCA(dim=3, dt=float(t[1] - t[0]), q=q, r=0.5)
+    det = FusedCUSUM(3) if adaptive else None
+    n = t.size
+    sm = np.zeros((n, 3))
+    pred = {h: np.full((n, 3), np.nan) for h in horizons}
+    drift: set[float] = set()
+    since = 0
+    for i in range(n):
+        miss = np.any(np.isnan(fixes[i]))
+        if miss:
+            since += 1
+            sm[i] = kf.forecast(since)[-1]          # coast: extrapolate the CA state
+        else:
+            since = 0
+            sm[i] = kf.update(fixes[i])
+            if det is not None and det.update(kf.last_residuals_):
+                drift.add(round(float(t[i]), 2))
+                kf.inflate(3.0)
+        fc = kf.forecast(max(horizons) + since)
+        for h in horizons:
+            if i + h < n:
+                pred[h][i + h] = fc[h - 1 + since]
+    return sm, pred, sorted(drift)
+
+
+def ekf_track(t, fixes, gyro, horizons=(10,), *, adaptive=False):
+    """Gyro-aided coordinated-turn EKF: the fair GPS+IMU *recursive* baseline.
+    Same information as the windowed gyro dead-reckoning (GPS position + gyro
+    yaw-rate), but as a textbook EKF. During GPS gaps it dead-reckons on the gyro
+    (``coast``) instead of holding. Returns ``(smoothed, pred, drift_times)``."""
+    ekf = bl.CTEKFGyro(dt=float(t[1] - t[0]), r_gps=GPS_SIGMA ** 2,
+                       r_gyro=GYRO_SIGMA ** 2)
+    det = FusedCUSUM(3) if adaptive else None
+    n = t.size
+    sm = np.zeros((n, 3))
+    pred = {h: np.full((n, 3), np.nan) for h in horizons}
+    drift: set[float] = set()
+    since = 0
+    last_w = 0.0
+    for i in range(n):
+        w = float(gyro[i]) if np.isfinite(gyro[i]) else last_w
+        last_w = w
+        if np.any(np.isnan(fixes[i])):
+            since += 1
+            sm[i] = ekf.coast(w)                 # IMU-aided dead-reckoning
+        else:
+            since = 0
+            sm[i] = ekf.update(fixes[i], w)
+            if det is not None and det.update(ekf.last_residuals_):
+                drift.add(round(float(t[i]), 2))
+                ekf.inflate(3.0)
+        fc = ekf.forecast(max(horizons))
+        for h in horizons:
+            if i + h < n:
+                pred[h][i + h] = fc[h - 1]
+    return sm, pred, sorted(drift)
+
+
+# --------------------------------------------------------------------------- #
+# Full 9-DOF IMU (3-axis gyro + 3-axis accelerometer) + strapdown fusion through
+# the *external-regressor* LSI filter. This is the richer model the floor argument
+# calls for: the accelerometer adds the actually-sensed acceleration (speed
+# changes, centripetal/normal load) the gyro-only constant-speed model assumes
+# away, and the 3-axis gyro gives the full 3-D attitude (banked turns, climb).
+# --------------------------------------------------------------------------- #
+def _euler_R(psi, th, phi):
+    """Body->world rotation from yaw/pitch/roll (ZYX)."""
+    cz, sz = np.cos(psi), np.sin(psi); cy, sy = np.cos(th), np.sin(th)
+    cx, sx = np.cos(phi), np.sin(phi)
+    Rz = np.array([[cz, -sz, 0], [sz, cz, 0], [0, 0, 1]])
+    Ry = np.array([[cy, 0, sy], [0, 1, 0], [-sy, 0, cy]])
+    Rx = np.array([[1, 0, 0], [0, cx, -sx], [0, sx, cx]])
+    return Rz @ Ry @ Rx
+
+
+def _exp_so3(w, dt):
+    """Rodrigues exponential of a body-rate increment -> a proper rotation."""
+    th = w * dt; a = float(np.linalg.norm(th))
+    if a < 1e-12:
+        return np.eye(3)
+    k = th / a
+    K = np.array([[0, -k[2], k[1]], [k[2], 0, -k[0]], [-k[1], k[0], 0]])
+    return np.eye(3) + np.sin(a) * K + (1.0 - np.cos(a)) * (K @ K)
+
+
+def _log_so3(dR, dt):
+    """Body rate that integrates ``dR`` over ``dt`` (the exact inverse of
+    :func:`_exp_so3`), so the simulated gyro re-integrates to the true attitude."""
+    c = np.clip((np.trace(dR) - 1.0) / 2.0, -1.0, 1.0); a = float(np.arccos(c))
+    if a < 1e-9:
+        return np.zeros(3)
+    v = np.array([dR[2, 1] - dR[1, 2], dR[0, 2] - dR[2, 0], dR[1, 0] - dR[0, 1]])
+    return a / (2.0 * np.sin(a)) * v / dt
+
+
+def build_imu(t, truth, *, gyro_sigma=IMU_GYRO_SIGMA, acc_sigma=IMU_ACC_SIGMA, seed=0):
+    """Simulate a full 9-DOF IMU consistent with the truth trajectory: a 3-axis
+    gyro (body angular rate) and a 3-axis accelerometer (specific force in body).
+
+    Attitude = flight kinematics: heading from the velocity, pitch from the climb
+    angle, roll from the coordinated-turn bank ``atan2(v·ψ̇, g)``. The gyro rate is
+    the *exact* relative rotation (matrix log), so integrating it reproduces the
+    attitude; the accelerometer is ``R^T (a_world − g)`` — what a strapped-down
+    sensor reads. Returns ``(R0, gyro, accel)`` with ``R0`` the initial attitude
+    (the alignment a real rig gets at start-up)."""
+    rng = np.random.default_rng(seed); dt = float(t[1] - t[0]); m = t.size
+    vel = np.gradient(truth, dt, axis=0)
+    acc = np.gradient(vel, dt, axis=0)
+    vh = np.hypot(vel[:, 0], vel[:, 1]) + 1e-9
+    psi = np.arctan2(vel[:, 1], vel[:, 0])
+    pitch = np.arctan2(vel[:, 2], vh)
+    bank = np.arctan2(vh * np.gradient(np.unwrap(psi), dt), 9.81)
+    R = np.array([_euler_R(psi[i], pitch[i], bank[i]) for i in range(m)])
+    omega = np.zeros((m, 3))
+    for i in range(m - 1):
+        omega[i] = _log_so3(R[i].T @ R[i + 1], dt)
+    omega[-1] = omega[-2]
+    f_body = np.einsum("nij,nj->ni", np.transpose(R, (0, 2, 1)), acc - GRAVITY)
+    gyro = omega + rng.normal(0, gyro_sigma, omega.shape)
+    accel = f_body + rng.normal(0, acc_sigma, f_body.shape)
+    return R[0], gyro, accel
+
+
+def strapdown_basis(t, gyro, accel, R0, *, tau=IMU_WASH_TAU):
+    """Strapdown integration of the IMU into a per-axis position basis ``S``.
+
+    Integrate the gyro into attitude, rotate the accelerometer into the world,
+    remove gravity, and double-integrate to a position. A raw double integral
+    drifts unboundedly (the classic INS problem: a ~3 m/s² gravity-leak from any
+    attitude error becomes thousands of metres), which a windowed filter cannot
+    absorb. So the integration is a **washout** (leaky, time-constant ``tau``):
+    the basis stays bounded and drift-free while keeping the maneuver content the
+    accelerometer senses. The residual smooth drift is mopped up by the model's
+    polynomial-drift terms — the rich model the LSI filter now carries. Returns
+    ``S`` of shape ``(n, 3)``."""
+    dt = float(t[1] - t[0]); R = R0.copy(); m = t.size
+    S = np.zeros((m, 3)); v = np.zeros(3); s = np.zeros(3); a = dt / tau
+    for i in range(m):
+        aw = R @ accel[i] + GRAVITY
+        R = R @ _exp_so3(gyro[i], dt)
+        v = (1.0 - a) * v + aw * dt
+        s = (1.0 - a) * s + v * dt
+        S[i] = s
+    return S
+
+
+def imu_lsi_track(t, fixes, gyro, accel, R0, horizons=(10,), *, window=28,
+                  drift="c2*tt**2"):
+    """Full-IMU GPS fusion run **entirely through dtfit's LSI filter**, per axis.
+
+    The strapdown basis ``S`` (gyro attitude + accelerometer, washed out) is fed
+    to :class:`LSIFilter` as an **external regressor**: the per-axis model is
+    ``c0 + c1·t + (polynomial drift) + S`` — the accelerometer supplies the sensed
+    motion shape, the polynomial absorbs the residual INS drift, and the GPS
+    anchors the absolute trajectory, all fused by the integral (Legendre-spectrum)
+    measurement. Missing fixes (NaN rows) coast on the IMU basis. Returns
+    ``(smoothed, pred)``.
+
+    The drift compensator is a **quadratic** (``c2·tt²``), not a cubic: with the
+    accelerometer already supplying the motion shape, a cubic drift term overfits
+    the GPS noise on clean fixes and — having no data to anchor it — extrapolates
+    explosively while coasting through a GPS gap. The quadratic is both more
+    accurate on clean smoothing and far more stable during dropouts. Paired with a
+    slightly wider ``window`` (28; the order-6 projection wants room) the per-axis
+    LSI now leads the coordinated-turn EKF on smoothing, coasting and robustness."""
+    n = t.size; sm = np.zeros((n, 3)); ax = ["Sx", "Sy", "Sz"]
+    S = strapdown_basis(t, gyro, accel, R0)
+    nq = 2 + (drift.count("c") if drift else 0)
+
+    def expr(a):
+        if drift:
+            return f"c0 + c1*tt + {drift} + {ax[a]}"
+        return f"c0 + c1*tt + {ax[a]}"
+
+    flts = [LSIFilter(expr(a), "tt", regressors=ax[a],
+                      p0=[float(fixes[0, a])] + [0.0] * (nq - 1), window_size=window,
+                      order=6, q_diag=[1e-2] * nq, adapt_noise=True,
+                      drift_reset="inflate") for a in range(3)]
+    pred = {h: np.full((n, 3), np.nan) for h in horizons}
+    for i in range(n):
+        miss = np.any(np.isnan(fixes[i]))
+        for a in range(3):
+            if not miss:
+                flts[a].partial_fit(t[i], fixes[i, a], regressors={ax[a]: S[i, a]})
+            sm[i, a] = float(flts[a].predict(np.array([t[i]]),
+                                             regressors={ax[a]: S[i, a]})[0])
+        # Forecast by extrapolating the IMU-sensed motion: hold the smoothed
+        # estimate's local velocity (a finite difference of the fused track)
+        # forward. The model's polynomial *drift-compensation* terms are a local
+        # nuisance fit, so evaluating the model at a future time would extrapolate
+        # them and blow up; the smoothed-track velocity already carries the
+        # accelerometer's information without that pathology.
+        for h in horizons:
+            if i >= 1 and i + h < n:
+                pred[h][i + h] = sm[i] + h * (sm[i] - sm[i - 1])
+    return sm, pred
+
+
+def roll_rmse(pred_h, truth, mask=None):
+    m = ~np.isnan(pred_h[:, 0])
+    m[:WARMUP] = False
+    if mask is not None:
+        m &= mask
+    return rmse3(pred_h[m], truth[m]) if m.any() else float("nan")
+
+
+def match_onsets(flags):
+    caught = sum(any(o - 0.3 <= f <= o + 1.5 for f in flags) for o in ONSETS)
+    fa = sum(not any(o - 0.3 <= f <= o + 1.5 for o in ONSETS) for f in flags)
+    lat = []
+    for o in ONSETS:
+        hit = [f for f in flags if o - 0.3 <= f <= o + 1.5]
+        if hit:
+            lat.append(min(hit) - o)
+    return caught, fa, (float(np.median(lat)) if lat else float("nan"))
+
+
+def _batch_one(arg):
+    """One random-trajectory trial for the E6 batch (module-level so it is picklable
+    for a process pool). Returns ``(j, {method: smoothing RMSE}, sample-or-None)``."""
+    j, n = arg
+    plan = random_plan(seed=1000 + j)
+    t, truth, fixes, gyro, _ = build_rig(n, seed=2000 + j, plan=plan)
+    R0, gy3, ac3 = build_imu(t, truth, seed=3000 + j)
+    msk = np.ones(n, bool); msk[:WARMUP] = False
+    out = {
+        "raw": rmse3(fixes[msk], truth[msk]),
+        "lsi": rmse3(dtfit_track(t, fixes, (1,), kind="lsi")[0][msk], truth[msk]),
+        "imu": rmse3(imu_lsi_track(t, fixes, gy3, ac3, R0, (1,))[0][msk], truth[msk]),
+        "ekf": rmse3(ekf_track(t, fixes, gyro, (1,))[0][msk], truth[msk]),
+        "kal": rmse3(kalman_track(t, fixes, (1,))[0][msk], truth[msk]),
+    }
+    return j, out, (truth if j < 6 else None)
+
+
+def _run_batch(n_traj, n):
+    """Run the E6 batch across processes (independent trials), with a serial
+    fallback -- e.g. when already inside a non-forking pool worker."""
+    args = [(j, n) for j in range(n_traj)]
+    try:
+        import os
+        from concurrent.futures import ProcessPoolExecutor
+        workers = min(8, (os.cpu_count() or 4))
+        with ProcessPoolExecutor(max_workers=workers) as ex:
+            return list(ex.map(_batch_one, args))
+    except Exception:
+        return [_batch_one(a) for a in args]   # daemonic worker / no fork: serial

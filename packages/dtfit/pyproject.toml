@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dtfit"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Differential-transformation fitting: nonlinear smoothing and forecasting via differential / non-Taylor transformations"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -12,9 +12,17 @@ license = { text = "MIT" }
 authors = [{ name = "Oleksandr Tuhanskykh", email = "ringanaro@gmail.com" }]
 keywords = ["regression", "nonlinear", "time-series", "differential-transformations", "statistical-learning"]
 classifiers = [
-    "Programming Language :: Python :: 3",
+    "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: Mathematics",
+    "Typing :: Typed",
 ]
 dependencies = [
     "numpy>=1.24",
@@ -35,6 +43,12 @@ dev = ["pytest>=7", "pytest-cov>=4", "ruff>=0.4", "mypy>=1.8"]
 Homepage = "https://github.com/ringavirda/science-pylab"
 Repository = "https://github.com/ringavirda/science-pylab"
 Issues = "https://github.com/ringavirda/science-pylab/issues"
+
+[tool.setuptools.dynamic]
+version = { attr = "dtfit.__about__.__version__" }
+
+[tool.setuptools]
+license-files = ["LICENSE"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -66,12 +80,20 @@ testpaths = ["tests"]
 pythonpath = ["tests"]
 
 [tool.mypy]
-# No `python_version` pin: mypy targets each CI matrix interpreter (3.10-3.13).
-# Pinning to 3.10 forced mypy to reject PEP 695 `type` statements in the newer
-# numpy stubs that pip installs on the 3.12/3.13 runners (numpy/__init__.pyi);
-# the 3.10 matrix job still enforces the language floor.
+# No `python_version` pin here on purpose. mypy's default target does NOT track
+# the running interpreter, so pinning a single version (e.g. 3.10) makes it
+# reject the PEP 695 `type` statements in the numpy stubs shipped for 3.12+.
+# Instead CI passes `--python-version ${{ matrix.python-version }}` so each job
+# type-checks against its own interpreter (see .github/workflows/ci.yml).
 files = ["src/dtfit"]
 ignore_missing_imports = true  # scipy/sklearn/sympy/matplotlib ship partial stubs
+
+[tool.pyright]
+# Keep the Pylance/pyright experience in step with the mypy gate. The package is
+# clean at "standard"; src, examples and tests are all type-checked.
+include = ["src", "examples", "tests"]
+pythonVersion = "3.10"
+typeCheckingMode = "standard"
 
 [tool.coverage.run]
 source = ["dtfit"]

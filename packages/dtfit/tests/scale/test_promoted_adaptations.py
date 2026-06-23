@@ -2,8 +2,8 @@
 
 Covers the three levers promoted alongside the batched/partitioned estimators:
 
-* ``fit_eac_adaptive`` -- curvature-adaptive EAC windows (#6), validated on
-  concentrated transients;
+* ``fit_eac(window_mode="curvature")`` -- curvature-adaptive EAC windows (#6),
+  validated on concentrated transients;
 * the ``fit_lsi`` **oscillatory recipe** (``oscillatory=`` / ``freq_param=`` plus
   ``fft_frequency_seed``), which recovers a sinusoid the smoothed default erases;
 * ``FusedChiSquareDetector`` -- the multi-axis fused fault detector on a
@@ -15,7 +15,7 @@ import pytest
 
 from dtfit import (
     fit_lsi,
-    fit_eac_adaptive,
+    fit_eac,
     fft_frequency_seed,
     FilterBank,
     FusedChiSquareDetector,
@@ -28,16 +28,17 @@ def test_adaptive_eac_recovers_transient():
     rng = np.random.default_rng(4)
     t = np.linspace(0, 3, 400)
     y = 2.0 * (1 - np.exp(-3.0 * t)) + rng.normal(0, 0.02, t.size)
-    r = fit_eac_adaptive(t, y, "K*(1-exp(-a*x))", "x", p0=[1.0, 1.0])
+    r = fit_eac(t, y, "K*(1-exp(-a*x))", "x", window_mode="curvature",
+                p0=[1.0, 1.0])
     assert abs(r.coeffs[0] - 2.0) < 0.2 and abs(r.coeffs[1] - 3.0) < 0.5
 
 
-def test_adaptive_eac_equal_mode_runs():
+def test_adaptive_eac_uniform_mode_runs():
     rng = np.random.default_rng(5)
     t = np.linspace(0, 3, 300)
     y = 1.5 * (1 - np.exp(-2.0 * t)) + rng.normal(0, 0.02, t.size)
-    r = fit_eac_adaptive(t, y, "K*(1-exp(-a*x))", "x", window_mode="equal",
-                         p0=[1.0, 1.0])
+    r = fit_eac(t, y, "K*(1-exp(-a*x))", "x", window_mode="uniform",
+                p0=[1.0, 1.0])
     assert abs(r.coeffs[0] - 1.5) < 0.3
 
 

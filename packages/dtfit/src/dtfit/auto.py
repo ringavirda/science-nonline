@@ -9,19 +9,19 @@ stable API:
 
 * :func:`auto_estimate` -- recover physical parameters, routing by signal *shape*
   to the estimator variant that fits it (oscillatory -> the LSI oscillatory
-  recipe; transient / peak -> adaptive-window EAC; outliers -> robust EAC; else
-  the better of LSI / EAC by in-sample fit).
+  recipe; transient / peak -> curvature-window EAC; outliers -> robust-loss EAC;
+  else the better of LSI / EAC by in-sample fit).
 * :func:`auto_forecast` -- a structured fit-then-extrapolate forecaster that
   routes the model class (saturating growth -> logistic; a detected cycle -> a
   joint linear+seasonal fit; otherwise a quadratic level), with a **no-structure
   guard** (persist when the fit cannot beat a random walk on a held-out training
   tail) and a **divergence guard** (drop a runaway quadratic to linear).
 
-Both compose only stable pieces (:func:`dtfit.fit_lsi`, :func:`dtfit.fit_eac`,
-:func:`dtfit.fit_eac_adaptive`, :func:`dtfit.fft_frequency_seed`); they are the
-conservative merges the studies validated, and they keep the honest ceilings:
-near-random-walk series fall back to persistence, and ``auto_estimate`` matches
-but does not beat a well-initialised NLLS on clean bulk shapes.
+Both compose only stable pieces (:func:`dtfit.fit_lsi`, :func:`dtfit.fit_eac`
+with curvature-adaptive windows and the robust loss, :func:`dtfit.fft_frequency_seed`);
+they are the conservative merges the studies validated, and they keep the honest
+ceilings: near-random-walk series fall back to persistence, and ``auto_estimate``
+matches but does not beat a well-initialised NLLS on clean bulk shapes.
 """
 
 from __future__ import annotations
@@ -35,7 +35,6 @@ from dtfit.types import FittingResult, InitialGuess
 from dtfit.methods import (
     fit_lsi,
     fit_eac,
-    fit_eac_adaptive,
     fft_frequency_seed,
     model_params,
 )
@@ -100,9 +99,10 @@ def auto_estimate(
         x, y: Observed samples.
         expr, var: Model expression and main variable.
         shape: One of ``"auto"`` (detect oscillation, else bulk), ``"oscillatory"``,
-            ``"transient"`` / ``"peak"`` (adaptive-window EAC), ``"robust"``
-            (outlier-robust EAC), or ``"bulk"`` (the better of LSI / EAC by
-            in-sample fit). The variant-follows-shape mapping the study validated.
+            ``"transient"`` / ``"peak"`` (curvature-window EAC), ``"robust"``
+            (outlier-robust EAC via ``loss="soft_l1"``), or ``"bulk"`` (the better
+            of LSI / EAC by in-sample fit). The variant-follows-shape mapping the
+            study validated.
         freq_param: Name of the angular-frequency parameter, forwarded to the LSI
             oscillatory recipe (:func:`fit_lsi`); implies an oscillatory shape.
         p0: Optional initial guess.
@@ -125,7 +125,7 @@ def auto_estimate(
         return fit_lsi(x, y, expr, var, p0=p0, bounds=bounds, oscillatory=True,
                        freq_param=freq_param)
     if shape in ("transient", "peak"):
-        return fit_eac_adaptive(x, y, expr, var, window_mode="curvature", p0=p0)
+        return fit_eac(x, y, expr, var, window_mode="curvature", p0=p0)
     if shape == "robust":
         return fit_eac(x, y, expr, var, p0=p0, bounds=_eac_bounds(bounds),
                        loss="soft_l1")

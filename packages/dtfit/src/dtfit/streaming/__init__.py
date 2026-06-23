@@ -14,10 +14,19 @@ method, so the same method is discoverable across execution modes:
   :class:`dtfit.PartitionedLSI`; its measurement is the window's **Legendre
   spectrum** (a richer measurement that captures oscillations the area criterion
   partly cancels).
+
+Both accept optional **external regressors**, so the integral measurement can be
+applied to a model that also depends on measured side-channels (e.g. an IMU-derived
+motion basis), not just on the sample position.
 """
 
 from ._eac import EACFilter
 from ._lsi import LSIFilter
 from ._bank import FilterBank, FusedChiSquareDetector
 
-__all__ = ["EACFilter", "LSIFilter", "FilterBank", "FusedChiSquareDetector"]
+__all__ = [
+    "EACFilter",
+    "LSIFilter",
+    "FilterBank",
+    "FusedChiSquareDetector",
+]

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any, Callable
+from typing import Any, Callable, Literal, overload
 
 import numpy as np
 
@@ -32,6 +32,11 @@ class FittingResult:
         names: Parameter names aligned with ``coeffs``.
         model: a precomputed NumPy callable of the fitted model; if omitted it is
             lambdified lazily from ``expr`` + ``coeffs``.
+        label: Optional tag carried through batch/parallel fits (a channel name,
+            grid cell, ...); ``None`` for a plain single fit.
+        error: Set to a message instead of coefficients when a fit failed inside
+            a batch (:func:`dtfit.fit_many`), so one bad problem does not abort
+            the batch; ``None`` for a successful fit.
     """
 
     def __init__(
@@ -42,6 +47,9 @@ class FittingResult:
         var: str | None = None,
         names: tuple[str, ...] | Sequence[str] = (),
         model: Callable[..., Any] | None = None,
+        *,
+        label: Any = None,
+        error: str | None = None,
     ) -> None:
         self.coeffs = np.asarray(coeffs, dtype=float)
         self.cov = cov
@@ -49,10 +57,26 @@ class FittingResult:
         self.var = var
         self.names: tuple[str, ...] = tuple(names)
         self._model = model
+        self.label = label
+        self.error = error
 
     def __repr__(self) -> str:
+        if self.error is not None:
+            return f"FittingResult(error={self.error!r}, label={self.label!r})"
         return (f"FittingResult(expr={self.expr!r}, "
                 f"params={self.params!r})")
+
+    # Picklability: the lazily-built ``_model`` is a lambdified closure that does
+    # not survive a process-pool round trip, so drop it on pickling -- it rebuilds
+    # from ``expr``/``coeffs`` on first access. This is what lets a worker return
+    # a fitted result across the ``fit_many`` (loky) boundary.
+    def __getstate__(self) -> dict[str, Any]:
+        state = self.__dict__.copy()
+        state["_model"] = None
+        return state
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        self.__dict__.update(state)
 
     # the fitted model (callable) -- precomputed or rebuilt from expr
     @property
@@ -103,6 +127,13 @@ class FittingResult:
         se = self.stderr()
         return {n: (float(v) - z * se[n], float(v) + z * se[n])
                 for n, v in self.params.items()}
+
+    @overload
+    def predict(self, x: np.ndarray, *,
+                return_std: Literal[False] = False) -> np.ndarray: ...
+    @overload
+    def predict(self, x: np.ndarray, *,
+                return_std: Literal[True]) -> tuple[np.ndarray, np.ndarray]: ...
 
     def predict(self, x: np.ndarray, *, return_std: bool = False):
         """Evaluate the fitted model at ``x``.

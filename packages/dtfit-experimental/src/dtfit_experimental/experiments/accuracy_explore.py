@@ -1,7 +1,7 @@
 """Exploration harness: recovery accuracy across the whole model catalogue.
 
 For every :data:`SCENARIOS` family, over a noise sweep, fit via the realistic
-user path -- ``Model.fit()`` self-seeded, exactly as the docs/notebooks do it --
+user path -- ``Model.fit()`` self-seeded, exactly as the examples do it --
 and a ``scipy.curve_fit`` baseline seeded the same way, and report parameter
 recovery (max relative error) and curve quality (R^2 vs the clean signal).
 

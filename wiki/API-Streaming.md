@@ -88,7 +88,7 @@ Differs from `EACFilter` only in:
 
 | name | default | meaning |
 |---|---|---|
-| `order` | `5` | Legendre spectral order; measurement is the first `order+1` coefficients (richer observability, larger measurement vector). Clamped so `order+1 ≤ window_size` |
+| `order` | `5` | Legendre spectral order; measurement is the first `order+1` coefficients (richer observability, larger measurement vector). Clamped so `order+1 <= window_size` |
 | `r` | `1.0` | *base* measurement-noise variance; per-coefficient variance is `r*(2j+1)` (the LSI orthonormal weighting, down-weighting noisier high orders) |
 
 (No `n_sub` -- the spectral order plays that role.)
@@ -149,9 +149,9 @@ normalized by an online EWMA of its variance and the squares are summed into a
 |---|---|---|
 | `bank` | -- | the `FilterBank` to drive (filters must expose `last_residual_`, `W`, `inflate` -- both stock filters do) |
 | `alpha` | `1e-4` | per-step false-alarm probability; threshold is `chi2.ppf(1-alpha, df=K)` |
-| `inflate` | `4.0` | covariance re-arm factor on detection (`≤1` disables the re-arm; flag still raised) |
+| `inflate` | `4.0` | covariance re-arm factor on detection (`<=1` disables the re-arm; flag still raised) |
 | `ewma` | `0.9` | decay for the per-stream innovation-variance estimate |
-| `warmup` | `None` | steps before detecting (default `3 × window`) |
+| `warmup` | `None` | steps before detecting (default `3 x window`) |
 | `cooldown` | `None` | steps to suppress detection after a flag (default one `window`) |
 
 - `update(t, y) -> bool` -- ingest one sample per stream; returns `True` iff this

@@ -6,8 +6,7 @@ The core batch fitters and their support functions. All return a
 [../methods/](Methods).
 
 - [`fit_lsi`](#fit_lsi) -- Least-Squares Integral (accurate, general default)
-- [`fit_eac`](#fit_eac) -- Equal-Areas Criterion (robust, fast)
-- [`fit_eac_adaptive`](#fit_eac_adaptive) -- EAC with curvature-placed windows
+- [`fit_eac`](#fit_eac) -- Equal-Areas Criterion (robust, fast); `window_mode="curvature"` for curvature-placed windows
 - [`ensemble_fit`](#ensemble_fit) -- overlapping-window robust ensemble (outliers)
 - [`fit_dsb`](#fit_dsb) -- Differential Spectra Balance (symbolic reference)
 - [`find_degree`](#find_degree) -- polynomial degree selection (DSB support)
@@ -20,9 +19,10 @@ The core batch fitters and their support functions. All return a
 
 ```python
 fit_lsi(data_x, data_y, expr, var, *,
-        k_star=5, alpha=0.0, filter_data=True,
+        k_star=None, alpha=0.0, filter_data=True,
         bounds=None, p0=None,
-        oscillatory=False, freq_param=None) -> FittingResult
+        oscillatory=False, freq_param=None,
+        random_state=0) -> FittingResult
 ```
 
 Fit `expr` to `(data_x, data_y)` by integral least-squares in the reconditioned
@@ -36,16 +36,19 @@ batch fitter.
 | `data_x`, `data_y` | array | -- | observed samples (1-D) |
 | `expr` | str | -- | model, e.g. `"a0 + a1*exp(a2*x)"` |
 | `var` | str | -- | main variable name in `expr` |
-| `k_star` | int \| `"auto"` | `5` | number of Legendre spectral coefficients to match; `"auto"` selects it by BIC of the data fit |
+| `k_star` | int \| `"auto"` \| None | `None` | number of Legendre spectral coefficients to match; `None` uses Legendre order 5 (auto-raised under the oscillatory recipe); `"auto"` selects it by BIC of the data fit |
 | `alpha` | float | `0.0` | extra `exp(-alpha*j)` down-weight on high orders, on top of the built-in `1/(2j+1)`; usually leave at 0 |
 | `filter_data` | bool | `True` | apply a Savitzky-Golay pre-filter to `y` |
 | `bounds` | list[(lo, hi)] \| None | `None` | per-parameter bounds; **when given, a global search (differential evolution) runs before local refinement** |
 | `p0` | array \| None | `None` | initial guess (defaults to ones) |
 | `oscillatory` | bool | `False` | apply the oscillatory recipe (smoothing off, order raised to resolve the cycle) |
 | `freq_param` | str \| None | `None` | name of the angular-frequency parameter; seeds it from the data's FFT peak and **implies `oscillatory=True`** |
+| `random_state` | int \| None | `0` | seed for the deterministic global / differential-evolution search; `None` uses the global RNG |
 
 **Notes**
 
+- Inputs are validated: `data_x`/`data_y` must be 1-D, equal-length, finite, and
+  carry enough samples, or a `ValueError` is raised.
 - The empirical spectrum is a Maclaurin-type fit, so LSI needs a **modest dynamic
   range** -- normalize a wide domain (e.g. to `[0, 1.5]`) and scale `y` to O(1)
   first.
@@ -68,8 +71,8 @@ print({k: round(v, 3) for k, v in res.params.items()})
 
 ```python
 fit_eac(data_x, data_y, expr, var, *,
-        active_ratio=0.8, n_windows=None, bounds=None,
-        loss="linear", f_scale=1.0, p0=None) -> FittingResult
+        active_ratio=0.8, n_windows=None, window_mode="uniform",
+        bounds=None, loss="linear", f_scale=1.0, p0=None) -> FittingResult
 ```
 
 Fit `expr` by matching **integral areas** of model and data over windows. The
@@ -83,7 +86,8 @@ transient/saturating shapes.
 | `data_x`, `data_y` | array | -- | observed samples |
 | `expr`, `var` | str | -- | model and main variable |
 | `active_ratio` | float | `0.8` | leading fraction of the data used for window placement. **Set to `1.0` for a saturating shape** whose asymptote lives in the tail (e.g. `arctan`), or `a` is biased |
-| `n_windows` | int \| None | `None` | number of area equations; defaults to `2 × n_params` (overdetermined, for noise averaging). Must be >= `n_params`; clamped so each window keeps >= 3 samples |
+| `n_windows` | int \| None | `None` | number of area equations; defaults to `2 x n_params` (overdetermined, for noise averaging). Must be >= `n_params`; clamped so each window keeps >= 3 samples |
+| `window_mode` | str | `"uniform"` | window placement: `"uniform"` (default, evenly spaced edges) or `"curvature"` (curvature-adaptive edges -- narrow where the signal bends, wide where it's smooth; best for localized transients/peaks and rational-saturating shapes) |
 | `bounds` | (lower, upper) \| None | `None` | parameter bounds (scipy `least_squares` form); switches to a trust-region solver |
 | `loss` | str | `"linear"` | least-squares loss; `"soft_l1"`/`"cauchy"`/`"huber"` for outlier robustness |
 | `f_scale` | float | `1.0` | soft margin of the robust `loss`: residuals below it stay quadratic, above it are down-weighted. **The robust loss acts on window-area residuals**, which are usually << 1, so the default `1.0` leaves a robust loss behaving like `"linear"` -- lower `f_scale` to a clean window's area-residual scale to actually engage it. Ignored when `loss="linear"` |
@@ -91,12 +95,14 @@ transient/saturating shapes.
 
 **Notes**
 
-- Needs at least `2 × n_params` samples.
+- Needs at least `2 x n_params` samples.
+- Inputs are validated: `data_x`/`data_y` must be 1-D, equal-length, finite, and
+  carry enough samples, or a `ValueError` is raised.
 - Returns a covariance when the system is overdetermined (the default).
 - Because the robust loss is applied to *integrated windows*, it can only
   down-weight whole contaminated windows -- give it **enough windows** that an
   outlier stays localized for the robustness to bite. See the worked discussion in
-  [notebook 02](Notebook-02-Fitting-Methods).
+  [example 02](Example-02-Fitting-Methods).
 
 **Example**
 
@@ -108,30 +114,22 @@ res = fit_eac(x, y, "a*atan(w*x)", "x",
 ---
 
 <a name="fit_eac_adaptive"></a>
-## `fit_eac_adaptive`
+## Curvature-adaptive windows (`fit_eac(..., window_mode="curvature")`)
+
+The former standalone `fit_eac_adaptive` is gone; its behavior is now the
+`window_mode="curvature"` path of [`fit_eac`](#fit_eac). Passing
+`window_mode="curvature"` places window edges by **curvature** -- narrow where the
+signal bends, wide where it's smooth -- so each window carries roughly equal
+information. It is the best estimator for localized transients/peaks and
+rational-saturating shapes (Michaelis-Menten / Hill / `arctan`).
 
 ```python
-fit_eac_adaptive(data_x, data_y, expr, var, *,
-                 n_windows=None, window_mode="curvature", p0=None) -> FittingResult
+res = fit_eac(data_x, data_y, expr, var,
+              n_windows=None, window_mode="curvature", p0=None)
 ```
 
-EAC variant that places window edges by **curvature** -- narrow where the signal
-bends, wide where it's smooth -- so each window carries roughly equal information.
-The best estimator for localized transients/peaks and rational-saturating shapes
-(Michaelis-Menten / Hill / `arctan`).
-
-**Arguments**
-
-| name | type | default | meaning |
-|---|---|---|---|
-| `data_x`, `data_y` | array | -- | observed samples |
-| `expr`, `var` | str | -- | model and main variable |
-| `n_windows` | int \| None | `None` | number of area windows (default `2 × n_params`) |
-| `window_mode` | str | `"curvature"` | `"curvature"` (curvature-adaptive edges) or `"equal"` (uniform edges, the `fit_eac` placement) |
-| `p0` | array \| None | `None` | initial guess (defaults to ones) |
-
-Uses the full data record (no `active_ratio` clipping), which is part of why it
-suits saturating tails. Returns a `FittingResult` with covariance.
+The default `window_mode="uniform"` reproduces the original evenly-spaced EAC
+placement. Returns a `FittingResult` with covariance.
 
 ---
 
@@ -260,7 +258,7 @@ spacing is read from `x[1] - x[0]`.
 
 ```python
 from dtfit import fft_frequency_seed
-w0 = fft_frequency_seed(x, y)   # ≈ angular frequency of the dominant cycle
+w0 = fft_frequency_seed(x, y)   # ~= angular frequency of the dominant cycle
 ```
 
 ---

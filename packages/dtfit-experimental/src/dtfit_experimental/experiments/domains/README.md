@@ -14,35 +14,42 @@ validity (does it recover the right answer?), applicability (does it cover the
 domain's real axes?) and usefulness (does the merge beat the obvious baseline /
 earn its complexity?).
 
-Each report has a **"Methods under test (dtfit)"** section explaining exactly
+Each notebook has a **"Methods under test (dtfit)"** section explaining exactly
 what each method does, a **"Baseline methods"** section listing the established
 domain-standard methods compared against, and includes **real-data** tests.
+
+Each domain is a self-contained folder with a `backend.py` (the compute — the
+single source of truth for its simulation/estimation/data) and a Jupyter
+notebook (the report: tables, figures, narrative) plus its `figures/`.
 
 ## Domains
 
 | domain | dtfit methods tested | compared against | data |
 |--------|----------------------|------------------|------|
-| [`forecasting/`](forecasting/report.md) | LSI, EAC, #2 Fourier-LSI, #5 boosting, auto-merged pipeline | random walk, seasonal-naïve, drift, poly-extrap, Holt-Winters ETS, Theta, (S)ARIMA, MLP, LSTM | 12 series × 2 horizons (structurally-correct model per series): 8 measured (COVID, USD/UAH, sunspots, CO₂, El Niño, Nile, ETTh1, weather) + **4 physics/signal waveforms** (RLC ring-down transient, AC + harmonics, AM carrier, linear chirp) |
-| [`parameter_estimation/`](parameter_estimation/report.md) | LSI, EAC, #6 adaptive-EAC, #3 ensemble, #4 joint, merged selector | SciPy NLLS (LM), robust NLLS (soft-L1), MLP, Gaussian process | 16 nonlinear model families + applicability map; noise & outlier sweeps; sparse/transient/short-record/multi-channel; real COVID & USD/UAH rate recovery |
-| [`big_data/`](big_data/report.md) | GEMM batch (`fit_lsi_batched`), fused streaming `PartitionedBatchLSI`, distributed `merge` (#1), streaming `EACFilter` | per-channel SciPy NLLS, vectorised polynomial `lstsq`, sklearn `SGDRegressor.partial_fit`, recursive least squares | 4 multi-channel panels + **real 321-channel** electricity; GB-scale memory wall, numerical stability, mergeability, online cost |
-| [`embedded_control/`](embedded_control/report.md) | `EACFilter`, `LSIFilter`, `FilterBank` + fused χ² detector, `inflate` | Extended Kalman Filter, Recursive Least Squares, constant-accel Kalman, sliding-window refit | 4 plant shapes + applicability map; robustness (noise/outliers/dropout); multi-axis fault detection; deployable footprint; **real USD/UAH** streaming |
+| [`forecasting/`](forecasting/forecasting.ipynb) | LSI, EAC, #2 Fourier-LSI, #5 boosting, auto-merged pipeline | random walk, seasonal-naïve, drift, poly-extrap, Holt-Winters ETS, Theta, (S)ARIMA, MLP, LSTM | 12 series × 2 horizons (structurally-correct model per series): 8 measured (COVID, USD/UAH, sunspots, CO₂, El Niño, Nile, ETTh1, weather) + **4 physics/signal waveforms** (RLC ring-down transient, AC + harmonics, AM carrier, linear chirp) |
+| [`parameter_estimation/`](parameter_estimation/parameter_estimation.ipynb) | LSI, EAC, #6 adaptive-EAC, #3 ensemble, #4 joint, merged selector | SciPy NLLS (LM), robust NLLS (soft-L1), MLP, Gaussian process | 16 nonlinear model families + applicability map; noise & outlier sweeps; sparse/transient/short-record/multi-channel; real COVID & USD/UAH rate recovery |
+| [`big_data/`](big_data/big_data.ipynb) | GEMM batch (`fit_lsi_batched`), fused streaming `PartitionedBatchLSI`, distributed `merge` (#1), streaming `EACFilter` | per-channel SciPy NLLS, vectorised polynomial `lstsq`, sklearn `SGDRegressor.partial_fit`, recursive least squares | 4 multi-channel panels + **real 321-channel** electricity; GB-scale memory wall, numerical stability, mergeability, online cost |
+| [`embedded_control/`](embedded_control/embedded_control.ipynb) | `EACFilter`, `LSIFilter`, `FilterBank` + fused χ² detector, `inflate` | Extended Kalman Filter, Recursive Least Squares, constant-accel Kalman, sliding-window refit | 4 plant shapes + applicability map; robustness (noise/outliers/dropout); multi-axis fault detection; deployable footprint; **real USD/UAH** streaming |
+| [`realtime_gps/`](realtime_gps/realtime_gps.ipynb) | streaming `LSIFilter`/`EACFilter` (external regressors), full-IMU strapdown fused inside LSI, fused NIS/CUSUM detector | constant-accel Kalman, gyro-aided coordinated-turn EKF | simulated 9-DOF rig (3-D maneuvering target, GPS fixes, 3-axis gyro + accelerometer) with dropouts & multipath glitches |
 
 ## Run
 
 ```bash
-pip install -e '.[bench]'              # matplotlib, torch, statsmodels, pandas
+pip install -e '.[bench]'              # matplotlib, torch, statsmodels, pandas, jupyter
 python build_native.py                 # build the GIL-released C kernels
 
-python -m experiments.domains.run_domains          # full run -> reports + DOMAINS.md
-python -m experiments.domains.run_domains --quick  # fast smoke run
+# open a notebook and re-run it interactively
+jupyter lab experiments/domains/forecasting/forecasting.ipynb
 
-python -m experiments.domains.forecasting.run      # a single domain (also: --quick)
+# or execute headless (writes outputs + figures in place)
+jupyter nbconvert --to notebook --execute --inplace \
+    experiments/domains/forecasting/forecasting.ipynb
 ```
 
-Reuses `experiments/common` (ReportWriter, metrics, baselines, plotting) and the
-real datasets in `experiments/data/`, so the reports are consistent with the
-experiment suite. The index and per-merge table are regenerated into
-[`DOMAINS.md`](DOMAINS.md) on every suite run.
+Each notebook carries a config block of knobs near the top (sized for a few-minute
+run by default; comments show how to scale up). The backends reuse
+`experiments/common` (metrics, baselines, datasets, plotting) and the real
+datasets in `experiments/data/`. [`DOMAINS.md`](DOMAINS.md) indexes the notebooks.
 
 ## Reporting tone
 

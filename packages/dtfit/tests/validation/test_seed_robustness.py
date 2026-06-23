@@ -59,6 +59,7 @@ def test_basin_stability_to_seed_perturbation(name, factor):
     x, y, _ = scn.make(0.02, seed=0)
     m = scn.model()
     p0, _ = m._seed_arrays(x, y)
+    assert p0 is not None  # the catalogue scenarios are all self-seeding
     perturbed = [v * factor for v in p0]
     names = ordered_params(scn)
     with warnings.catch_warnings():

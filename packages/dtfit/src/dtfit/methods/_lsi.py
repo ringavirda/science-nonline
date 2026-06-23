@@ -39,7 +39,7 @@ from scipy.signal import savgol_filter
 from dtfit.log import echo
 from dtfit._core._kernels import legendre_project
 from dtfit.types import FittingResult, InitialGuess
-from ._common import model_params, _covariance, information_criteria
+from ._common import model_params, _covariance, information_criteria, _validate_xy
 
 
 def fft_frequency_seed(x: np.ndarray, y: np.ndarray) -> float:
@@ -96,13 +96,14 @@ def fit_lsi(
     expr: str,
     var: str,
     *,
-    k_star: int | str = 5,
+    k_star: int | str | None = None,
     alpha: float = 0.0,
     filter_data: bool = True,
     bounds: list[tuple[float, float]] | None = None,
     p0: InitialGuess = None,
     oscillatory: bool = False,
     freq_param: str | None = None,
+    random_state: int | None = 0,
 ) -> FittingResult:
     """Fit ``expr`` to ``(data_x, data_y)`` using the integral least-squares
     criterion in the reconditioned (Legendre) differential-transformation scheme.
@@ -111,8 +112,11 @@ def fit_lsi(
         data_x, data_y: Observed samples.
         expr: Model expression, e.g. ``"a0 + a1*x + a2*exp(a3*x)"``.
         var: Main variable name in ``expr``.
-        k_star: Number of spectral coefficients (Legendre order) to match, or
-            ``"auto"`` to select it by BIC of the data fit.
+        k_star: Number of spectral coefficients (Legendre order) to match. An int
+            sets the order explicitly; ``"auto"`` selects it by BIC of the data
+            fit; ``None`` (default) uses order 5, or -- under the oscillatory
+            recipe -- an order high enough to resolve the dominant cycle
+            (:func:`_osc_order`).
         alpha: Extra exponential down-weight ``exp(-alpha*j)`` on high-order
             coefficients, on top of the built-in ``1/(2j+1)`` orthonormal weight.
             Defaults to 0 (the orthogonal basis already tames high orders).
@@ -123,14 +127,20 @@ def fit_lsi(
         oscillatory: Apply the **oscillatory recipe** validated across the
             forecasting and parameter-estimation domain studies: a smoothed,
             low-order spectral fit erases a cycle, so this forces
-            ``filter_data=False`` and -- unless ``k_star`` is given explicitly
-            (left at its default ``5``) -- raises the spectral order to resolve
-            the dominant cycle (:func:`_osc_order`). A sinusoid recovers to <1%
-            with this recipe versus ~50% without it.
+            ``filter_data=False`` and -- unless ``k_star`` is given explicitly --
+            raises the spectral order to resolve the dominant cycle
+            (:func:`_osc_order`). A sinusoid recovers to <1% with this recipe
+            versus ~50% without it. Passing ``freq_param`` implies this recipe;
+            pass ``oscillatory=True`` to enable it without naming a frequency
+            parameter.
         freq_param: Name of the model's **angular-frequency** parameter. When
             given, its initial guess is seeded from the data's FFT peak
             (:func:`fft_frequency_seed`) -- the seed the local (no-bounds) solve
             needs to lock onto the right cycle. Implies the oscillatory recipe.
+        random_state: Seed for the global (differential-evolution) search used on
+            the bounded path, for reproducibility; ``None`` draws from NumPy's
+            global RNG (non-deterministic). Defaults to ``0`` (deterministic). Has
+            no effect on the unbounded local solve, which is already deterministic.
 
     Returns:
         FittingResult with the fitted coefficients, callable model and a
@@ -142,15 +152,15 @@ def fit_lsi(
     if not params:
         raise RuntimeError("Model expression has no free parameters to fit.")
 
-    x = np.asarray(data_x, dtype=float)
-    y = np.asarray(data_y, dtype=float)
+    x, y = _validate_xy(data_x, data_y)
 
     oscillatory = oscillatory or freq_param is not None
     if oscillatory:
         # The cycle lives in the high-order spectrum and is destroyed by
-        # smoothing; force the recipe (raise order only if k_star is default).
+        # smoothing; force the recipe (raise the order only when the caller left
+        # it unset, i.e. ``k_star is None``).
         filter_data = False
-        if k_star == 5:
+        if k_star is None:
             k_star = _osc_order(x, y)
 
     # 1. Optional smoothing to tame noise before the spectral projection.
@@ -159,7 +169,12 @@ def fit_lsi(
         if window > 3:
             y = np.asarray(savgol_filter(y, window, polyorder=3), dtype=float)
 
-    order = _auto_order(x, y) if k_star == "auto" else int(k_star)
+    if k_star is None:
+        order = 5  # the conditioned default Legendre order
+    elif k_star == "auto":
+        order = _auto_order(x, y)
+    else:
+        order = int(k_star)
     # The spectral residual has order+1 entries and must carry at least as many
     # equations as parameters, or the least-squares is underdetermined and LM
     # raises. Floor the order at n_params-1 so every catalogue model is solvable
@@ -245,7 +260,7 @@ def fit_lsi(
             # cast: `seed` is the portable arg across scipy versions (newer stubs
             # only expose its `rng` successor).
             res_g = cast(Any, differential_evolution)(
-                cost, bounds, strategy="best1bin", popsize=15, seed=0
+                cost, bounds, strategy="best1bin", popsize=15, seed=random_state
             )
             res = minimize(cost, res_g.x, method="L-BFGS-B", bounds=bounds)
             coeffs = np.asarray(res.x, dtype=np.float64)

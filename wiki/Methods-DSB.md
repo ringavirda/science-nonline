@@ -104,7 +104,7 @@ overdetermined; DSB then solves the leading $m$ equations symbolically and
 
 ## Worked example
 
-`y = a0 + a1.x + a2.exp(a3.x)` on `x∈[0,3]` with 5 % noise -- DSB's intended
+`y = a0 + a1.x + a2.exp(a3.x)` on `xin[0,3]` with 5 % noise -- DSB's intended
 **additive** form (one term per discrete branch). It produces a faithful curve
 fit (R^2 ~= 0.95); the residual structure at large `x` shows where a single
 exponential term cannot bend enough to follow the data.

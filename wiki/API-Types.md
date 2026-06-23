@@ -22,17 +22,17 @@ around.
 FittingResult(coeffs, cov=None, expr=None, var=None, names=(), model=None)
 ```
 
-You rarely construct one yourself; the fitters return it. (The `scale` fitters
-return the lighter [`BatchFittingResult`](API-Scaling#batchfittingresult), which has
-the same `model`/`predict` but drops the uncertainty methods so it stays
-picklable across a process pool.)
+You rarely construct one yourself; the fitters return it. `FittingResult` is
+picklable, so it survives a process-pool round trip; the `scale` fitters return it
+too. [`BatchFittingResult`](API-Scaling#batchfittingresult) is now a **deprecated
+back-compat alias** of `FittingResult`, kept for compatibility.
 
 ## Attributes
 
 | attribute | type | meaning |
 |---|---|---|
 | `coeffs` | ndarray | fitted coefficients, ordered by sorted parameter name |
-| `cov` | ndarray \| None | parameter covariance (`n×n`) when the method produced one from an overdetermined system; else `None`. Diagonal square-roots are the standard errors |
+| `cov` | ndarray \| None | parameter covariance (`nxn`) when the method produced one from an overdetermined system; else `None`. Diagonal square-roots are the standard errors |
 | `expr` | str \| None | the model expression (enables serialization & error bands) |
 | `var` | str \| None | the main variable name |
 | `names` | tuple[str] | parameter names aligned with `coeffs` |
@@ -60,7 +60,7 @@ uncertain parameters and narrow where it isn't. This needs both `cov` and `expr`
 
 ```python
 y_hat = res.predict(x)
-y_hat, sigma = res.predict(x, return_std=True)   # 1σ band from parameter covariance
+y_hat, sigma = res.predict(x, return_std=True)   # 1sigma band from parameter covariance
 ```
 
 ### `stderr() -> dict[str, float]`
@@ -71,7 +71,7 @@ Per-parameter standard errors (sqrt of the covariance diagonal). Raises if `cov`
 Per-parameter confidence intervals (normal approximation) at the given level.
 
 ### `summary() -> str`
-A short human-readable text summary -- parameters `±` standard errors when a
+A short human-readable text summary -- parameters `+/-` standard errors when a
 covariance is available.
 
 ```python

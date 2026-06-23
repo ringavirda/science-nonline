@@ -10,6 +10,9 @@ without touching the hand-edited pages:
   * the ``dtfit-experimental`` experiment and  per-case / per-domain reports
     domain reports
 
+  * ``packages/dtfit/examples/*.py``          the runnable example scripts
+    (rendered to guide pages, docstring + source)
+
 It also refreshes the ``_Sidebar`` and ``_Footer`` and copies every referenced
 figure. A companion workflow (``.github/workflows/wiki.yml``) pushes ``wiki/`` to
 the wiki git repo. (This script was also the one-time bootstrap that produced the
@@ -31,8 +34,6 @@ Run from anywhere::
 
     python scripts/build_wiki.py                  # refresh generated pages in wiki/
     python scripts/build_wiki.py --out build/wiki # write somewhere else
-
-Requires ``nbconvert`` for the notebooks (``pip install nbconvert``).
 """
 
 from __future__ import annotations
@@ -47,8 +48,9 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 DOCS = REPO / "docs"
 EXP = REPO / "packages/dtfit-experimental/src/dtfit_experimental/experiments"
+EXAMPLES = REPO / "packages/dtfit/examples"
 
-GH_REPO = "ringavirda/science-nonline"
+GH_REPO = "ringavirda/science-pylab"
 GH_BLOB = f"https://github.com/{GH_REPO}/blob/main/"
 
 # Words that should be fully upper-cased in generated page titles.
@@ -114,11 +116,10 @@ def _build_page_map() -> dict[str, str]:
             else:
                 m[r] = f"{title}-{_title(p.stem)}"
 
-    # notebooks
-    nb_dir = DOCS / "guides/notebooks"
-    m[rel(nb_dir / "README.md")] = "Notebooks"
-    for p in sorted(nb_dir.glob("*.ipynb")):
-        m[rel(p)] = f"Notebook-{_title(p.stem)}"
+    # examples (runnable scripts -> rendered guide pages)
+    m[rel(EXAMPLES / "README.md")] = "Examples"
+    for p in sorted(EXAMPLES.glob("*.py")):
+        m[rel(p)] = f"Example-{_title(p.stem)}"
 
     # ---- experiments -----------------------------------------------------
     m[rel(EXP / "README.md")] = "Experiments"
@@ -353,45 +354,32 @@ def _figure_dest(rp: str, figures: dict[str, Path]) -> str:
 
 
 # --------------------------------------------------------------------------- #
-# Notebooks
+# Examples
 # --------------------------------------------------------------------------- #
-def convert_notebook(nb_path: Path, page: str, out_dir: Path,
-                     figures: dict[str, Path], unknown: set[str],
-                     page_map: dict[str, str]) -> None:
-    """Convert one executed notebook to a markdown wiki page (with plots)."""
-    from nbconvert import MarkdownExporter
-    import nbformat
+def render_example(path: Path, page: str, out_dir: Path, unknown: set[str]) -> None:
+    """Render a runnable example script as a markdown guide page.
 
-    nb = nbformat.read(nb_path, as_version=4)
-    exporter = MarkdownExporter()
-    body, resources = exporter.from_notebook_node(nb)
+    The module docstring becomes the page intro; the rest of the source is
+    embedded verbatim in a ``python`` code fence with a link to the file on
+    GitHub. Examples are authored ASCII-only, so ``to_ascii`` is a safety net.
+    """
+    src = path.read_text(encoding="utf-8")
+    mo = re.match(r'\s*(?:"""(.*?)"""|\'\'\'(.*?)\'\'\')', src, re.DOTALL)
+    if mo:
+        doc = (mo.group(1) or mo.group(2) or "").strip()
+        body_src = src[mo.end():].lstrip("\n")
+    else:
+        doc, body_src = "", src
+    rel = path.relative_to(REPO).as_posix()
+    title = page.replace("Example-", "").replace("-", " ")
 
-    # Persist extracted output images (plots) under figures/, prefixed by page.
-    name_remap: dict[str, str] = {}
-    for fname, data in resources.get("outputs", {}).items():
-        dest = f"{page}-{fname}"
-        (out_dir / "figures" / dest).write_bytes(data)
-        name_remap[fname] = f"figures/{dest}"
-
-    # Protect the output-image links so rewrite_links / to_ascii leave them
-    # alone (they point into the wiki, not the repo), then restore at the end.
-    stash: dict[str, str] = {}
-
-    def _protect(mo: re.Match) -> str:
-        alt, src = mo.group(1), mo.group(2)
-        if src in name_remap:
-            token = f"@@NBIMG{len(stash)}@@"
-            stash[token] = f"![{alt}]({name_remap[src]})"
-            return token
-        return mo.group(0)
-
-    body = re.sub(r"!\[([^\]]*)\]\(([^)]+)\)", _protect, body)
-    body = rewrite_links(body, nb_path.relative_to(REPO).as_posix(),
-                         page_map, figures)
-    body = to_ascii(body, unknown)
-    for token, val in stash.items():
-        body = body.replace(token, val)
-    (out_dir / f"{page}.md").write_text(body.rstrip() + "\n", encoding="utf-8")
+    parts = [f"# Example {title}", ""]
+    if doc:
+        parts += [doc, ""]
+    parts += [f"Source: [`{rel}`]({GH_BLOB}{rel})", "", "```python",
+              body_src.rstrip(), "```"]
+    text = to_ascii("\n".join(parts), unknown)
+    (out_dir / f"{page}.md").write_text(text.rstrip() + "\n", encoding="utf-8")
 
 
 # --------------------------------------------------------------------------- #
@@ -406,15 +394,15 @@ def make_sidebar() -> str:
             ("Lineage & variants", "Guides-Lineage-and-Variants"),
             ("Choosing a method", "Guides-Choosing-a-Method"),
         ]),
-        ("Notebooks", [
-            ("Overview", "Notebooks"),
-            ("01 Quickstart", "Notebook-01-Quickstart"),
-            ("02 Fitting methods", "Notebook-02-Fitting-Methods"),
-            ("03 Models & auto", "Notebook-03-Models-and-Auto"),
-            ("04 sklearn estimator", "Notebook-04-Sklearn-Estimator"),
-            ("05 Streaming", "Notebook-05-Streaming"),
-            ("06 Scaling", "Notebook-06-Scaling"),
-            ("07 Diagnostics", "Notebook-07-Diagnostics"),
+        ("Examples", [
+            ("Overview", "Examples"),
+            ("01 Quickstart", "Example-01-Quickstart"),
+            ("02 Fitting methods", "Example-02-Fitting-Methods"),
+            ("03 Models & auto", "Example-03-Models-and-Auto"),
+            ("04 sklearn estimator", "Example-04-Sklearn-Estimator"),
+            ("05 Streaming", "Example-05-Streaming"),
+            ("06 Scaling", "Example-06-Scaling"),
+            ("07 Diagnostics", "Example-07-Diagnostics"),
         ]),
         ("API reference", [
             ("Overview", "API"),
@@ -502,11 +490,10 @@ def main(argv: list[str]) -> int:
         text = to_ascii(text, unknown)
         (out_dir / f"{page}.md").write_text(text.rstrip() + "\n", encoding="utf-8")
 
-    # Notebooks.
-    nb_dir = DOCS / "guides/notebooks"
-    for nb in sorted(nb_dir.glob("*.ipynb")):
-        page = f"Notebook-{_title(nb.stem)}"
-        convert_notebook(nb, page, out_dir, figures, unknown, page_map)
+    # Examples (rendered from the runnable scripts).
+    for ex in sorted(EXAMPLES.glob("*.py")):
+        page = f"Example-{_title(ex.stem)}"
+        render_example(ex, page, out_dir, unknown)
 
     # Copy referenced figures.
     for dest, src in figures.items():

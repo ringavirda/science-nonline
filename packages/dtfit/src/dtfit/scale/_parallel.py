@@ -11,10 +11,11 @@ Two backends, both useful:
 
 * ``backend="loky"`` (default) -- separate worker **processes**, true parallelism
   unaffected by the GIL. Problems carry the model as a SymPy **expression
-  string** (picklable); workers rebuild and lambdify it, and return the
-  lightweight :class:`BatchFittingResult` (coefficients + covariance, never a
-  lambdified callable), so nothing unpicklable crosses the process boundary --
-  this matters on Windows, where workers are spawned, not forked.
+  string** (picklable); workers rebuild and lambdify it, and return a
+  :class:`dtfit.FittingResult` that drops its lambdified callable on pickling
+  (rebuilt lazily on the caller side), so nothing unpicklable crosses the
+  process boundary -- this matters on Windows, where workers are spawned, not
+  forked.
 * ``backend="threading"`` -- worker **threads** sharing memory. The compiled
   numeric kernels (``dtfit._native``) release the GIL on their hot loops, so the
   integral/projection work runs concurrently without process or pickling
@@ -34,6 +35,12 @@ from joblib import Parallel, delayed
 
 from dtfit.methods import fit_lsi, fit_eac
 from dtfit.types import FittingResult
+
+# ``FittingResult`` is itself picklable (it drops its lazily-built callable on
+# pickling and rebuilds it from ``expr``/``coeffs`` on first access), so it
+# doubles as the batch result -- there is no separate lightweight type. The name
+# is kept as an alias for back-compatibility.
+BatchFittingResult = FittingResult
 
 __all__ = ["FittingProblem", "BatchFittingResult", "fit_many"]
 
@@ -65,58 +72,17 @@ class FittingProblem:
     label: Any = None
 
 
-@dataclass
-class BatchFittingResult:
-    """Lightweight, picklable fit result.
-
-    Carries only the numbers needed to reconstruct the model (so it survives a
-    process-pool round trip). The lambdified callable is rebuilt lazily on first
-    access to :attr:`model`.
-    """
-
-    coeffs: np.ndarray
-    expr: str
-    var: str
-    cov: np.ndarray | None = None
-    label: Any = None
-    error: str | None = None  # set instead of coeffs when the fit raised
-    _model: Callable[..., Any] | None = field(
-        default=None, repr=False, compare=False
-    )
-
-    @property
-    def model(self) -> Callable[..., Any]:
-        """Rebuild and cache the fitted model ``f(x)`` from ``expr``/``coeffs``."""
-        if self._model is None:
-            import sympy as sp
-
-            from dtfit.methods._common import model_params
-
-            t = sp.Symbol(self.var)
-            f_sym = cast("sp.Expr", sp.sympify(self.expr))
-            params = model_params(f_sym, t)
-            subs = list(zip(params, self.coeffs))
-            self._model = sp.lambdify(t, f_sym.subs(subs), "numpy")
-        assert self._model is not None
-        return self._model
-
-    def predict(self, x: np.ndarray) -> np.ndarray:
-        """Evaluate the fitted model on ``x`` (broadcasting scalars)."""
-        v = self.model(np.asarray(x, dtype=float))
-        if np.ndim(v) == 0:
-            v = np.full(np.shape(x), float(v))
-        return np.asarray(v, dtype=float)
-
-
-def _fit_one(problem: FittingProblem) -> BatchFittingResult:
+def _fit_one(problem: FittingProblem) -> FittingResult:
     """Worker entry point: fit a single problem, returning a picklable result.
 
     Module-level so it is importable in spawned worker processes. A failed fit
-    is captured as ``error`` rather than crashing the whole batch.
+    is captured as ``error`` rather than crashing the whole batch. The returned
+    :class:`FittingResult` carries the problem ``label`` and rebuilds its model
+    lazily on the caller side (nothing unpicklable crosses the boundary).
     """
     fitter = _FITTERS.get(problem.method)
     if fitter is None:
-        return BatchFittingResult(
+        return FittingResult(
             coeffs=np.array([]), expr=problem.expr, var=problem.var,
             label=problem.label,
             error=f"unknown method {problem.method!r} (use 'lsi' or 'eac')",
@@ -129,15 +95,10 @@ def _fit_one(problem: FittingProblem) -> BatchFittingResult:
             problem.var,
             **problem.kwargs,
         )
-        return BatchFittingResult(
-            coeffs=np.asarray(res.coeffs, dtype=float),
-            expr=problem.expr,
-            var=problem.var,
-            cov=res.cov,
-            label=problem.label,
-        )
+        res.label = problem.label
+        return res
     except Exception as exc:  # keep the batch alive; report per-problem
-        return BatchFittingResult(
+        return FittingResult(
             coeffs=np.array([]), expr=problem.expr, var=problem.var,
             label=problem.label, error=f"{type(exc).__name__}: {exc}",
         )
@@ -149,7 +110,7 @@ def fit_many(
     n_jobs: int = -1,
     backend: str = "loky",
     verbose: int = 0,
-) -> list[BatchFittingResult]:
+) -> list[FittingResult]:
     """Fit many independent problems in parallel.
 
     Args:
@@ -160,8 +121,9 @@ def fit_many(
         verbose: Forwarded to :class:`joblib.Parallel` (progress chatter).
 
     Returns:
-        Results in input order. A problem that failed has ``error`` set and an
-        empty ``coeffs`` rather than aborting the batch.
+        A :class:`dtfit.FittingResult` per problem, in input order, each tagged
+        with the problem's ``label``. A problem that failed has ``error`` set and
+        an empty ``coeffs`` rather than aborting the batch.
     """
     problems = list(problems)
     if not problems:
@@ -171,4 +133,4 @@ def fit_many(
     results = Parallel(n_jobs=n_jobs, backend=backend, verbose=verbose)(
         delayed(_fit_one)(p) for p in problems
     )
-    return cast("list[BatchFittingResult]", list(results))
+    return cast("list[FittingResult]", list(results))

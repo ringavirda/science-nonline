@@ -64,7 +64,7 @@ white-noise residuals; leftover autocorrelation means the model *class* is wrong
 (e.g. a trend fit to a seasonal series).
 
 **Returns:** `residuals` (the array), `durbin_watson`, `lag1_autocorr`,
-`normality_p` (Shapiro-Wilk p-value, for `3 ≤ n ≤ 5000`), `mean`, `std`.
+`normality_p` (Shapiro-Wilk p-value, for `3 <= n <= 5000`), `mean`, `std`.
 
 ```python
 d = residual_diagnostics(res, x, y)

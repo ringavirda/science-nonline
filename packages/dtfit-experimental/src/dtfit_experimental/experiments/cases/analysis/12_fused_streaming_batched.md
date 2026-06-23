@@ -13,7 +13,7 @@ Source: [`../../src/dtfit/adaptations/partitioned.py`](../../src/dtfit/adaptatio
 (`PartitionedBatchLSI`), built on the new
 [`_spectral.py`](../../src/dtfit/adaptations/_spectral.py) primitive
 `Basis.project_integral_batched` (raw additive integrals).
-Tested in: [Fused multi-channel big data (10)](../10_fused_partitioned_batched/report.md).
+Tested in: [Fused multi-channel big data (10)](../10_fused_partitioned_batched/10_fused_partitioned_batched.ipynb).
 Extends [#1 map-reduce](01_map_reduce_partitioned.md) and the
 [GEMM-batched projection](10_gemm_batched_projection.md).
 

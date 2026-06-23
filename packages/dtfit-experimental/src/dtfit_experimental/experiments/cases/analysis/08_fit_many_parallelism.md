@@ -6,8 +6,8 @@ spawn + pickle + per-fit setup costs dwarf the work. It pays off only for
 coarse/heavy tasks or via the threading backend on GIL-released kernels.
 
 Source: [`../../src/dtfit/parallel.py`](../../src/dtfit/parallel.py).
-Tested in: [Parallel scaling (7)](../07_parallel_scaling/report.md),
-used as orchestration in [Noise (3)](../03_noise_robustness/report.md).
+Tested in: [Parallel scaling (7)](../07_parallel_scaling/07_parallel_scaling.ipynb),
+used as orchestration in [Noise (3)](../03_noise_robustness/03_noise_robustness.ipynb).
 
 ## What it is
 

@@ -497,7 +497,8 @@ def fig_eac_adaptive() -> None:
     L_t, k_t, x0_t = 1.0, 2.5, 5.0
     clean = L_t / (1.0 + np.exp(-k_t * (x - x0_t)))   # sharp step at x0=5
     y = clean + rng.normal(0, 0.02, x.size)
-    res = dt.fit_eac_adaptive(x, y, "L/(1 + exp(-k*(x - x0)))", "x", p0=[1.0, 1.0, 5.0])
+    res = dt.fit_eac(x, y, "L/(1 + exp(-k*(x - x0)))", "x", window_mode="curvature",
+                     p0=[1.0, 1.0, 5.0])
     yhat = np.asarray(res.model(x))
     m = 6
 

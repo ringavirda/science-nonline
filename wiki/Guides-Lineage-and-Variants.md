@@ -36,7 +36,7 @@ rewritten as **numeric** methods for production, and finally extended to a
    SYMBOLIC ERA (analytical, exact, fragile)                  (kept only as reference)
         |                                                             |
    +----+-----+---------------+                                       |
-  DSB        DSBI            DSBE  ◄--- the three original              |
+  DSB        DSBI            DSBE  <--- the three original              |
  (balance)  (integral)     (equal areas)   "differential spectra        |
         |        |               |          balance" formulations       |
         |        |               |                                      |
@@ -127,7 +127,7 @@ In short, the original LSI spent effort *fighting* a bad basis; the current LSI
 
 ### EAC -- from exactly-determined to overdetermined to adaptive
 
-| | original EAC (~= DSBE) | current EAC | adaptive EAC |
+| | original EAC (~= DSBE) | current EAC (uniform) | curvature EAC |
 |---|---|---|---|
 | **Windows** | exactly $m$ (one per parameter) | $2m$ by default (**overdetermined**) | $2m$, but **placed by curvature** |
 | **Noise** | no redundancy -> throws away the averaging that integration buys | extra equations average out per-window noise (~15% lower variance) | windows concentrate where the signal bends (most information) |
@@ -135,8 +135,9 @@ In short, the original LSI spent effort *fighting* a bad basis; the current LSI
 | **Jacobian** | -- | analytic **integrated** Jacobian (exact, smooth) | same |
 | **Best for** | -- | transients, saturating shapes, few params | peaks & rational-saturating rises (Michaelis-Menten, Hill, `arctan`) |
 
-The three EAC generations are all shipped: `fit_eac` (equal, overdetermined
-windows) and `fit_eac_adaptive` (curvature windows). Details:
+All three EAC generations ship in one function: `fit_eac` defaults to equal,
+overdetermined windows (`window_mode="uniform"`), and the curvature-placed
+variant is the `window_mode="curvature"` option of the same call. Details:
 [../methods/eac.md](Methods-EAC).
 
 ---
@@ -156,7 +157,7 @@ the complete list across the stable API.
 | **EAC (default)** | `fit_eac(...)` | overdetermined equal-areas, most robust/fastest |
 | **EAC, robust loss** | `fit_eac(..., loss="soft_l1", f_scale=...)` | down-weights outlier-contaminated windows |
 | **EAC, bounded** | `fit_eac(..., bounds=...)` | constrained trust-region fit |
-| **Adaptive EAC** | `fit_eac_adaptive(...)` | curvature-placed windows for peaks/saturating shapes |
+| **Curvature EAC** | `fit_eac(..., window_mode="curvature")` | curvature-placed windows for peaks/saturating shapes |
 | **Ensemble** | `ensemble_fit(...)` | overlapping-window median + spread -- outlier-robust, no `f_scale` tuning |
 | **DSB** | `fit_dsb(...)` | symbolic exact balance (reference only) |
 | **EACFilter** | `EACFilter(...)` | streaming EAC (area measurement) |
@@ -187,8 +188,8 @@ kept experimental until it proves itself. Here is the complete list with status.
 | # | adaptation | now in `dtfit` as | what it is & how it works |
 |---|---|---|---|
 | **#1** | one-pass / distributed map-reduce | `PartitionedLSI`, `PartitionedEAC` | the empirical fingerprint is **additive over the domain** (a sum of per-chunk integrals), so a dataset too big for memory is reduced chunk-by-chunk in one pass, and distributed workers' partial sums `merge()` exactly. -> [../api/scaling.md](API-Scaling) |
-| **--** | GEMM-batched projection | `fit_lsi_batched`, `project_spectra`, `PartitionedBatchLSI` | the fingerprint is **linear across channels**, so `B` channels' spectra are one matrix multiply `Dᵀ.(w⊙Y)` -- runnable on CPU/GPU by swapping only *where the arrays live*. -> [../api/scaling.md](API-Scaling) |
-| **#6** | curvature-adaptive windows | `fit_eac_adaptive` | place EAC's windows by cumulative curvature -- narrow where the signal bends -- so each window carries equal information. Best for peaks/saturating shapes. -> [../api/fitting.md#fit_eac_adaptive](API-Fitting#fit_eac_adaptive) |
+| **--** | GEMM-batched projection | `fit_lsi_batched`, `PartitionedBatchLSI` (low-level `dtfit.scale.project_spectra`) | the fingerprint is **linear across channels**, so `B` channels' spectra are one matrix multiply `D^T.(w*Y)` -- runnable on CPU/GPU by swapping only *where the arrays live*. -> [../api/scaling.md](API-Scaling) |
+| **#6** | curvature-adaptive windows | `fit_eac(..., window_mode="curvature")` | place EAC's windows by cumulative curvature -- narrow where the signal bends -- so each window carries equal information. Best for peaks/saturating shapes. -> [../api/fitting.md#fit_eac](API-Fitting#fit_eac) |
 | **--** | LSI oscillatory recipe | `fit_lsi(oscillatory=..., freq_param=...)`, `fft_frequency_seed` | smoothing off + high order + FFT-seeded frequency, so a cycle isn't erased. -> [../api/fitting.md#fit_lsi](API-Fitting#fit_lsi) |
 | **--** | fused multi-axis detection | `FusedChiSquareDetector` | pool a filter bank's per-stream innovations into one `chi2(K)` statistic to catch a fault too weak in any single stream. -> [../api/streaming.md#fused](API-Streaming#fused) |
 | **#3** | overlapping-window ensemble | `ensemble_fit`, `EnsembleResult` | fit on many overlapping sub-windows and take the **median** of the per-window estimates -- bagging over time; rejects outlier windows and yields a spread. Outlier-robust without `f_scale` tuning. -> [../methods/ensemble.md](Methods-Ensemble) |
@@ -222,7 +223,7 @@ adaptation is measured against are in
 
 ```
 dtfit (stable, public)
-+-- batch fitting          fit_lsi . fit_eac . fit_eac_adaptive . fit_dsb . ensemble_fit
++-- batch fitting          fit_lsi . fit_eac (window_mode=uniform|curvature) . fit_dsb . ensemble_fit
 |   support                find_degree . fft_frequency_seed
 +-- result type            FittingResult
 +-- sklearn estimator      NonlineRegressor
@@ -230,7 +231,7 @@ dtfit (stable, public)
 +-- model framework        models.<family> . Model . suggest_models
 +-- streaming / online     EACFilter . LSIFilter . FilterBank . FusedChiSquareDetector
 +-- scaling backends       fit_many . Partitioned{LSI,EAC,BatchLSI}
-|                          fit_lsi_batched . project_spectra
+|                          fit_lsi_batched   (dtfit.scale.project_spectra low-level)
 +-- diagnostics            fit_report . residual_diagnostics . FitDisplay . ResidualsDisplay
 
 dtfit-experimental (separate; promotes into dtfit when validated)

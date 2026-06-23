@@ -1,5 +1,11 @@
 # dtfit
 
+[![CI](https://github.com/ringavirda/science-pylab/actions/workflows/ci.yml/badge.svg)](https://github.com/ringavirda/science-pylab/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://github.com/ringavirda/science-pylab)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Typed](https://img.shields.io/badge/typed-yes-brightgreen)](https://peps.python.org/pep-0561/)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+
 **D**ifferential-**t**ransformation **fit**ting: nonlinear smoothing and
 forecasting on time-series / Big Data, using methods built in the scheme of
 differential (non-Taylor) transformations. Developed as part of a PhD

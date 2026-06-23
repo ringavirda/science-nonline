@@ -6,8 +6,10 @@ suite asks a different question: **for each real application domain, what is the
 best combination of the methods, and does the merged pipeline actually work in a
 realistic setting?**
 
-Four domains, each its own folder with a ``run.py`` (-> ``report.md`` +
-``figures/``):
+Each domain is its own folder holding a ``backend.py`` (the single source of
+truth for its simulation / estimation / data infra) and a Jupyter notebook that
+imports it and produces the report (tables, figures, narrative) into
+``figures/``:
 
 * ``forecasting`` -- structured fit-then-extrapolate, merging the trend (LSI) and
   seasonal (Fourier-basis / boosting) levers into one auto-composed forecaster.
@@ -20,9 +22,12 @@ Four domains, each its own folder with a ``run.py`` (-> ``report.md`` +
 * ``embedded_control`` -- real-time online identification, merging the streaming
   filters, the multi-stream ``FilterBank`` and the fused drift detector, with the
   deployable embedded-footprint accounting, against a Kalman baseline.
+* ``realtime_gps`` -- streaming LSI/EAC (with external regressors) and a full-IMU
+  strapdown fused inside the LSI filter, vs a constant-accel Kalman and a
+  gyro-aided coordinated-turn EKF, on a simulated 9-DOF rig.
 
-Driven by ``python -m experiments.domains.run_domains [--quick]`` which also
-regenerates ``experiments/domains/DOMAINS.md``. Reuses ``experiments/common``
-(ReportWriter, metrics, baselines, plotting) so the reports are consistent with
-the case experiments in ``experiments/cases``.
+Open and run a notebook directly (``jupyter lab forecasting/forecasting.ipynb``)
+or headless via ``jupyter nbconvert --execute``. ``DOMAINS.md`` indexes them.
+Reuses ``experiments/common`` (metrics, baselines, datasets, plotting) so the
+backends are consistent with the case experiments in ``experiments/cases``.
 """

@@ -6,8 +6,8 @@ parsimony and enforced consistency*, not accuracy. The case where it *should*
 help (genuinely weak per-channel data) was not cleanly demonstrated.
 
 Source: [`../../src/dtfit/adaptations/joint.py`](../../src/dtfit/adaptations/joint.py).
-Tested in: [Control MIMO (1)](../01_control_systems/report.md),
-[GPS (5)](../05_gps_trajectory/report.md) (intended retest — inconclusive, see caveat).
+Tested in: [Control MIMO (1)](../01_control_systems/01_control_systems.ipynb),
+[GPS (5)](../05_gps_trajectory/05_gps_trajectory.ipynb) (intended retest — inconclusive, see caveat).
 
 ## What it is
 
@@ -86,6 +86,6 @@ mixed-effects regime where pooling is provably more efficient.
 ## Related
 
 - The clean per-channel result it was measured against is in the
-  [control report](../01_control_systems/report.md).
+  [control report](../01_control_systems/01_control_systems.ipynb).
 - Its intended weak-data retest depends on fixing the GPS `nan`
   ([09_streaming_filters.md](09_streaming_filters.md)).

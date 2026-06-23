@@ -5,7 +5,7 @@ aggregation breaks down once many windows are corrupted, and plain **LSI is both
 simpler and more robust**. Does not clear the promotion gate.
 
 Source: [`../../src/dtfit/adaptations/ensemble.py`](../../src/dtfit/adaptations/ensemble.py).
-Tested in: [Noise & robustness (3)](../03_noise_robustness/report.md).
+Tested in: [Noise & robustness (3)](../03_noise_robustness/03_noise_robustness.ipynb).
 
 ## What it is
 
@@ -80,4 +80,4 @@ outliers), which is the worst case for any voting/median scheme.
 ## Related
 
 - The reliable robustness route is LSI's built-in prefilter — see the
-  [noise report](../03_noise_robustness/report.md) "Reading it".
+  [noise report](../03_noise_robustness/03_noise_robustness.ipynb) "Reading it".

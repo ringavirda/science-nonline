@@ -11,16 +11,16 @@
 - [Lineage & variants](Guides-Lineage-and-Variants)
 - [Choosing a method](Guides-Choosing-a-Method)
 
-**Notebooks**
+**Examples**
 
-- [Overview](Notebooks)
-- [01 Quickstart](Notebook-01-Quickstart)
-- [02 Fitting methods](Notebook-02-Fitting-Methods)
-- [03 Models & auto](Notebook-03-Models-and-Auto)
-- [04 sklearn estimator](Notebook-04-Sklearn-Estimator)
-- [05 Streaming](Notebook-05-Streaming)
-- [06 Scaling](Notebook-06-Scaling)
-- [07 Diagnostics](Notebook-07-Diagnostics)
+- [Overview](Examples)
+- [01 Quickstart](Example-01-Quickstart)
+- [02 Fitting methods](Example-02-Fitting-Methods)
+- [03 Models & auto](Example-03-Models-and-Auto)
+- [04 sklearn estimator](Example-04-Sklearn-Estimator)
+- [05 Streaming](Example-05-Streaming)
+- [06 Scaling](Example-06-Scaling)
+- [07 Diagnostics](Example-07-Diagnostics)
 
 **API reference**
 

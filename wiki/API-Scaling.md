@@ -7,7 +7,7 @@ Pick by your situation ([../guides/choosing-a-method.md Sec.3](Guides-Choosing-a
 | situation | tool |
 |---|---|
 | many **independent** fits | [`fit_many`](#fit_many) |
-| many **channels on a shared grid** | [`fit_lsi_batched`](#fit_lsi_batched) / [`project_spectra`](#project_spectra) |
+| many **channels on a shared grid** | [`fit_lsi_batched`](#fit_lsi_batched) / [`project_spectra`](#project_spectra) (in `dtfit.scale`) |
 | a dataset **too big for memory**, one pass | [`PartitionedLSI`](#partitioned) / [`PartitionedEAC`](#partitioned) |
 | **distributed** workers, then combine | the same accumulators via `.merge()` |
 | many channels **and** streaming | [`PartitionedBatchLSI`](#partitionedbatch) |
@@ -21,7 +21,7 @@ The online (one-sample-at-a-time) counterparts are in
 ## `fit_many`
 
 ```python
-fit_many(problems, *, n_jobs=-1, backend="loky", verbose=0) -> list[BatchFittingResult]
+fit_many(problems, *, n_jobs=-1, backend="loky", verbose=0) -> list[FittingResult]
 ```
 
 Fit many **independent** problems in parallel (different series and/or models).
@@ -33,8 +33,9 @@ Fit many **independent** problems in parallel (different series and/or models).
 | `backend` | `"loky"` | `"loky"` (processes), `"threading"` (rides GIL-released kernels), or `"multiprocessing"` |
 | `verbose` | `0` | forwarded to `joblib.Parallel` |
 
-Returns [`BatchFittingResult`](#batchfittingresult)s **in input order**. A failed
-problem has its `error` set (and empty `coeffs`) rather than aborting the batch.
+Returns [`FittingResult`](API-Types) objects **in input order**, each carrying
+`.label` and `.error`. A failed problem has its `error` set (and empty `coeffs`)
+rather than aborting the batch.
 
 ```python
 from dtfit import fit_many, FittingProblem
@@ -61,22 +62,29 @@ A picklable spec for one fit (a dataclass):
 <a name="batchfittingresult"></a>
 ### `BatchFittingResult`
 
-A lightweight, picklable result (survives a process-pool round trip):
+A **deprecated back-compat alias** of [`FittingResult`](API-Types), kept for
+compatibility. `fit_many` now returns full `FittingResult` objects (which are
+picklable and survive a process-pool round trip), each carrying:
 
 - `coeffs`, `expr`, `var`, `cov`, `label`, `error` (set instead of `coeffs` when
   the fit raised).
 - `model` -- the fitted callable, rebuilt lazily from `expr`/`coeffs`.
 - `predict(x) -> ndarray` -- evaluate the model (broadcasts scalars).
 
-It does **not** carry the uncertainty helpers of the full
-[`FittingResult`](API-Types) (those are dropped to stay picklable/lean).
+Because they are real `FittingResult`s, the uncertainty helpers (`stderr`,
+`confidence_intervals`, prediction bands) are available when a covariance was
+produced. Prefer the name `FittingResult` in new code.
 
 ---
 
 <a name="project_spectra"></a>
 ## `project_spectra`
 
+Not top-level -- import from the `scale` submodule:
+
 ```python
+from dtfit.scale import project_spectra
+
 project_spectra(x, Y, *, order=6, basis="legendre", backend="auto", **basis_kwargs) -> ndarray
 ```
 

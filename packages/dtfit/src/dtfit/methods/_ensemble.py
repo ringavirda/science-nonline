@@ -8,12 +8,14 @@ corrupted by outliers, and the inter-window spread is a cheap empirical
 uncertainty band. This is bagging over the time axis, applicable to both EAC and
 LSI.
 
-When to use it: **outlier-contaminated** data. The median-of-windows aggregation
-rejects whole corrupted windows without the per-problem ``f_scale`` tuning that
-``fit_eac(loss="soft_l1", ...)`` needs -- and stays stable where that robust loss
-can diverge. On clean (Gaussian-noise) data prefer a single whole-record fit:
-the ensemble trades a little accuracy there for the outlier robustness, so it is
-a specialised tool rather than the default path.
+When to use it: **densely outlier-contaminated** data. The median-of-windows
+aggregation rejects whole corrupted windows without the per-problem ``f_scale``
+tuning that ``fit_eac(loss="soft_l1", ...)`` needs -- and stays stable where that
+robust loss can diverge. For lighter contamination the robust loss on a single
+``fit_eac`` is the cheaper path (see :func:`dtfit.fit_eac`); the ensemble is the
+heavier-duty complement. On clean (Gaussian-noise) data prefer a single
+whole-record fit: the ensemble trades a little accuracy there for the outlier
+robustness, so it is a specialised tool rather than the default path.
 """
 
 from __future__ import annotations

@@ -21,7 +21,7 @@ Is the data arriving live / do the parameters change over time?
          +- you want one reliable default        > LSI            (fit_lsi)
          +- data is very noisy / few parameters
          |   / a transient or saturating shape    > EAC           (fit_eac)
-         +- a localized peak or sharp bend         > adaptive EAC  (fit_eac_adaptive)
+         +- a localized peak or sharp bend         > curvature EAC (fit_eac(..., window_mode="curvature"))
          +- a sinusoid / clear cycle               > LSI oscillatory recipe
          |                                           (fit_lsi(..., freq_param="w"))
          +- outliers / glitches present            > Ensemble  (ensemble_fit)
@@ -38,8 +38,9 @@ production fitter (see [methods-explained.md#dsb](Guides-Methods-Explained#dsb))
   nonlinear-in-parameters models.
 - **Switch to EAC when noise is high or you need speed**, and the model has few
   (2-4) parameters. EAC is ~5x faster than LSI and the most noise-robust.
-- **Use the adaptive EAC for peaks and saturating rises** (Gaussian, Lorentzian,
-  Michaelis-Menten, Hill, `arctan`) -- curvature-placed windows fit the bend.
+- **Use the curvature EAC for peaks and saturating rises** (Gaussian, Lorentzian,
+  Michaelis-Menten, Hill, `arctan`) -- pass `fit_eac(..., window_mode="curvature")`
+  so curvature-placed windows fit the bend.
 - **Use the oscillatory recipe for anything with a cycle.** A plain smoothed fit
   erases cycles; you must pass `freq_param`/`oscillatory=True`.
 - **Use the ensemble when outliers/glitches contaminate the record.**
@@ -81,7 +82,7 @@ Only relevant for large or many-channel data ([api/scaling.md](API-Scaling)):
 | Situation | Tool |
 |---|---|
 | Many **independent** fits (different series/models) | `fit_many` (process/thread fan-out) |
-| Many **channels on a shared x-grid**, fit at once | `fit_lsi_batched` / `project_spectra` (one GEMM) |
+| Many **channels on a shared x-grid**, fit at once | `fit_lsi_batched` (one GEMM; low-level `project_spectra` lives in `dtfit.scale`) |
 | A dataset **too big for memory**, one pass | `PartitionedLSI` / `PartitionedEAC` (streaming map-reduce) |
 | **Distributed** workers, then combine | the same `Partitioned*` accumulators via `.merge()` |
 | Many channels **and** streaming | `PartitionedBatchLSI` |

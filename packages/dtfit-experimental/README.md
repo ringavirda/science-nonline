@@ -37,16 +37,26 @@ pip install -e "packages/dtfit-experimental[bench]"  # + matplotlib/torch/statsm
 
 ## Run the suites
 
+The experiments are self-contained **Jupyter notebooks** — `cases/` (per-adaptation
+studies) and `domains/` (per-application-domain studies). Each experiment folder
+holds a `backend.py` (the compute) and the notebook (the report: tables, figures,
+narrative). Fetch the datasets once, then open or execute any notebook:
+
 ```bash
 python -m dtfit_experimental.experiments.download_data          # fetch datasets
-python -m dtfit_experimental.experiments.cases.run_suite        # per-adaptation cases
-python -m dtfit_experimental.experiments.domains.run_domains    # per-domain validation
+
+# open and re-run interactively
+jupyter lab src/dtfit_experimental/experiments/cases/01_control_systems/01_control_systems.ipynb
+
+# or execute headless (writes outputs + figures in place)
+jupyter nbconvert --to notebook --execute --inplace \
+    src/dtfit_experimental/experiments/cases/01_control_systems/01_control_systems.ipynb
 ```
 
-Both runners share a single generalized driver
-(`dtfit_experimental.experiments._runner`); pass `--quick` for a smoke run,
-`--jobs N` to cap worker processes (`--jobs 1` = serial). Each suite writes a
-`report.md` + `figures/` per experiment and regenerates its index
-(`cases/REPORTS.md`, `domains/DOMAINS.md`). See
+Each notebook has a config block of knobs near the top (sized for a few-minute run
+by default; comments show how to scale up). The indexes
+[`cases/REPORTS.md`](src/dtfit_experimental/experiments/cases/REPORTS.md) and
+[`domains/DOMAINS.md`](src/dtfit_experimental/experiments/domains/DOMAINS.md) link
+every notebook. See
 [`src/dtfit_experimental/experiments/README.md`](src/dtfit_experimental/experiments/README.md)
 for the real-data validation details.
