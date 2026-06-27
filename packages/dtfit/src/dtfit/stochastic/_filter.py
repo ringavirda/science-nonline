@@ -213,8 +213,8 @@ class StochasticFilter:
         # log volatility level -- a fused (persistence, volatility) descriptor.
         stat = np.array([self._rho1(), 0.5 * np.log(self._acov[0] + 1e-12)])
         if not self._det_init:
-            self._fast = stat.copy()
-            self._slow = stat.copy()
+            self._fast[:] = stat
+            self._slow[:] = stat
             self._det_init = True
             return
         self._fast += self._afast * (stat - self._fast)

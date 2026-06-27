@@ -356,6 +356,14 @@ def test_filter_experiment_is_viable():
 
 
 # --- real economic data (USD/UAH, bundled CSV) -------------------------- #
+# experiments/data is gitignored, so the CSV is absent in CI -- skip there.
+needs_usd_uah = pytest.mark.skipif(
+    not (B.EXPERIMENTS_DIR / "data" / "usd_uah_2014_2015.csv").exists(),
+    reason="bundled USD/UAH CSV not available (experiments/data is gitignored)",
+)
+
+
+@needs_usd_uah
 def test_real_usd_uah_level_is_random_walk_and_ties_rw():
     rd = B.exp_real_data()
     # the FX level is a near-random walk; the merged router should say so
