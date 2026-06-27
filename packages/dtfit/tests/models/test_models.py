@@ -70,6 +70,21 @@ def test_suggest_models_custom_candidates():
     assert ranked[0].name == "logistic"
 
 
+def test_suggest_models_include_exclude_filter():
+    rng = np.random.default_rng(3)
+    t = np.linspace(0.5, 6, 200)
+    y = 2.0 * np.exp(0.5 * t) + rng.normal(0, 1.0, t.size)
+    # exclude by category prunes the whole 'growth' family from the shortlist
+    names = [s.name for s in suggest_models(t, y, exclude=["growth"])]
+    assert "exponential" not in names and "exp_growth_offset" not in names
+    # exclude by name drops just that family
+    names = [s.name for s in suggest_models(t, y, exclude=["exponential"])]
+    assert "exponential" not in names
+    # include restricts the search to the named families only
+    names = [s.name for s in suggest_models(t, y, include=["linear", "quadratic"])]
+    assert set(names) <= {"linear", "quadratic"}
+
+
 @pytest.mark.parametrize("name,fn,kw", [
     ("first_order", lambda t: 3.0 * (1 - np.exp(-t / 1.2)), {}),
     ("hill", lambda t: 5.0 * t**2 / (3.0**2 + t**2), {}),

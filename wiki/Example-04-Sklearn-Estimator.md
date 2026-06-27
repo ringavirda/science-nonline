@@ -8,7 +8,7 @@ cross_val_score. It takes a single input feature (the model's variable).
 
 Run headless:   python examples/04_sklearn_estimator.py
 
-Source: [`packages/dtfit/examples/04_sklearn_estimator.py`](https://github.com/ringavirda/science-pylab/blob/main/packages/dtfit/examples/04_sklearn_estimator.py)
+Source: [`packages/dtfit/examples/04_sklearn_estimator.py`](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit/examples/04_sklearn_estimator.py)
 
 ```python
 import numpy as np

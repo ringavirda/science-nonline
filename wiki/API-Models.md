@@ -73,7 +73,8 @@ fit = trend_plus_cycle.fit(x, y)
 ## `suggest_models`
 
 ```python
-suggest_models(x, y, candidates=None, *, method="auto", top=None) -> list[Suggestion]
+suggest_models(x, y, candidates=None, *, method="auto", top=None,
+               include=None, exclude=None) -> list[Suggestion]
 ```
 
 Fit candidate families to `(x, y)` and rank them **best-first by AIC**.
@@ -83,6 +84,8 @@ Fit candidate families to `(x, y)` and rank them **best-first by AIC**.
 | `candidates` | `None` | models to try; default is a **shape-based shortlist** of the catalog (oscillatory data skips peak/monotone families, etc.; ambiguous data falls back to the whole catalog so the true family is never dropped) |
 | `method` | `"auto"` | fitting method passed to each model |
 | `top` | `None` | if given, return only the best `top` |
+| `include` | `None` | keep only candidates whose **name** (e.g. `"logistic"`) or **category** (e.g. `"decay"`, `"oscillatory"`) is in this list -- restrict the search to families you believe plausible |
+| `exclude` | `None` | drop candidates whose name or category is in this list -- prune families you know don't apply (e.g. `exclude=["oscillatory"]` on a monotone series) without post-filtering. Applied **after** `include` |
 
 Candidates whose fit fails (or yields non-finite R^2) are skipped. Each result is a
 [`Suggestion`](#suggestion).
@@ -90,6 +93,11 @@ Candidates whose fit fails (or yields non-finite R^2) are skipped. Each result i
 ```python
 for s in suggest_models(x, y, top=3):
     print(f"{s.name:20s} r2={s.r2:.4f} aic={s.aic:.1f}")
+
+# you know the data is not oscillatory -> prune those families up front
+suggest_models(x, y, exclude=["oscillatory"])
+# or restrict to the exponential growth/decay families only
+suggest_models(x, y, include=["growth", "decay"])
 ```
 
 <a name="suggestion"></a>

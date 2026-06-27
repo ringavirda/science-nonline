@@ -251,5 +251,7 @@ def fit_eac(
 
     model = sp.lambdify(t, f_sym.subs(dict(zip(params, coeffs))), "numpy")
     return FittingResult(model=model, coeffs=coeffs, cov=cov,
-                         expr=expr, var=var, names=tuple(str(p) for p in params))
+                         expr=expr, var=var, names=tuple(str(p) for p in params),
+                         converged=bool(sol.success), message=str(sol.message),
+                         x_range=(float(np.min(x)), float(np.max(x))))
 

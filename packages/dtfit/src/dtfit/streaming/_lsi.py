@@ -33,7 +33,7 @@ symbolic model and its derivatives are compiled once in ``__init__``; the hot
 path contains no SymPy and is ``O(W·order·params)`` per sample.
 """
 
-from typing import Any, Callable, Mapping, Sequence
+from typing import Any, Callable, Sequence
 
 import numpy as np
 import sympy as sp
@@ -42,9 +42,10 @@ from scipy.stats import chi2
 
 from dtfit._core._kernels import legendre_project
 from dtfit.types import InitialGuess
+from ._base import _RecursiveFilter
 
 
-class LSIFilter:
+class LSIFilter(_RecursiveFilter):
     """Online integral-least-squares (LSI) parameter tracker with drift detection.
 
     Drop-in sibling of :class:`EACFilter` with the same ``partial_fit`` /
@@ -313,11 +314,6 @@ class LSIFilter:
             for p in self.params
         ]
 
-    @property
-    def params_(self) -> dict[str, float]:
-        """Current parameter estimate as a ``{name: value}`` mapping."""
-        return {str(s): float(v) for s, v in zip(self.params, self.p)}
-
     def _eval(self, func, t_arr, reg_cols=None):
         """Evaluate a compiled callable on the window, broadcasting scalars.
         ``reg_cols`` supplies the external-regressor columns aligned with ``t_arr``
@@ -329,34 +325,6 @@ class LSIFilter:
         if np.ndim(v) == 0:  # constant model/derivative -> broadcast
             v = np.full_like(t_arr, float(v), dtype=float)
         return np.asarray(v, dtype=float)
-
-    def _reg_tuple(self, regressors) -> tuple:
-        """Coerce one regressor sample to a tuple ordered like ``self.regressors``."""
-        if regressors is None:
-            raise ValueError(
-                "this model declares external regressors; pass them to partial_fit"
-            )
-        if isinstance(regressors, Mapping):
-            return tuple(float(regressors[r_]) for r_ in self.regressors)
-        vals = np.atleast_1d(np.asarray(regressors, dtype=float))
-        if vals.size != len(self.regressors):
-            raise ValueError(
-                f"expected {len(self.regressors)} regressors, got {vals.size}"
-            )
-        return tuple(float(v) for v in vals)
-
-    def _predict_cols(self, xa: np.ndarray, regressors) -> list[np.ndarray]:
-        """Regressor columns broadcast to ``xa`` for :meth:`predict`."""
-        if regressors is None:
-            raise ValueError("predict() needs regressor values for this model")
-        if isinstance(regressors, Mapping):
-            return [np.broadcast_to(np.asarray(regressors[r_], float), xa.shape)
-                    for r_ in self.regressors]
-        arr = np.asarray(regressors, float)
-        if arr.ndim == 2 and arr.shape[1] == len(self.regressors):
-            return [arr[:, c] for c in range(arr.shape[1])]
-        return [np.broadcast_to(arr.reshape(-1)[c], xa.shape)
-                for c in range(len(self.regressors))]
 
     def _model_spectrum(self, t0, tn, t_arr=None, reg_cols=None, proj=None):
         """Model Legendre spectrum and its parameter Jacobian over the window.
@@ -588,27 +556,5 @@ class LSIFilter:
         self.drift_flag_ = True
         self.last_drift_direction_ = 1 if up else -1
 
-    def inflate(self, factor: float | None = None) -> None:
-        """Inflate the parameter covariance so new data dominates -- a public
-        hook for an external maneuver/change detector to re-arm the filter for
-        fast re-adaptation without discarding the current estimate.
-
-        Args:
-            factor: Covariance multiplier; defaults to ``drift_inflation``.
-        """
-        self.P = self.P * (self.drift_inflation if factor is None else float(factor))
-
     # Convenience alias matching the recursive-filter naming.
     update = partial_fit
-
-    def predict(self, x: np.ndarray, regressors=None) -> np.ndarray:
-        """Evaluate the model at the current parameter estimate.
-
-        With external regressors, ``regressors`` supplies their value(s) at ``x``
-        (a ``{name: array-or-scalar}`` mapping broadcast to ``x``'s shape, or an
-        ``(len(x), n_reg)`` array)."""
-        xa = np.asarray(x, dtype=float)
-        if not self._has_reg:
-            return self._f(xa, *self.p)
-        cols = self._predict_cols(xa, regressors)
-        return self._f(xa, *cols, *self.p)

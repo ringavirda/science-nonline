@@ -25,7 +25,7 @@ The model-framework wrapper :class:`dtfit.Stochastic` exposes the batch solution
 through the ``.fit(x, y)`` / ``.predict`` convention of :class:`dtfit.Model`.
 """
 
-from dtfit.stochastic._model import (
+from dtfit.stochastic._estimators import (
     sample_acf,
     hurst_aggvar,
     hurst_spectral,
@@ -33,10 +33,9 @@ from dtfit.stochastic._model import (
     garch_persistence,
     cycle_period,
     decompose_trend_cycle,
-    fit_stochastic,
-    StochasticModel,
-    FORECASTERS,
 )
+from dtfit.stochastic._model import fit_stochastic, StochasticModel
+from dtfit.stochastic._forecast import FORECASTERS
 from dtfit.stochastic._filter import StochasticFilter
 
 __all__ = [

@@ -252,6 +252,7 @@ def fit_lsi(
         if local is not None:
             coeffs = np.asarray(local.x, dtype=np.float64)
             jac = local.jac
+            converged, message = bool(local.success), str(local.message)
         else:
             def cost(c: np.ndarray) -> float:
                 r = residual(c)
@@ -265,17 +266,21 @@ def fit_lsi(
             res = minimize(cost, res_g.x, method="L-BFGS-B", bounds=bounds)
             coeffs = np.asarray(res.x, dtype=np.float64)
             jac = _numeric_jac(residual, coeffs)
+            converged, message = bool(res.success), str(res.message)
     else:
         sol = least_squares(residual, guess, method="lm")
         coeffs = np.asarray(sol.x, dtype=np.float64)
         jac = sol.jac
+        converged, message = bool(sol.success), str(sol.message)
 
     echo("LSI fitted coefficients:", coeffs)
     cov = _covariance(jac, residual(coeffs), len(params))
 
     model = sp.lambdify(t, f_sym.subs(dict(zip(params, coeffs))), "numpy")
     return FittingResult(model=model, coeffs=coeffs, cov=cov,
-                         expr=expr, var=var, names=tuple(str(p) for p in params))
+                         expr=expr, var=var, names=tuple(str(p) for p in params),
+                         converged=converged, message=message,
+                         x_range=(float(np.min(x)), float(np.max(x))))
 
 
 def _numeric_jac(residual, c: np.ndarray, eps: float = 1e-6) -> np.ndarray:

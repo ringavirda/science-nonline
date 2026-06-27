@@ -104,8 +104,10 @@ by `oscillatory=True` or by naming the angular-frequency parameter with
 
 - **smoothing off** -- the cycle lives in the high-order spectrum that the
   Savitzky-Golay pre-filter would destroy;
-- **order raised** to resolve the dominant cycle -- about $1.4$ cycles over the
-  window plus headroom (`_osc_order`), instead of the default 5;
+- **order raised** to resolve the dominant cycle -- a Legendre degree of about
+  $\pi \cdot \text{cycles}$ plus headroom (`_osc_order`: the classical
+  orthogonal-polynomial resolution threshold for a sinusoid), instead of the
+  default 5;
 - **frequency seeded** from the data's FFT peak via
   [`fft_frequency_seed`](API-Fitting#fft_frequency_seed) -- the local solve
   cannot lock onto the right cycle without a frequency seed.
@@ -139,6 +141,32 @@ see [../experimental/adaptations-api.md](Experimental-Adaptations-API)), and
 the **same** machinery powers the scale backends ([scaling.md](Methods-Scaling)) -- where
 the empirical coefficient $\beta_j = (2j+1)/H\cdot\int y\,P_j\,dx$ is used in its
 **additive integral** form $\int y\,P_j\,dx$, which sums across a domain partition.
+
+## Relation to classical (Western) methods
+
+LSI also has well-known Western counterparts worth naming for a signal-processing
+audience:
+
+- **Spectral-Galerkin projection.** A weighted integral least-squares match in an
+  *orthogonal* (Legendre) basis is a **spectral / $p$-version Galerkin** projection:
+  global orthogonal-polynomial test functions, where [EAC](Methods-EAC) uses local
+  piecewise-constant (Haar) ones. The two are the $p$- and $h$-versions of one
+  weighted-residual identification.
+- **Method of moments (and what the reconditioning buys).** Matching the model's and
+  data's spectral coefficients is **classical moment matching** (Pearson / GMM). The
+  *monomial*-moment form of this is the ill-conditioned Hilbert system above -- so
+  LSI's switch to an orthogonal basis is precisely the reconditioning that turns a
+  naive method-of-moments fit into a perfectly-conditioned one. (The experimental
+  suite runs the unconditioned monomial method-of-moments as a baseline to show the
+  gap -- see [the baselines page](Experimental-Baselines).)
+- **Variable projection (Golub-Pereyra).** For a model linear in an amplitude (e.g.
+  $A\,f(t;\theta)$), the Legendre projection is **linear in $A$** -- the same
+  separable structure VarPro exploits to eliminate the linear parameters in closed
+  form. LSI shares that structure without the alternating-minimization loop.
+- **Prony / ESPRIT** are the algebraic alternative to the oscillatory recipe for
+  recovering a frequency from an exponential/sinusoid sum (roots / subspace
+  eigenvalues vs. a high-order spectral fit). All of these are baselined in the
+  experimental suite -- see [the baselines page](Experimental-Baselines).
 
 ## Optimizations and guards
 

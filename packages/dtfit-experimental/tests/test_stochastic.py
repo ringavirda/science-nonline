@@ -219,7 +219,7 @@ def test_vendored_adf_matches_statsmodels_to_machine_precision():
     ``adfuller`` to machine precision -- so removing the dependency does not change
     a single gate verdict."""
     sm = pytest.importorskip("statsmodels.tsa.stattools")
-    from dtfit.stochastic._model import _adf_tau, _adf_pvalue
+    from dtfit.stochastic._stats import _adf_tau, _adf_pvalue
 
     def gen(kind, s):
         r = np.random.default_rng(100 + s)

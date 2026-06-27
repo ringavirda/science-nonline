@@ -1,5 +1,20 @@
 """dtfit-experimental -- experimental structural adaptations of EAC / LSI.
 
+This distribution has **two tiers**, kept deliberately distinct:
+
+1. **The library** -- *this* top-level package (``import dtfit_experimental``): a
+   small, importable surface of experimental adaptations (``fit_lsi_basis``,
+   ``fit_joint``, ``boosted_fit``) plus the backend helpers. This is the
+   promotion staging area -- code that may graduate into stable ``dtfit``.
+2. **The study** -- :mod:`dtfit_experimental.experiments`: the per-case /
+   per-domain **validation suite** (notebooks + backends + the established
+   baselines each method is measured against). It is a research/dev tree, *not*
+   part of the library's API contract -- it is exempt from the mypy gate and
+   ruff-relaxed, and is driven via ``python -m dtfit_experimental.experiments...``
+   rather than imported as a library. Nothing in tier 1 imports from it.
+
+The rest of this docstring describes tier 1 (the adaptations).
+
 These are new ways to *compose* the differential-transformation fitting methods
 of :mod:`dtfit`, grounded in the methods' own math (linearity of integration;
 orthogonal-basis projection; additive areas). They are prototyped here, evaluated

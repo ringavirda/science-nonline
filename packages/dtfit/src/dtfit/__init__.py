@@ -37,8 +37,9 @@ Scale (same methods, run big):
         under ``dtfit.scale``.
 
 Result type:
-    FittingResult: the self-describing fitted-model result (also returned by
-        fit_many; BatchFittingResult is a back-compat alias of it).
+    FittingResult: the self-describing fitted-model result -- named parameters,
+        uncertainty, an optimizer ``converged`` flag, and extrapolation-aware
+        ``predict``. Batch and single fits (incl. fit_many) return this same type.
     enable_logging() / logger: opt-in library logging.
 
 Submodules (imported explicitly, kept out of the top-level namespace, after
@@ -70,7 +71,7 @@ from dtfit.streaming import (
     FilterBank,
     FusedChiSquareDetector,
 )
-from dtfit.scale._parallel import fit_many, FittingProblem, BatchFittingResult
+from dtfit.scale._parallel import fit_many, FittingProblem
 # Promoted after the experiment suite validated them across the big-data and
 # parallel workloads: the exact one-pass / distributed (map-reduce) estimators
 # and the GEMM-batched multi-channel projection. The remaining adaptations stay
@@ -122,7 +123,6 @@ __all__ = [
     "find_degree",
     "fit_many",
     "FittingProblem",
-    "BatchFittingResult",
     "FittingResult",
     "enable_logging",
     "logger",

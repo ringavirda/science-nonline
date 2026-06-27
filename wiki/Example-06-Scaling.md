@@ -13,7 +13,7 @@ Per-problem independence makes dtfit embarrassingly parallel. Three tools:
 
 Run headless:   python examples/06_scaling.py
 
-Source: [`packages/dtfit/examples/06_scaling.py`](https://github.com/ringavirda/science-pylab/blob/main/packages/dtfit/examples/06_scaling.py)
+Source: [`packages/dtfit/examples/06_scaling.py`](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit/examples/06_scaling.py)
 
 ```python
 import numpy as np

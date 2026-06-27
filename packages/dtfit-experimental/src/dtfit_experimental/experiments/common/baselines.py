@@ -5,6 +5,14 @@ practitioner would actually reach for, wrapped behind small uniform helpers:
 
 * classical curve fitting -- SciPy ``curve_fit`` (Levenberg-Marquardt NLLS),
   ``numpy.polyfit``;
+* the **Western parameter-estimation lineage** a signal-processing / system-ID
+  reviewer would reach for -- Prony's method and its modern subspace successors
+  (Matrix Pencil / ESPRIT), Golub-Pereyra variable projection (VarPro), and the
+  classical method of moments / GMM (see :func:`prony_fit`, :func:`matrix_pencil_fit`,
+  :func:`varpro_fit`, :func:`moment_match_fit`). These are the *same-job*
+  counterparts to dtfit's EAC/LSI: they recover the same nonlinear parameters
+  (rates, frequencies, amplitudes) by different routes -- algebraic recurrences,
+  separable least squares, or integral moment matching;
 * neural nets -- scikit-learn ``MLPRegressor`` (batch and incremental
   ``partial_fit``), and PyTorch MLP / LSTM sequence forecasters;
 * classical time series -- statsmodels ARIMA / SARIMAX;
@@ -439,6 +447,231 @@ def gp_curve(x, y, x_eval, *, seed=0):
                                   random_state=seed, n_restarts_optimizer=1)
     gp.fit(x, y)
     return gp.predict(np.asarray(x_eval, float).reshape(-1, 1))
+
+
+# --------------------------------------------------------------------------- #
+# the Western parameter-estimation lineage (the signal-processing / system-ID
+# foils a reviewer outside the Pukhov school would reach for)
+#
+# These recover the *same* nonlinear parameters as dtfit's EAC/LSI -- growth /
+# decay rates, frequencies, amplitudes -- but by the classical Western routes:
+#
+#   * Prony / Matrix Pencil / ESPRIT -- the algebraic & subspace route: an
+#     exponential sum obeys a linear recurrence, so its modes are the roots of a
+#     characteristic polynomial (Prony) or the eigenvalues of a shift on the
+#     data's signal subspace (Matrix Pencil / ESPRIT). Closed-form, non-iterative.
+#   * Variable projection (Golub-Pereyra) -- the separable-NLLS route: eliminate
+#     the linearly-appearing amplitudes in closed form and optimise only over the
+#     nonlinear shape parameters.
+#   * Method of moments / GMM -- the integral-moment route: match the model's and
+#     the data's integral moments. This is the *unconditioned* ancestor of LSI
+#     (monomial moments form an ill-conditioned Hilbert system -- exactly the
+#     pathology LSI removes by switching to an orthogonal Legendre basis).
+#
+# All are pure NumPy/SciPy (no new dependency) and expose a small uniform result
+# so the domain harness can score parameter recovery and prediction the same way
+# it scores dtfit.
+# --------------------------------------------------------------------------- #
+class ExpSumModel:
+    """A recovered sum of complex exponentials ``y(t) ~= Re sum_i amp_i e^{rate_i (t - t0)}``.
+
+    The output of :func:`prony_fit` / :func:`matrix_pencil_fit`. ``rate`` are the
+    continuous-time poles ``mu_i = log(z_i)/dt`` (real part = growth/decay, imag
+    part = angular frequency); ``amp`` the complex amplitudes. For a real signal
+    the conjugate-pair structure makes the reconstruction real.
+    """
+
+    def __init__(self, rate, amp, t0, dt):
+        self.rate = np.asarray(rate, dtype=complex)
+        self.amp = np.asarray(amp, dtype=complex)
+        self.t0 = float(t0)
+        self.dt = float(dt)
+
+    @property
+    def damping(self) -> np.ndarray:
+        """Per-mode damping ``-Re(rate)`` (positive = decaying)."""
+        return -self.rate.real
+
+    @property
+    def frequency(self) -> np.ndarray:
+        """Per-mode angular frequency ``|Im(rate)|`` (rad per unit ``t``)."""
+        return np.abs(self.rate.imag)
+
+    def predict(self, t_eval) -> np.ndarray:
+        t_eval = np.asarray(t_eval, dtype=float)
+        basis = np.exp(np.outer(t_eval - self.t0, self.rate))  # (n, K)
+        return np.real(basis @ self.amp)
+
+
+def _exp_amplitudes(t, y, rate, t0) -> np.ndarray:
+    """Least-squares complex amplitudes of an exponential sum with known poles."""
+    vander = np.exp(np.outer(np.asarray(t, float) - t0, np.asarray(rate, complex)))
+    amp, *_ = np.linalg.lstsq(vander, np.asarray(y, dtype=complex), rcond=None)
+    return amp
+
+
+def prony_fit(t, y, n_modes) -> ExpSumModel:
+    """Classical **Prony's method** (1795): fit a sum of ``n_modes`` exponentials.
+
+    An exponential sum satisfies a linear recurrence, so the algorithm is two
+    linear steps: (1) solve the (overdetermined) recurrence for its coefficients;
+    (2) the roots of the characteristic polynomial are the discrete poles
+    ``z_i = e^{mu_i dt}``, from which the rates ``mu_i`` follow and the amplitudes
+    drop out of a Vandermonde least squares. Non-iterative and exact in the
+    noiseless case -- the original of the whole exponential-fitting lineage and the
+    algebraic counterpart to dtfit's integral EAC/LSI. Sensitive to noise (its
+    modern successors :func:`matrix_pencil_fit` add an SVD denoising step);
+    assumes (near-)uniform sampling. ``y`` may be real or complex.
+    """
+    t = np.asarray(t, dtype=float)
+    y = np.asarray(y, dtype=float)
+    n = y.size
+    k = int(n_modes)
+    if n < 2 * k + 1:
+        raise ValueError(f"need >= {2 * k + 1} samples for {k} Prony modes; got {n}")
+    dt = float(np.mean(np.diff(t)))
+    # Linear-prediction system: y[m] = sum_j a[j] y[m-j], m = k .. n-1.
+    # Row m is [y[m-1], y[m-2], ..., y[m-k]] (the window before m, reversed).
+    rows = np.array([y[m - k:m][::-1] for m in range(k, n)])
+    rhs = y[k:n]
+    a, *_ = np.linalg.lstsq(rows, rhs, rcond=None)
+    # Characteristic polynomial z^k - a1 z^{k-1} - ... - ak ; its roots are z_i.
+    z = np.roots(np.concatenate([[1.0], -a]))
+    z = z[z != 0]
+    rate = np.log(z.astype(complex)) / dt
+    amp = _exp_amplitudes(t, y, rate, t[0])
+    return ExpSumModel(rate, amp, t[0], dt)
+
+
+def matrix_pencil_fit(t, y, n_modes, *, pencil=None) -> ExpSumModel:
+    """**Matrix Pencil** method (Hua & Sarkar 1990) -- the SVD-robust successor of
+    Prony, in the same family as **ESPRIT** and **MUSIC**.
+
+    Instead of rooting a noise-sensitive recurrence polynomial, it builds a Hankel
+    matrix from the samples, denoises it by truncating its SVD to the ``n_modes``
+    dominant singular vectors, and recovers the discrete poles ``z_i`` as the
+    eigenvalues of a one-row shift on the signal subspace. This subspace step is
+    what makes it markedly more noise-robust than classical Prony, and it is the
+    method a signal-processing reviewer would name for exponential/sinusoid
+    recovery ("how does this compare to ESPRIT?"). Assumes (near-)uniform
+    sampling. ``pencil`` is the pencil parameter ``L`` (defaults to ``N/2``, the
+    standard rank-robust choice).
+    """
+    t = np.asarray(t, dtype=float)
+    y = np.asarray(y, dtype=float)
+    n = y.size
+    k = int(n_modes)
+    dt = float(np.mean(np.diff(t)))
+    L = int(pencil) if pencil is not None else n // 2
+    L = max(k + 1, min(L, n - k - 1))
+    # Hankel Y, shape (n-L, L+1): Y[i, j] = y[i + j].
+    hankel = np.array([y[i:i + L + 1] for i in range(n - L)])
+    if min(hankel.shape) <= k:
+        raise ValueError(f"too few samples ({n}) to resolve {k} matrix-pencil modes")
+    _, _, vh = np.linalg.svd(hankel, full_matrices=False)
+    vk = vh.conj().T[:, :k]                       # dominant right singular vectors
+    # Rotational invariance: V2 = z V1 on the (denoised) signal subspace.
+    psi = np.linalg.pinv(vk[:-1, :]) @ vk[1:, :]
+    z = np.linalg.eigvals(psi)
+    z = z[z != 0]
+    rate = np.log(z.astype(complex)) / dt
+    amp = _exp_amplitudes(t, y, rate, t[0])
+    return ExpSumModel(rate, amp, t[0], dt)
+
+
+class VarProModel:
+    """A fitted separable model ``y ~= Phi(alpha; t) @ c`` (output of :func:`varpro_fit`).
+
+    ``alpha`` are the recovered nonlinear shape parameters, ``linear`` the linear
+    coefficients ``c`` solved in closed form at ``alpha``.
+    """
+
+    def __init__(self, alpha, linear, design):
+        self.alpha = np.asarray(alpha, dtype=float)
+        self.linear = np.asarray(linear, dtype=float)
+        self._design = design
+
+    def predict(self, t_eval) -> np.ndarray:
+        phi = np.asarray(self._design(self.alpha, np.asarray(t_eval, float)),
+                         dtype=float)
+        return phi @ self.linear
+
+
+def varpro_fit(t, y, design, alpha0, *, bounds=None, maxfev=20000) -> VarProModel:
+    """**Variable projection** (Golub & Pereyra 1973) for a separable model.
+
+    Many exponential / harmonic / basis models are linear in some parameters
+    (amplitudes ``c``) and nonlinear in the rest (rates / frequencies ``alpha``):
+    ``y ~= Phi(alpha; t) @ c``. VarPro eliminates ``c`` analytically -- for any
+    ``alpha`` the optimal ``c`` is ``Phi(alpha)^+ y`` -- and optimises only over the
+    smaller, better-conditioned nonlinear set, minimising the *projection*
+    residual ``(I - Phi Phi^+) y``. It is the standard modern method for
+    multi-exponential / Fourier fitting and converges far better than throwing all
+    parameters at joint NLLS. The structural cousin of dtfit's LSI, which is also
+    linear in an amplitude once the model is projected onto its basis.
+
+    Args:
+        design: ``design(alpha, t) -> Phi`` building the ``(len(t), K)`` matrix of
+            the ``K`` linearly-appearing basis columns at the nonlinear ``alpha``.
+        alpha0: Initial nonlinear parameters.
+        bounds: Optional ``(lo, hi)`` bounds on ``alpha`` (as ``least_squares`` takes).
+    """
+    from scipy.optimize import least_squares
+
+    t = np.asarray(t, dtype=float)
+    y = np.asarray(y, dtype=float)
+
+    def resid(alpha):
+        phi = np.asarray(design(alpha, t), dtype=float)
+        c, *_ = np.linalg.lstsq(phi, y, rcond=None)
+        return phi @ c - y
+
+    kw = {"max_nfev": maxfev}
+    if bounds is not None:
+        kw["bounds"] = bounds
+    sol = least_squares(resid, np.asarray(alpha0, dtype=float), **kw)
+    phi = np.asarray(design(sol.x, t), dtype=float)
+    c, *_ = np.linalg.lstsq(phi, y, rcond=None)
+    return VarProModel(sol.x, c, design)
+
+
+def moment_match_fit(t, y, func, p0, *, bounds=None, n_moments=None,
+                     maxfev=20000) -> np.ndarray:
+    """Classical **method of moments / GMM** with monomial integral moments.
+
+    Identify ``theta`` by demanding the model reproduce the data's first ``m``
+    integral moments: ``int t^k f(t; theta) dt = int t^k y dt`` for
+    ``k = 0 .. m-1`` (``m = #params`` by default), solved as least squares over
+    ``theta``. Like EAC/LSI it matches *integral functionals* of the model to the
+    data (so noise averages out), but with **monomial** test functions -- which
+    form an ill-conditioned, Hilbert-like moment system. That is exactly the
+    conditioning pathology the current LSI removes by projecting onto an
+    *orthogonal* Legendre basis, so this is the fair "what does the reconditioning
+    buy?" foil and the deterministic-fit cousin of Pearson's method of moments
+    (1894) / Hansen's GMM (1982). ``t`` is normalised to ``[0, 1]`` internally so
+    the high-order moments do not overflow.
+    """
+    from scipy.optimize import least_squares
+    from scipy.integrate import simpson
+
+    t = np.asarray(t, dtype=float)
+    y = np.asarray(y, dtype=float)
+    m = len(p0) if n_moments is None else int(n_moments)
+    span = float(t[-1] - t[0]) or 1.0
+    tn = (t - t[0]) / span
+    weights = [tn ** k for k in range(m)]
+    data_moments = np.array([simpson(y=y * w, x=t) for w in weights])
+
+    def resid(p):
+        fv = np.asarray(func(t, *p), dtype=float)
+        model_moments = np.array([simpson(y=fv * w, x=t) for w in weights])
+        return model_moments - data_moments
+
+    kw = {"max_nfev": maxfev}
+    if bounds is not None:
+        kw["bounds"] = bounds
+    sol = least_squares(resid, np.asarray(p0, dtype=float), **kw)
+    return np.asarray(sol.x, dtype=float)
 
 
 # --------------------------------------------------------------------------- #

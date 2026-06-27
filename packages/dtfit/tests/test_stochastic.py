@@ -223,7 +223,7 @@ def test_unit_root_gate_verdicts_without_statsmodels():
 
 def test_vendored_adf_matches_statsmodels():
     sm = pytest.importorskip("statsmodels.tsa.stattools")
-    from dtfit.stochastic._model import _adf_tau, _adf_pvalue
+    from dtfit.stochastic._stats import _adf_tau, _adf_pvalue
     for s in range(3):
         for x in (np.cumsum(np.random.default_rng(100 + s).standard_normal(400)),
                   gen_ar1(400, 0.9, np.random.default_rng(200 + s))):

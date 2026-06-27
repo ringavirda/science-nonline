@@ -35,6 +35,27 @@ def test_partial_fit_returns_self():
     assert flt.partial_fit(0.0, 0.0) is flt
 
 
+@pytest.mark.parametrize("cls", [EACFilter, LSIFilter])
+def test_running_param_uncertainty_contracts(cls):
+    """Both filters expose a running covariance/std that shrinks as the
+    parameters become identified (the streaming twin of FittingResult.stderr)."""
+    rng = np.random.default_rng(0)
+    t = np.linspace(0, 40, 1500)
+    y = 3.0 * np.sin(1.5 * t) + rng.normal(0, 0.3, t.size)
+    flt = cls("A*sin(w*t)", "t", p0=[1.0, 1.0], window_size=50)
+
+    flt.partial_fit(t[0], y[0])
+    early = float(np.trace(flt.param_cov_))
+    for ti, yi in zip(t[1:], y[1:]):
+        flt.partial_fit(ti, yi)
+
+    assert flt.param_cov_.shape == (2, 2)
+    assert set(flt.stderr_) == {"A", "w"}
+    assert all(v >= 0 for v in flt.stderr_.values())
+    # the posterior covariance has contracted from its large initial value
+    assert float(np.trace(flt.param_cov_)) < early
+
+
 def _feed_step(low: float, high: float, n: int = 120):
     """Run the filter over a clean level step and return (filter, direction)."""
     rng = np.random.default_rng(0)

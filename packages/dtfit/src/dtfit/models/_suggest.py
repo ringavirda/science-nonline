@@ -15,7 +15,7 @@ from scipy.stats import spearmanr
 
 from dtfit.types import FittingResult
 from dtfit.diagnostics import fit_report
-from dtfit.auto import _dominant_period
+from dtfit._signal import dominant_period
 from ._model import Model
 from ._catalog import CATALOG
 
@@ -38,7 +38,7 @@ def _detect_categories(x: np.ndarray, y: np.ndarray) -> set[str]:
     y = np.asarray(y, dtype=float)
     n = y.size
     cats: set[str] = set()
-    _, strength = _dominant_period(y)
+    _, strength = dominant_period(y)
     # a real cycle: a strong spectral peak *and* several zero-crossings of the
     # detrended signal (>= ~2 full periods). Crossing-count separates an
     # oscillation from a single broad hump, which a spectral period alone can't.
@@ -120,6 +120,8 @@ def suggest_models(
     *,
     method: str = "auto",
     top: int | None = None,
+    include: list[str] | None = None,
+    exclude: list[str] | None = None,
 ) -> list[Suggestion]:
     """Fit candidate model families to ``(x, y)`` and rank them by AIC.
 
@@ -131,6 +133,13 @@ def suggest_models(
             never dropped). Each is fit self-seeded via :meth:`Model.fit`.
         method: Fitting method passed to each model (``"auto"`` routes by shape).
         top: If given, return only the best ``top`` suggestions.
+        include: Keep only candidates whose **name** (e.g. ``"logistic"``) or
+            **category** (e.g. ``"decay"``, ``"oscillatory"``) is in this list --
+            restrict the search to families you believe plausible.
+        exclude: Drop candidates whose name or category is in this list -- prune
+            families you know don't apply (e.g. ``exclude=["oscillatory"]`` on a
+            monotone series) without post-filtering the result. Applied after
+            ``include``.
 
     Returns:
         :class:`Suggestion` list sorted best-first (lowest AIC). Candidates whose
@@ -138,6 +147,12 @@ def suggest_models(
         for a quick shortlist, or inspect ``.report`` for the full diagnostics.
     """
     models = candidates if candidates is not None else _shortlist(x, y)
+    if include is not None:
+        inc = set(include)
+        models = [m for m in models if m.name in inc or m.category in inc]
+    if exclude is not None:
+        exc = set(exclude)
+        models = [m for m in models if m.name not in exc and m.category not in exc]
     out: list[Suggestion] = []
     for m in models:
         try:

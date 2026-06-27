@@ -9,7 +9,7 @@ metrics on arrays, use sklearn.metrics / scipy.stats directly.)
 Run headless:        python examples/07_diagnostics.py
 Show the plots too:  python examples/07_diagnostics.py --plot   (needs the viz extra)
 
-Source: [`packages/dtfit/examples/07_diagnostics.py`](https://github.com/ringavirda/science-pylab/blob/main/packages/dtfit/examples/07_diagnostics.py)
+Source: [`packages/dtfit/examples/07_diagnostics.py`](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit/examples/07_diagnostics.py)
 
 ```python
 import sys
@@ -30,7 +30,7 @@ def main() -> None:
 
     rep = fit_report(res, x, y)
     print("== fit_report ==")
-    for k in ("n", "rmse", "r2", "aic", "bic", "durbin_watson"):
+    for k in ("n", "rmse", "r2", "aic", "bic", "durbin_watson", "converged"):
         if k in rep:
             print("  {:14s}: {}".format(k, round(rep[k], 4)
                                         if isinstance(rep[k], float) else rep[k]))
@@ -85,6 +85,7 @@ if __name__ == "__main__":
   aic           : -797.2346
   bic           : -786.6703
   durbin_watson : 2.1299
+  converged     : True
 
 == residual_diagnostics ==
   durbin_watson : 2.13

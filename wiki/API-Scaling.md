@@ -59,12 +59,13 @@ A picklable spec for one fit (a dataclass):
 | `kwargs` | `{}` | method-specific keywords (`p0`, `bounds`, ...) |
 | `label` | `None` | tag carried through to the result (channel name, etc.) |
 
-<a name="batchfittingresult"></a>
-### `BatchFittingResult`
+### Return type
 
-A **deprecated back-compat alias** of [`FittingResult`](API-Types), kept for
-compatibility. `fit_many` now returns full `FittingResult` objects (which are
-picklable and survive a process-pool round trip), each carrying:
+`fit_many` (and the batched / partitioned fitters) return plain
+[`FittingResult`](API-Types) objects -- batch and single fits share the **same**
+type. There is no separate batch type: `FittingResult` is itself picklable (it
+drops its lazily-built callable on pickling and rebuilds it from `expr`/`coeffs`
+on the caller side), so it survives a process-pool round trip and carries:
 
 - `coeffs`, `expr`, `var`, `cov`, `label`, `error` (set instead of `coeffs` when
   the fit raised).
@@ -73,7 +74,9 @@ picklable and survive a process-pool round trip), each carrying:
 
 Because they are real `FittingResult`s, the uncertainty helpers (`stderr`,
 `confidence_intervals`, prediction bands) are available when a covariance was
-produced. Prefer the name `FittingResult` in new code.
+produced.
+
+> The old `BatchFittingResult` alias has been **removed**; use `FittingResult`.
 
 ---
 

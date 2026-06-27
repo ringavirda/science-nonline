@@ -14,7 +14,7 @@ Each differential-transformation fitter uses a different *measurement* of "fit":
 
 Run headless:   python examples/02_fitting_methods.py
 
-Source: [`packages/dtfit/examples/02_fitting_methods.py`](https://github.com/ringavirda/science-pylab/blob/main/packages/dtfit/examples/02_fitting_methods.py)
+Source: [`packages/dtfit/examples/02_fitting_methods.py`](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit/examples/02_fitting_methods.py)
 
 ```python
 import numpy as np

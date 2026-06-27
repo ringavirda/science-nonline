@@ -38,11 +38,10 @@ from dtfit.types import FittingResult
 
 # ``FittingResult`` is itself picklable (it drops its lazily-built callable on
 # pickling and rebuilds it from ``expr``/``coeffs`` on first access), so it
-# doubles as the batch result -- there is no separate lightweight type. The name
-# is kept as an alias for back-compatibility.
-BatchFittingResult = FittingResult
+# doubles as the batch result -- there is no separate lightweight type. Batch and
+# single fits return the same :class:`dtfit.FittingResult`.
 
-__all__ = ["FittingProblem", "BatchFittingResult", "fit_many"]
+__all__ = ["FittingProblem", "fit_many"]
 
 _FITTERS: dict[str, Callable[..., FittingResult]] = {
     "lsi": fit_lsi,

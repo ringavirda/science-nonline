@@ -1,10 +1,16 @@
-"""Compile the dtfit._native C extension with clang.
+"""Compile the dtfit._native C extension with clang (standalone dev builder).
 
 The package works in pure Python without this step; building it swaps the
 compiled numeric kernels in for the SciPy/NumPy fallbacks (see
 ``dtfit/_kernels.py``) and speeds up the integral-based methods. It is a raw
 CPython + NumPy C-API extension compiled directly with clang -- no setuptools /
 pybind11 required, which keeps it working on bleeding-edge Python.
+
+``pip install`` now builds the same extension automatically via the optional
+``Extension`` declared in ``setup.py`` (``optional=True`` -> graceful NumPy
+fallback when no compiler is present). This script remains for the fast dev loop:
+an incremental clang rebuild without a full reinstall, plus the VS Code
+IntelliSense config and ``--clean``.
 
 Cross-platform build:
 

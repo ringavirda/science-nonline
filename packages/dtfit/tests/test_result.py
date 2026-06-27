@@ -1,9 +1,11 @@
 """FittingResult: named params, uncertainty, prediction bands, serialization."""
 
+import warnings
+
 import numpy as np
 import pytest
 
-from dtfit import fit_lsi, FittingResult
+from dtfit import fit_lsi, fit_eac, FittingResult
 
 
 @pytest.fixture
@@ -46,6 +48,33 @@ def test_serialization_roundtrip(fit):
     r2 = FittingResult.from_dict(d)
     assert np.allclose(r2.coeffs, r.coeffs)
     assert np.allclose(r2.predict(t), r.predict(t))  # rebuilt model matches
+    assert r2.x_range == r.x_range  # training range survives the round trip
+
+
+def test_convergence_flag_is_reported(fit):
+    r, t, y = fit
+    # the iterative fitters report optimizer convergence; this clean fit converges
+    assert r.converged is True
+    assert isinstance(r.message, str) and r.message
+    # eac populates it too
+    re = fit_eac(t, y, "a*exp(b*t)", "t", p0=[1.0, 1.0])
+    assert re.converged is True
+
+
+def test_predict_warns_only_on_extrapolation(fit):
+    r, t, y = fit
+    assert r.x_range is not None and r.x_range[0] <= t[0] and r.x_range[1] >= t[-1]
+    # inside the fitted range: no warning
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        r.predict(t, warn_extrapolation=True)
+    # past the fitted range: a UserWarning fires
+    with pytest.warns(UserWarning, match="extrapolat"):
+        r.predict(np.array([t[-1] + 10.0]), warn_extrapolation=True)
+    # opt-in only: default predict never warns
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        r.predict(np.array([t[-1] + 10.0]))
 
 
 def test_summary_is_str(fit):

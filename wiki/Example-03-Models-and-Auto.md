@@ -10,7 +10,7 @@ framework.
 
 Run headless:   python examples/03_models_and_auto.py
 
-Source: [`packages/dtfit/examples/03_models_and_auto.py`](https://github.com/ringavirda/science-pylab/blob/main/packages/dtfit/examples/03_models_and_auto.py)
+Source: [`packages/dtfit/examples/03_models_and_auto.py`](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit/examples/03_models_and_auto.py)
 
 ```python
 from collections import defaultdict

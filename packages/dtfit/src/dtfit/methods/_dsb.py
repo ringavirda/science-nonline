@@ -95,7 +95,7 @@ def fit_dsb(
             "(rank) so the balance can identify them."
         )
 
-    coeffs = _solve_balance(informative, params, n, p0)
+    coeffs, converged, message = _solve_balance(informative, params, n, p0)
     echo("DSB fitted coefficients:", coeffs)
 
     cov = (
@@ -107,7 +107,8 @@ def fit_dsb(
     subs_map = [(p, float(c)) for p, c in zip(params, coeffs)]
     model = sp.lambdify(t, f_sym.subs(subs_map), "numpy")
     return FittingResult(model=model, coeffs=coeffs, cov=cov,
-                         expr=expr, var=var, names=tuple(str(p) for p in params))
+                         expr=expr, var=var, names=tuple(str(p) for p in params),
+                         converged=converged, message=message)
 
 
 def _solve_balance(
@@ -115,10 +116,14 @@ def _solve_balance(
     params: list[sp.Symbol],
     n: int,
     p0: InitialGuess,
-) -> np.ndarray:
+) -> tuple[np.ndarray, bool, str]:
     """Solve the balance: symbolic on the square subsystem (keeping DSB's
     analytical nature), then numeric refinement when overdetermined; fall back to
-    pure numeric least squares if the symbolic solver finds nothing."""
+    pure numeric least squares if the symbolic solver finds nothing.
+
+    Returns ``(coeffs, converged, message)`` -- ``converged`` reflects the numeric
+    refinement/fallback when one runs, else the symbolic solve found a real root.
+    """
     square = balance[:n]
     guess = np.ones(n) if p0 is None else np.asarray(p0, dtype=float)
 
@@ -137,7 +142,7 @@ def _solve_balance(
     if len(balance) > n:
         echo("Overdetermined balance; refining numerically.")
         return _solve_numeric(balance, params, best)
-    return best
+    return best, True, "symbolic balance solved"
 
 
 def _solve_symbolic(
@@ -165,11 +170,13 @@ def _solve_numeric(
     system: Sequence[sp.Basic] | sp.Expr,
     coeffs: list[sp.Symbol],
     guess: np.ndarray,
-) -> np.ndarray:
-    """Refine / solve the balance by nonlinear least squares from ``guess``."""
+) -> tuple[np.ndarray, bool, str]:
+    """Refine / solve the balance by nonlinear least squares from ``guess``.
+
+    Returns ``(coeffs, converged, message)`` from the least-squares solver."""
     func = sp.lambdify(coeffs, system, "scipy")
     sol = least_squares(lambda c: func(*c), guess.astype(np.float64))
-    return np.asarray(sol.x, dtype=np.float64)
+    return np.asarray(sol.x, dtype=np.float64), bool(sol.success), str(sol.message)
 
 
 def _balance_funcs(balance: list[sp.Expr], params: list[sp.Symbol]):

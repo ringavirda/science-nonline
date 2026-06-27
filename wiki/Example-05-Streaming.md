@@ -14,7 +14,7 @@ the .tracking() / .robust() presets instead of the ~20 raw knobs.
 
 Run headless:   python examples/05_streaming.py
 
-Source: [`packages/dtfit/examples/05_streaming.py`](https://github.com/ringavirda/science-pylab/blob/main/packages/dtfit/examples/05_streaming.py)
+Source: [`packages/dtfit/examples/05_streaming.py`](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit/examples/05_streaming.py)
 
 ```python
 import numpy as np

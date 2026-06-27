@@ -1,10 +1,8 @@
 name: Publish Wiki
 
-# Mirrors the generated wiki/ pages into the GitHub wiki repo
+# Mirrors the wiki/ pages into the GitHub wiki repo
 # (https://github.com/ringavirda/science-nonline.wiki.git) on every push to main.
-# The pages are produced from docs/ by scripts/build_wiki.py and committed under
-# wiki/; this job just publishes them. Run that script and commit before pushing:
-#   python scripts/build_wiki.py
+# The pages are maintained directly in wiki/; this job just publishes them.
 
 on:
   push:

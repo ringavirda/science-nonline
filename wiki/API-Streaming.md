@@ -52,10 +52,21 @@ parameters and detects drift.
   window fills. `update` is an alias (recursive-filter naming).
 - `predict(x) -> ndarray` -- evaluate the current model at `x`.
 - `params_ -> dict[str, float]` -- current parameter estimate.
+- `param_cov_ -> ndarray` -- the running parameter covariance `P` (the Kalman
+  state covariance), shape `(n_params, n_params)` -- the streaming analogue of
+  [`FittingResult.cov`](API-Types). Large early on, it contracts as the parameters
+  become identified and re-inflates on a detected drift.
+- `stderr_ -> dict[str, float]` -- per-parameter running standard errors (`sqrt`
+  of the `param_cov_` diagonal), the online twin of
+  [`FittingResult.stderr`](API-Types) -- an uncertainty band on the streamed
+  estimate (embedded control, fault detection).
 - `inflate(factor=None) -> None` -- manually inflate the covariance (the re-arm hook).
 - `n_drifts_` -- drifts detected so far; `drift_flag_` -- `True` only on the exact
   step a drift fires; `last_drift_direction_` -- `+1` up / `-1` down / `0` none;
   `last_residual_` -- most recent one-step innovation (NaN until the window fills).
+
+Both `param_cov_` and `stderr_` are shared by [`LSIFilter`](#lsifilter) (same
+Kalman-state surface).
 
 ```python
 from dtfit import EACFilter

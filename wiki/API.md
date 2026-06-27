@@ -38,7 +38,7 @@ signatures, arguments, return types, and behavior.
 | **Model framework** | `models`, `Model`, `suggest_models` (+ catalog families) | [models.md](API-Models) |
 | **Stochastic series** | `fit_stochastic`, `StochasticModel`, `StochasticFilter`, `Stochastic`, `stochastic` (estimators) | [stochastic.md](API-Stochastic) |
 | **Streaming / online** | `EACFilter`, `LSIFilter`, `FilterBank`, `FusedChiSquareDetector` | [streaming.md](API-Streaming) |
-| **Scaling backends** | `fit_many`, `FittingProblem`, `BatchFittingResult` (alias of `FittingResult`), `PartitionedLSI`, `PartitionedEAC`, `PartitionedBatchLSI`, `fit_lsi_batched` (`project_spectra` lives in `dtfit.scale`) | [scaling.md](API-Scaling) |
+| **Scaling backends** | `fit_many`, `FittingProblem`, `PartitionedLSI`, `PartitionedEAC`, `PartitionedBatchLSI`, `fit_lsi_batched` (`project_spectra` lives in `dtfit.scale`) | [scaling.md](API-Scaling) |
 | **Diagnostics** | `fit_report`, `residual_diagnostics`, `FitDisplay`, `ResidualsDisplay` | [diagnostics.md](API-Diagnostics) |
 | **Logging** | `enable_logging`, `logger` | [below](#logging) |
 
@@ -67,7 +67,7 @@ from dtfit import NonlineRegressor
 from dtfit import EACFilter, LSIFilter, FilterBank, FusedChiSquareDetector
 
 # scaling
-from dtfit import (fit_many, FittingProblem, BatchFittingResult,
+from dtfit import (fit_many, FittingProblem,
                    PartitionedLSI, PartitionedEAC, PartitionedBatchLSI,
                    fit_lsi_batched)
 from dtfit.scale import project_spectra   # not top-level

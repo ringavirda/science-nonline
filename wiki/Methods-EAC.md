@@ -118,6 +118,37 @@ the curvature estimate softens toward equal spacing.
 6. **Return** the fitted $\theta$, a `lambdify`-ed callable model, and (when
    overdetermined) a parameter covariance estimate.
 
+## Relation to classical (Western) methods
+
+The Pukhov differential-transformation lineage is largely absent from the Western
+literature, but EAC has exact, well-known counterparts there -- naming them makes
+the method legible to a signal-processing or system-identification audience and
+explains *why* the defaults are what they are.
+
+- **Galerkin weighted residuals (Haar test functions).** Requiring the area
+  residual to vanish on each window is exactly a **Galerkin / method-of-weighted-
+  residuals** identification with **piecewise-constant (Haar / indicator) test
+  functions** $\phi_i$: $\int \phi_i\,[x_{\text{data}}-f(\theta)]\,dt = 0$. The
+  exactly-determined ($M=m$) original is the classical square Galerkin system.
+- **Over-identified method of moments (GMM).** The shipped **overdetermined**
+  $M=2m$ form is an **over-identified moment system** -- $2m$ integral-functional
+  (moment) conditions in $m$ unknowns, solved by least squares. This is the lens
+  that justifies "*why $2m$ windows*": Hansen's GMM theory says extra moment
+  conditions reduce estimator variance (and supply the residual covariance an
+  exactly-determined system cannot), which is exactly the $\sim15\%$ variance drop
+  measured above. The robust `loss`/`f_scale` is then a **robust GMM / M-estimator**
+  on those moment conditions.
+- **Alternative routes to the same parameters.** For the special case of sums of
+  exponentials / sinusoids, the classical *algebraic* route is **Prony's method**
+  and its SVD-robust successors **Matrix Pencil / ESPRIT** (recover the modes as
+  roots / subspace eigenvalues rather than by area matching); the *separable*
+  route is **variable projection** (Golub-Pereyra). dtfit's experimental suite runs
+  these head-to-head as baselines -- see [the baselines page](Experimental-Baselines).
+
+In one line: **EAC is the $h$-version (local Haar) Galerkin / GMM** counterpart of
+[LSI](Methods-LSI)'s $p$-version (global spectral) projection -- two faces of the
+same weighted-residual identification.
+
 ## Robustness to outliers -- the robust loss and `f_scale`
 
 EAC accepts a robust least-squares `loss` (`"soft_l1"`, `"cauchy"`, `"huber"`) for

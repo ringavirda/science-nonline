@@ -9,7 +9,7 @@ parameters and returns a self-describing FittingResult.
 
 Run headless:   python examples/01_quickstart.py
 
-Source: [`packages/dtfit/examples/01_quickstart.py`](https://github.com/ringavirda/science-pylab/blob/main/packages/dtfit/examples/01_quickstart.py)
+Source: [`packages/dtfit/examples/01_quickstart.py`](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit/examples/01_quickstart.py)
 
 ```python
 import numpy as np
@@ -28,6 +28,9 @@ def main() -> None:
     print("== fit_lsi: a*exp(b*t) ==")
     print(res.summary())
     print("params:", {k: round(v, 4) for k, v in res.params.items()})
+    # The optimizer's verdict travels with the result: check it before trusting a
+    # fit (converged is False on a misspecified model or a bad seed).
+    print("converged:", res.converged)
 
     # 2. Uncertainty: an overdetermined fit carries a parameter covariance, so it
     #    reports standard errors, confidence intervals and a prediction band.
@@ -38,6 +41,15 @@ def main() -> None:
     xs = np.linspace(x.min(), x.max(), 5)
     y_hat, y_sd = res.predict(xs, return_std=True)
     print("predict(return_std) sd:", np.round(y_sd, 4))
+
+    # opt-in extrapolation guard: predicting past the fitted range is the classic
+    # curve-fitting footgun, so warn_extrapolation flags it instead of silently
+    # returning a wild value.
+    import warnings
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        res.predict(np.array([x.max() + 5.0]), warn_extrapolation=True)
+    print("extrapolation warned:", bool(caught))
 
     # 3. Don't want to choose the estimator? auto_estimate routes by signal shape.
     res2 = auto_estimate(x, y, "a*exp(b*t)", "t")
@@ -57,11 +69,13 @@ FittingResult: a*exp(b*t)
   a = 1.40784 +/- 0.0066
   b = 0.797447 +/- 0.0019
 params: {'a': 1.4078, 'b': 0.7974}
+converged: True
 
 == uncertainty ==
 stderr: {'a': 0.0066, 'b': 0.0019}
 95% CI: {'a': (1.395, 1.421), 'b': (0.794, 0.801)}
 predict(return_std) sd: [0.0066 0.0085 0.0094 0.0094 0.0242]
+extrapolation warned: True
 
 == auto_estimate ==
 params: {'a': 1.4078, 'b': 0.7974}

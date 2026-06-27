@@ -17,7 +17,7 @@ The online (streaming) counterparts live separately in :mod:`dtfit.streaming`.
 
 from ._partitioned import PartitionedLSI, PartitionedEAC, PartitionedBatchLSI
 from ._batched import fit_lsi_batched, project_spectra
-from ._parallel import fit_many, FittingProblem, BatchFittingResult
+from ._parallel import fit_many, FittingProblem
 
 __all__ = [
     "PartitionedLSI",
@@ -27,5 +27,4 @@ __all__ = [
     "project_spectra",
     "fit_many",
     "FittingProblem",
-    "BatchFittingResult",
 ]

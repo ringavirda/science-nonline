@@ -1,4 +1,9 @@
-"""dtfit experiment suite.
+"""dtfit experiment suite -- the *study* tier of ``dtfit-experimental``.
+
+This is the validation research tree, **not** part of the importable library
+contract (see :mod:`dtfit_experimental`): it is exempt from the mypy gate,
+ruff-relaxed, and run notebook-by-notebook rather than imported. The library tier
+(the experimental adaptations) never imports from here.
 
 Two families of experiments, each a folder of self-contained **Jupyter
 notebooks**:

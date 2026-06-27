@@ -56,6 +56,9 @@ def fit_report(result: Any, x: np.ndarray, y: np.ndarray) -> dict[str, Any]:
         "n": n, "n_params": k, "rss": rss, "rmse": rmse, "r2": r2,
         "aic": aic, "bic": bic, "durbin_watson": dw,
     }
+    converged = getattr(result, "converged", None)
+    if converged is not None:
+        report["converged"] = bool(converged)
     if getattr(result, "cov", None) is not None:
         report["params"] = result.params
         report["stderr"] = result.stderr()

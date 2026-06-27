@@ -1,5 +1,10 @@
 [build-system]
-requires = ["setuptools>=61"]
+# numpy is a *build* requirement too: the optional C extension declared in
+# setup.py compiles against the NumPy C-API headers (numpy.get_include()).
+# Building against NumPy 2.x yields kernels backward-compatible with the
+# runtime floor (numpy>=1.24). If the build can't run (no compiler/headers),
+# the extension is optional=True and the install falls back to pure NumPy.
+requires = ["setuptools>=61", "numpy>=2.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -58,7 +63,9 @@ dtfit = [
     "py.typed",          # ship inline type information (PEP 561)
 ]
 # The optional compiled kernels live in the private numeric core
-# (dtfit._core._native); ship their source, type stub and built artifacts.
+# (dtfit._core._native); the extension is declared in setup.py (optional=True)
+# so `pip install` builds it when it can. Ship the source + type stub (and any
+# pre-built artifact, e.g. from build_native.py) as package data too.
 "dtfit._core" = [
     "_native.c",         # source of the optional compiled kernels
     "_native.pyi",       # type stub for the compiled extension

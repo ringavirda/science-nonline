@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from collections.abc import Sequence
 from typing import Any, Callable, Literal, overload
 
@@ -37,6 +38,14 @@ class FittingResult:
         error: Set to a message instead of coefficients when a fit failed inside
             a batch (:func:`dtfit.fit_many`), so one bad problem does not abort
             the batch; ``None`` for a successful fit.
+        converged: Whether the underlying optimizer reported convergence. The
+            iterative fitters (``fit_lsi`` / ``fit_eac``) set this from the
+            solver; ``None`` means the method does not report it. A *successful
+            call* with ``converged is False`` is the silent-failure case to
+            watch -- a result is returned but the optimizer did not settle.
+        message: The optimizer's termination message, when available.
+        x_range: ``(min, max)`` of the training ``x``, recorded so
+            :meth:`predict` can warn on extrapolation; ``None`` when unknown.
     """
 
     def __init__(
@@ -50,6 +59,9 @@ class FittingResult:
         *,
         label: Any = None,
         error: str | None = None,
+        converged: bool | None = None,
+        message: str | None = None,
+        x_range: tuple[float, float] | None = None,
     ) -> None:
         self.coeffs = np.asarray(coeffs, dtype=float)
         self.cov = cov
@@ -59,12 +71,19 @@ class FittingResult:
         self._model = model
         self.label = label
         self.error = error
+        self.converged = converged
+        self.message = message
+        self.x_range = (
+            None if x_range is None
+            else (float(x_range[0]), float(x_range[1]))
+        )
 
     def __repr__(self) -> str:
         if self.error is not None:
             return f"FittingResult(error={self.error!r}, label={self.label!r})"
+        conv = "" if self.converged is not False else ", converged=False"
         return (f"FittingResult(expr={self.expr!r}, "
-                f"params={self.params!r})")
+                f"params={self.params!r}{conv})")
 
     # Picklability: the lazily-built ``_model`` is a lambdified closure that does
     # not survive a process-pool round trip, so drop it on pickling -- it rebuilds
@@ -130,19 +149,38 @@ class FittingResult:
 
     @overload
     def predict(self, x: np.ndarray, *,
-                return_std: Literal[False] = False) -> np.ndarray: ...
+                return_std: Literal[False] = False,
+                warn_extrapolation: bool = ...) -> np.ndarray: ...
     @overload
     def predict(self, x: np.ndarray, *,
-                return_std: Literal[True]) -> tuple[np.ndarray, np.ndarray]: ...
+                return_std: Literal[True],
+                warn_extrapolation: bool = ...) -> tuple[np.ndarray, np.ndarray]: ...
 
-    def predict(self, x: np.ndarray, *, return_std: bool = False):
+    def predict(self, x: np.ndarray, *, return_std: bool = False,
+                warn_extrapolation: bool = False):
         """Evaluate the fitted model at ``x``.
 
         With ``return_std=True`` also returns the 1-sigma prediction standard
         deviation propagated from the parameter covariance (delta method); this
         needs ``cov`` and the model ``expr``.
+
+        With ``warn_extrapolation=True`` a :class:`UserWarning` is issued when any
+        ``x`` falls outside the fitted training range (:attr:`x_range`) -- a
+        nonlinear model can extrapolate to nonsense, so this catches the most
+        common curve-fitting mistake. No-op when the training range is unknown.
         """
         x = np.asarray(x, dtype=float)
+        if warn_extrapolation and self.x_range is not None and x.size:
+            lo, hi = self.x_range
+            xmin, xmax = float(np.min(x)), float(np.max(x))
+            if xmin < lo or xmax > hi:
+                warnings.warn(
+                    f"predict() called outside the fitted range "
+                    f"[{lo:.6g}, {hi:.6g}] (got [{xmin:.6g}, {xmax:.6g}]); "
+                    "the nonlinear model is extrapolating.",
+                    UserWarning,
+                    stacklevel=2,
+                )
         y = np.asarray(self.model(x), dtype=float)
         if np.ndim(y) == 0:
             y = np.full_like(x, float(y))
@@ -185,18 +223,21 @@ class FittingResult:
             "names": list(self.names),
             "coeffs": self.coeffs.tolist(),
             "cov": None if self.cov is None else np.asarray(self.cov, float).tolist(),
+            "x_range": None if self.x_range is None else list(self.x_range),
         }
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "FittingResult":
         """Rebuild a :class:`FittingResult` from :meth:`to_dict` output."""
         cov = d.get("cov")
+        xr = d.get("x_range")
         return cls(
             coeffs=np.asarray(d["coeffs"], dtype=float),
             cov=None if cov is None else np.asarray(cov, dtype=float),
             expr=d["expr"],
             var=d["var"],
             names=tuple(d.get("names", ())),
+            x_range=None if xr is None else (float(xr[0]), float(xr[1])),
         )
 
     # human-readable summary
@@ -209,4 +250,7 @@ class FittingResult:
                 lines.append(f"  {n} = {v:.6g} +/- {se[n]:.3g}")
             else:
                 lines.append(f"  {n} = {v:.6g}")
+        if self.converged is False:
+            msg = f" ({self.message})" if self.message else ""
+            lines.append(f"  [warning] optimizer did not converge{msg}")
         return "\n".join(lines)

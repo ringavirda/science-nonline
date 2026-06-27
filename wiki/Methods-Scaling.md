@@ -114,8 +114,7 @@ models), `fit_many(problems, n_jobs=...)` fans the fits across a `joblib` pool
 is captured per-problem (its `error` set) rather than aborting the batch; results
 come back in input order as ordinary picklable
 [`FittingResult`](API-Types)s, each carrying the problem's `.label` (and `.error`
-when it failed). `BatchFittingResult` remains a back-compat alias of
-`FittingResult`.
+when it failed) -- batch and single fits return the same type.
 
 ## Optimizations and guards
 

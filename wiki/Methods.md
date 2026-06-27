@@ -138,6 +138,29 @@ methods go further and replace the monomial spectrum with a better-conditioned
 
 ---
 
+## Relation to classical (Western) methods
+
+The differential-transformation framing is native to the Pukhov school and largely
+invisible in the Western literature, so each batch method is restated here in the
+vocabulary a Western reviewer knows. The two production fitters are the two faces of
+one **weighted-residual (Galerkin) identification**:
+
+| dtfit method | classical identity | classical relatives (same goal, different route) |
+|---|---|---|
+| **EAC** (area matching) | Galerkin with piecewise-constant **Haar** test functions; the overdetermined $2m$-window form is an **over-identified method of moments (GMM)** | Prony / Matrix-Pencil / **ESPRIT** (algebraic pole recovery), variable projection |
+| **LSI** (orthogonal-basis spectral match) | a **spectral ($p$-version) Galerkin** projection / weighted integral least-squares in a Legendre basis | classical **method of moments** (the monomial form is LSI's ill-conditioned ancestor), variable projection, Prony/ESPRIT for cycles |
+
+So EAC and LSI are the **$h$-version (local Haar)** and **$p$-version (global
+spectral)** of the same projection, both derivable from classical moment-matching
+([Pearson](https://en.wikipedia.org/wiki/Method_of_moments_(statistics)),
+[Hansen's GMM](https://en.wikipedia.org/wiki/Generalized_method_of_moments)). The
+per-method pages develop this ([EAC](Methods-EAC#relation-to-classical-western-methods),
+[LSI](Methods-LSI#relation-to-classical-western-methods)), and the experimental
+suite runs all of these classical methods as **runnable baselines** -- see
+[the baselines page](Experimental-Baselines).
+
+---
+
 ## Reproducing the figures and tables
 
 All figures in `figures/` and every comparison table in these docs are produced by
@@ -157,4 +180,8 @@ the established **baselines** each method is measured against are documented in
 [../experimental/](Experimental). Baselines include SciPy `curve_fit`
 (Levenberg-Marquardt NLS, the gold standard), robust NLLS, `numpy.polyfit`, a
 Gaussian process, ARIMA/ETS/Theta, MLP/LSTM nets, an EKF, RLS and a
-constant-acceleration Kalman filter.
+constant-acceleration Kalman filter -- plus the **Western parameter-estimation
+lineage** (Prony, Matrix-Pencil / ESPRIT, variable projection, method of moments)
+and a **classical-estimator twin of the stochastic model** (ADF / OLS /
+periodogram / DFA / GARCH-QMLE), so the differential-transformation route is
+compared against the textbook toolkit it is meant to improve on.

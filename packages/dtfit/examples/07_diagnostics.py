@@ -26,7 +26,7 @@ def main() -> None:
 
     rep = fit_report(res, x, y)
     print("== fit_report ==")
-    for k in ("n", "rmse", "r2", "aic", "bic", "durbin_watson"):
+    for k in ("n", "rmse", "r2", "aic", "bic", "durbin_watson", "converged"):
         if k in rep:
             print("  {:14s}: {}".format(k, round(rep[k], 4)
                                         if isinstance(rep[k], float) else rep[k]))

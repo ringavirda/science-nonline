@@ -44,16 +44,20 @@ from dtfit_experimental import fit_joint
 
 from dtfit_experimental.experiments.common import EXPERIMENTS_DIR, metrics
 from dtfit_experimental.experiments.common import baselines as bl
-from dtfit_experimental.experiments.common.baselines import mlp_curve, gp_curve
+from dtfit_experimental.experiments.common.baselines import (
+    mlp_curve, gp_curve,
+    prony_fit, matrix_pencil_fit, varpro_fit, moment_match_fit,
+)
 
 __all__ = [
     "MODELS", "FAMILY_REASON",
     "gen", "param_err", "safe", "metrics",
     "est_lsi", "est_eac", "est_adaptive", "est_ensemble", "est_merged",
-    "est_nlls", "est_robust_nlls", "mlp_curve", "gp_curve",
+    "est_nlls", "est_robust_nlls", "est_moment", "mlp_curve", "gp_curve",
+    "prony_fit", "matrix_pencil_fit", "varpro_fit", "moment_match_fit",
     "A_METHODS", "DT_LABELS", "applicability_verdict",
     "noise_sweep", "outlier_sweep", "learner_curve_fit",
-    "regime_rows", "joint_channels", "load_data",
+    "regime_rows", "joint_channels", "subspace_rate_recovery", "load_data",
     "f_expgrow",
 ]
 
@@ -291,6 +295,18 @@ def est_robust_nlls(m, t, y):
     return dict(zip(m["names"], p))
 
 
+def est_moment(m, t, y):
+    """Method of moments / GMM (monomial integral moments) -- the *unconditioned*
+    integral-projection baseline. It matches the model's integral moments to the
+    data's exactly as EAC/LSI match areas/spectra, but with monomial (not
+    orthogonal) test functions, so it carries the Hilbert-matrix ill-conditioning
+    that LSI's Legendre reconditioning removes -- the fair "what does the
+    reconditioning buy?" foil across every family."""
+    p = bl.moment_match_fit(t, y, m["func"], m["p0"],
+                            bounds=_eac_bounds(m["bounds"]))
+    return dict(zip(m["names"], p))
+
+
 def safe(fn, m, t, y):
     """Run estimator ``fn`` and return its mean relative parameter-recovery error
     in % (NaN if it raises) -- the uniform cell the tables/sweeps fill."""
@@ -305,7 +321,11 @@ def safe(fn, m, t, y):
 # --------------------------------------------------------------------------- #
 A_METHODS = [("dtfit LSI", est_lsi), ("dtfit EAC", est_eac),
              ("dtfit adaptive-EAC (#6)", est_adaptive),
-             ("dtfit merged", est_merged), ("SciPy NLLS (gold)", est_nlls)]
+             ("dtfit merged", est_merged), ("SciPy NLLS (gold)", est_nlls),
+             # The unconditioned integral-moment ancestor of LSI -- included as
+             # the honest "what does the Legendre reconditioning buy?" foil (it
+             # is expected to trail on the higher-parameter families).
+             ("Method of moments", est_moment)]
 DT_LABELS = ["dtfit LSI", "dtfit EAC", "dtfit adaptive-EAC (#6)", "dtfit merged"]
 
 
@@ -445,6 +465,75 @@ def joint_channels(rng):
     indep_scatter = float(np.std(indep)) if indep else float("nan")
     return {"joint_err": float(joint_err), "indep_err": indep_err,
             "indep_scatter": indep_scatter}
+
+
+# --------------------------------------------------------------------------- #
+# Part C2 -- the Western signal-parameter lineage head-to-head
+# (Prony / Matrix Pencil / ESPRIT, the comparison a signal-processing reviewer
+# outside the Pukhov school asks for). Scoped to the two textbook, offset-clean
+# tasks where a subspace mode maps unambiguously to one physical quantity.
+# --------------------------------------------------------------------------- #
+def _dominant_mode_rate(model) -> float:
+    """Real part (growth/decay rate) of the highest-amplitude recovered mode."""
+    i = int(np.argmax(np.abs(model.amp)))
+    return float(model.rate[i].real)
+
+
+def _dominant_mode_frequency(model) -> float:
+    """Angular frequency ``|Im(rate)|`` of the highest-amplitude oscillatory mode."""
+    osc = model.frequency > 1e-9
+    if not np.any(osc):
+        return 0.0
+    amps = np.where(osc, np.abs(model.amp), -np.inf)
+    return float(model.frequency[int(np.argmax(amps))])
+
+
+def subspace_rate_recovery(rng, *, n=400, noise=0.03):
+    """dtfit vs the Western signal-parameter lineage on the tasks the subspace
+    methods were built for.
+
+    Compares dtfit LSI, gold-standard SciPy NLLS, classical **Prony** and the
+    SVD-robust **Matrix Pencil / ESPRIT** on recovering:
+
+    * a single exponential's **growth rate** ``b`` (``expgrow``);
+    * a sinusoid's **angular frequency** ``w`` (``sine``, mean-removed so the
+      subspace sees one clean conjugate pair).
+
+    These two families are where a Prony-family mode maps to exactly one physical
+    quantity, so the head-to-head is apples-to-apples. Returns a list of
+    ``{"task", "quantity", "true", "<method>": err% ...}`` rows.
+    """
+    def err(est_val, true_val):
+        return float(abs(est_val - true_val) / abs(true_val) * 100)
+
+    rows = []
+
+    eg = _model("expgrow")
+    t, y, _ = gen(eg, rng, n=n, noise=noise)
+    b_true = eg["true"]["b"]
+    rows.append({
+        "task": "exp growth rate (a*exp(b*t))", "quantity": "b", "true": b_true,
+        "dtfit LSI": err(est_lsi(eg, t, y)["b"], b_true),
+        "SciPy NLLS": err(est_nlls(eg, t, y)["b"], b_true),
+        "Prony": err(_dominant_mode_rate(prony_fit(t, y, 1)), b_true),
+        "Matrix Pencil/ESPRIT":
+            err(_dominant_mode_rate(matrix_pencil_fit(t, y, 1)), b_true),
+    })
+
+    si = _model("sine")
+    t, y, _ = gen(si, rng, n=n, noise=noise)
+    w_true = si["true"]["w"]
+    yc = y - float(np.mean(y))
+    rows.append({
+        "task": "sinusoid frequency (A*sin(w*t+p))", "quantity": "w",
+        "true": w_true,
+        "dtfit LSI": err(est_lsi(si, t, y)["w"], w_true),
+        "SciPy NLLS": err(est_nlls(si, t, y)["w"], w_true),
+        "Prony": err(_dominant_mode_frequency(prony_fit(t, yc, 2)), w_true),
+        "Matrix Pencil/ESPRIT":
+            err(_dominant_mode_frequency(matrix_pencil_fit(t, yc, 2)), w_true),
+    })
+    return rows
 
 
 # --------------------------------------------------------------------------- #

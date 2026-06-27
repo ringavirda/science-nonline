@@ -32,6 +32,7 @@ import numpy as np
 import sympy as sp
 
 from dtfit.types import FittingResult, InitialGuess
+from dtfit._signal import dominant_period
 from dtfit.methods import (
     fit_lsi,
     fit_eac,
@@ -41,28 +42,6 @@ from dtfit.methods import (
 
 
 # shared helpers
-def _dominant_period(y: np.ndarray, *, min_period: int = 4) -> tuple[float, float]:
-    """``(period_samples, strength)`` of the strongest spectral peak of a
-    linearly-detrended series; ``strength`` is the peak's share of detrended
-    power in ``[0, 1]`` (small => no real cycle)."""
-    y = np.asarray(y, dtype=float)
-    n = y.size
-    if n < 2 * min_period:
-        return float("nan"), 0.0
-    t = np.arange(n)
-    resid = y - np.polyval(np.polyfit(t, y, 1), t)
-    spec = np.abs(np.fft.rfft(resid)) ** 2
-    freqs = np.fft.rfftfreq(n, d=1.0)
-    spec[0] = 0.0
-    valid = (freqs > 1.0 / max(n, 1)) & (freqs <= 1.0 / min_period)
-    if not valid.any() or spec[valid].sum() == 0:
-        return float("nan"), 0.0
-    k = int(np.argmax(np.where(valid, spec, 0.0)))
-    strength = float(spec[k] / spec[1:].sum()) if spec[1:].sum() > 0 else 0.0
-    period = float(1.0 / freqs[k]) if freqs[k] > 0 else float("nan")
-    return period, strength
-
-
 def _ordered(expr: str, var: str, pmap: dict[str, tuple]) -> tuple[list[float], list[tuple[float, float]]]:
     """``(p0, bounds)`` ordered by the model's sorted parameter names -- the
     layout :func:`fit_lsi` uses -- from a ``{name: (p0, lo, hi)}`` map."""
@@ -118,7 +97,7 @@ def auto_estimate(
         if freq_param is not None:
             shape = "oscillatory"
         else:
-            _, strength = _dominant_period(y)
+            _, strength = dominant_period(y)
             shape = "oscillatory" if strength > 0.10 else "bulk"
 
     if shape == "oscillatory":
@@ -171,7 +150,7 @@ def _auto_model(y: np.ndarray, seasonal: bool, season_strength: float) -> str:
     otherwise a quadratic level (caught by the divergence guard if it runs away)."""
     if _looks_like_growth(y) and np.all(y > 0):
         return "logistic"
-    _, strength = _dominant_period(y)
+    _, strength = dominant_period(y)
     return "linear_seasonal" if (seasonal and strength > season_strength) else "poly"
 
 

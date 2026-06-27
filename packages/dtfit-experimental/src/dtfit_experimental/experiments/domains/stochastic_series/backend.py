@@ -46,12 +46,16 @@ from dtfit.stochastic import (
 )
 from dtfit_experimental.experiments.common import EXPERIMENTS_DIR, metrics
 from dtfit_experimental.experiments.common import baselines as bl
+from dtfit_experimental.experiments.common.classical_stochastic import (
+    fit_classical_stochastic, garch_mle_persistence, classical_decompose,
+)
 
 __all__ = [
     "gen_arfima", "gen_ar1", "gen_garch", "gen_ar2_cycle", "gen_trend_cycle",
     "exp_hurst_aggvar", "exp_hurst_spectral", "exp_ar1", "exp_garch",
     "exp_cycle", "exp_decompose",
     "exp_merged_router", "forecast_skill", "exp_forecast_skill",
+    "exp_model_comparison",
     "load_series", "exp_real_data",
     "REAL_DATASETS", "hurst_comparison", "exp_real_suite", "panel_forecasts",
     "exp_online_filter", "filter_trace",
@@ -263,7 +267,7 @@ def exp_garch(seeds: int = 8, *, n: int = 4000,
               params: tuple[tuple[float, float, float], ...] = (
                   (0.05, 0.08, 0.90), (0.05, 0.10, 0.85), (0.02, 0.05, 0.93))
               ) -> dict:
-    dt_e = []
+    dt_e, base_e = [], []
     for (omega, alpha, beta) in params:
         persist = alpha + beta
         for s in range(seeds):
@@ -273,13 +277,19 @@ def exp_garch(seeds: int = 8, *, n: int = 4000,
                 dt_e.append(_rel(est, persist))
             except Exception:
                 dt_e.append(np.nan)
+            # baseline: the textbook GARCH(1,1) Gaussian QMLE persistence
+            try:
+                base_e.append(_rel(garch_mle_persistence(r), persist))
+            except Exception:
+                base_e.append(np.nan)
     err = _mean(dt_e)
     return {
         "id": "E4", "name": "volatility persistence (GARCH(1,1))",
         "param": "alpha+beta", "metric": "rel.err %",
-        "dt_err": err, "base_err": float("nan"),
+        "dt_err": err, "base_err": _mean(base_e),
         "verdict": _verdict(err, 12.0, 30.0),
         "method": "LSI exponential fit to ACF of |returns|",
+        "extra": {"GARCH(1,1) QMLE": _mean(base_e)},
     }
 
 
@@ -324,6 +334,7 @@ def exp_decompose(seeds: int = 8, *, n: int = 600, slope: float = 0.02,
                   period: float = 50.0, amp: float = 3.0,
                   noise_sd: float = 1.0) -> dict:
     slope_e, period_e = [], []
+    bslope_e, bperiod_e = [], []
     for s in range(seeds):
         t, y = gen_trend_cycle(n, slope, period, amp, noise_sd,
                                np.random.default_rng(6000 + s))
@@ -334,14 +345,24 @@ def exp_decompose(seeds: int = 8, *, n: int = 600, slope: float = 0.02,
         except Exception:
             slope_e.append(np.nan)
             period_e.append(np.nan)
+        # baseline: textbook OLS trend + FFT-periodogram cycle
+        try:
+            bdec = classical_decompose(t, y, trend_deg=1)
+            bslope_e.append(_rel(bdec["slope"], slope))
+            bperiod_e.append(_rel(bdec["period"], period))
+        except Exception:
+            bslope_e.append(np.nan)
+            bperiod_e.append(np.nan)
     err = _mean([_mean(slope_e), _mean(period_e)])
+    base_err = _mean([_mean(bslope_e), _mean(bperiod_e)])
     return {
         "id": "E6", "name": "trend + cycle decomposition",
         "param": "slope & period", "metric": "rel.err %",
-        "dt_err": err, "base_err": float("nan"),
+        "dt_err": err, "base_err": base_err,
         "verdict": _verdict(err, 12.0, 30.0),
         "method": "LSI trend + oscillatory-recipe cycle",
-        "extra": {"slope_err": _mean(slope_e), "period_err": _mean(period_e)},
+        "extra": {"slope_err": _mean(slope_e), "period_err": _mean(period_e),
+                  "OLS+periodogram": base_err},
     }
 
 
@@ -392,29 +413,41 @@ def _router_cases() -> list[tuple[str, str, object]]:
 
 
 def exp_merged_router(seeds: int = 8) -> dict:
-    """Run ``fit_stochastic`` over every process and score regime-ID accuracy."""
+    """Run ``fit_stochastic`` over every process and score regime-ID accuracy --
+    head-to-head with the classical-estimator twin (``fit_classical_stochastic``)
+    on the *same* gated routing, so the comparison isolates the estimator."""
     rows = []
     correct = total = 0
+    c_correct = 0
     for name, expect, gen in _router_cases():
-        hits = 0
+        hits = c_hits = 0
         for s in range(seeds):
+            series = gen(700 + s)
             try:
-                if _regime_match(fit_stochastic(gen(700 + s)), expect):
+                if _regime_match(fit_stochastic(series), expect):
                     hits += 1
             except Exception:
                 pass
+            try:
+                if _regime_match(fit_classical_stochastic(series), expect):
+                    c_hits += 1
+            except Exception:
+                pass
         rows.append({"process": name, "expected": expect,
-                     "detected %": 100.0 * hits / seeds})
+                     "detected %": 100.0 * hits / seeds,
+                     "classical %": 100.0 * c_hits / seeds})
         correct += hits
+        c_correct += c_hits
         total += seeds
     acc = 100.0 * correct / total if total else float("nan")
+    c_acc = 100.0 * c_correct / total if total else float("nan")
     return {
         "id": "E7", "name": "merged router (regime identification)",
         "param": "regime", "metric": "accuracy %",
-        "dt_err": 100.0 - acc, "base_err": float("nan"),
+        "dt_err": 100.0 - acc, "base_err": 100.0 - c_acc,
         "verdict": _verdict(100.0 - acc, 10.0, 25.0),
         "method": "fit_stochastic gated composition", "accuracy": acc,
-        "rows": rows,
+        "classical_accuracy": c_acc, "rows": rows,
     }
 
 
@@ -467,6 +500,65 @@ def exp_forecast_skill(seeds: int = 5) -> dict:
                      **{k: _mean(v) for k, v in ratios.items()}})
     return {"id": "E8", "name": "forecast skill (RMSE ratio to random walk)",
             "rows": rows}
+
+
+# --------------------------------------------------------------------------- #
+# E8b -- the head-to-head: the SAME stochastic model, dtfit estimators vs the
+# classical estimators. Confirms whether routing the characterization through
+# dtfit's integral fitters actually improves on the textbook toolkit, on the
+# one axis that matters end-to-end: held-out forecast skill.
+# --------------------------------------------------------------------------- #
+def exp_model_comparison(seeds: int = 5) -> dict:
+    """``fit_stochastic`` vs its classical twin ``fit_classical_stochastic`` on
+    held-out forecasting across the structured regimes.
+
+    Both models run the *same* gated routing and the *same* regime-appropriate
+    forecaster set; the only difference is the estimator (dtfit's LSI/EAC integral
+    fits vs OLS / GARCH-QMLE / periodogram / DFA). For each process the last
+    ``h`` points are held out and scored by RMSE; the table reports each model's
+    RMSE ratio to the random walk (``< 1`` beats RW) and which model wins, so the
+    improvement (if any) from the dtfit route is explicit.
+    """
+    cases = [
+        ("trend + cycle", lambda s: gen_trend_cycle(
+            400, 0.03, 40.0, 3.0, 1.0, np.random.default_rng(s))[1], 40),
+        ("AR(2) cycle", lambda s: gen_ar2_cycle(
+            1200, 16.0, 0.97, np.random.default_rng(s)), 40),
+        ("AR(1) mean-revert", lambda s: gen_ar1(
+            800, 0.6, np.random.default_rng(s)), 30),
+        ("trend (linear)", lambda s: gen_trend_cycle(
+            400, 0.05, 1e9, 0.0, 1.0, np.random.default_rng(s))[1], 40),
+    ]
+    rows = []
+    dtfit_wins = 0
+    for name, gen, h in cases:
+        dt_r, cl_r = [], []
+        for s in range(seeds):
+            y = gen(900 + s)
+            train, test = y[:-h], y[-h:]
+            rw = metrics(test, bl.random_walk_forecast(train, h))["RMSE"] + 1e-12
+            try:
+                dt_r.append(metrics(test, fit_stochastic(train).forecast(h))["RMSE"] / rw)
+            except Exception:
+                dt_r.append(np.nan)
+            try:
+                cl_r.append(metrics(
+                    test, fit_classical_stochastic(train).forecast(h))["RMSE"] / rw)
+            except Exception:
+                cl_r.append(np.nan)
+        dt_ratio, cl_ratio = _mean(dt_r), _mean(cl_r)
+        winner = ("dtfit" if dt_ratio < cl_ratio else "classical"
+                  if np.isfinite(dt_ratio) and np.isfinite(cl_ratio) else "--")
+        dtfit_wins += int(winner == "dtfit")
+        rows.append({"process": name, "h": h, "dtfit/RW": dt_ratio,
+                     "classical/RW": cl_ratio, "winner": winner})
+    return {
+        "id": "E8b", "name": "model head-to-head (dtfit vs classical estimators)",
+        "rows": rows, "dtfit_wins": dtfit_wins, "n_cases": len(cases),
+        "verdict": ("dtfit improves" if dtfit_wins > len(cases) / 2
+                    else "comparable" if dtfit_wins == len(cases) / 2
+                    else "classical better"),
+    }
 
 
 # --------------------------------------------------------------------------- #
@@ -885,10 +977,11 @@ if __name__ == "__main__":  # pragma: no cover
         if "extra" in r:
             print(f"  {r['id']} detail: {r['extra']}")
         if r["id"] == "E7":
-            print(f"  E7 regime-ID accuracy: {r['accuracy']:.0f}%")
+            print(f"  E7 regime-ID accuracy: dtfit {r['accuracy']:.0f}%  vs "
+                  f"classical {r['classical_accuracy']:.0f}%")
             for rr in r["rows"]:
                 print(f"     {rr['process']:<22} {rr['expected']:<14} "
-                      f"{rr['detected %']:.0f}%")
+                      f"dtfit {rr['detected %']:.0f}%  classical {rr['classical %']:.0f}%")
         if r["id"] == "E11":
             print(f"  E11 streaming: phi track MAE {r['track_mae']:.3f}, "
                   f"break hit-rate {r['break_hit_rate']:.0f}%, "
@@ -900,6 +993,14 @@ if __name__ == "__main__":  # pragma: no cover
     for rr in fs["rows"]:
         print(" ", rr["process"], {k: round(v, 2) for k, v in rr.items()
                                     if k != "process"})
+
+    print("\n---- E8b model head-to-head: dtfit vs classical estimators ----")
+    cmp = exp_model_comparison(seeds=4)
+    for rr in cmp["rows"]:
+        print(f"  {rr['process']:<20} dtfit/RW={rr['dtfit/RW']:.2f} "
+              f"classical/RW={rr['classical/RW']:.2f}  -> {rr['winner']}")
+    print(f"  verdict: {cmp['verdict']} (dtfit wins {cmp['dtfit_wins']}/"
+          f"{cmp['n_cases']} forecast cases; the dtfit edge is in regime ID, see E7)")
 
     print("\n---- E9 real data: USD/UAH 2014-15 ----")
     rd = exp_real_data()
