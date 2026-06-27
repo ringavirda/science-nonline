@@ -39,4 +39,10 @@ instead of writing a formula, [one-call "just fit it" entry points](API-Auto)
 (`auto_estimate`, `auto_forecast`), and [scaling backends](API-Scaling) for
 big or multi-channel data.
 
+For genuinely **random** data (economic / financial series) there is a dedicated
+[stochastic-series solution](API-Stochastic): it fits the deterministic
+*functionals* of the process (its autocovariance, spectrum, trend/cycle) to
+characterize, forecast, and even generate it (`fit_stochastic`, `Stochastic`), with
+a streaming twin (`StochasticFilter`) that tracks the structure live.
+
 New here? Open [guides/README.md](Guides).

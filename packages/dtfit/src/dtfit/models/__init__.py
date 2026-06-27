@@ -26,6 +26,7 @@ saturating / peak / oscillatory) -- see :data:`CATALOG`.
 """
 
 from ._model import Model
+from ._stochastic import Stochastic
 from ._suggest import suggest_models, Suggestion
 from ._catalog import (
     CATALOG,
@@ -66,6 +67,7 @@ from ._catalog import (
 
 __all__ = [
     "Model",
+    "Stochastic",
     "suggest_models",
     "Suggestion",
     "CATALOG",

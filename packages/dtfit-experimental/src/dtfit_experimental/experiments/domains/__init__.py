@@ -25,6 +25,12 @@ imports it and produces the report (tables, figures, narrative) into
 * ``realtime_gps`` -- streaming LSI/EAC (with external regressors) and a full-IMU
   strapdown fused inside the LSI filter, vs a constant-accel Kalman and a
   gyro-aided coordinated-turn EKF, on a simulated 9-DOF rig.
+* ``stochastic_series`` -- can the deterministic fitters touch *random* series
+  (economic / financial data)? Fits dtfit to the **deterministic functionals**
+  of a stochastic process (autocovariance, spectrum, aggregated variance,
+  trend/cycle) and scores which parameter-recovery routes are viable (Hurst /
+  long memory, mean reversion, volatility persistence, stochastic cycle) against
+  known-truth simulators.
 
 Open and run a notebook directly (``jupyter lab forecasting/forecasting.ipynb``)
 or headless via ``jupyter nbconvert --execute``. ``DOMAINS.md`` indexes them.

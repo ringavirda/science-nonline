@@ -185,6 +185,6 @@ archive/**/*
 # Confidential: research-paper drafts and their generators. This covers both the
 # .docx files AND the scripts, because the scripts embed the full draft prose and
 # author contact details. (scripts/build_wiki.py is wiki tooling and stays tracked.)
-docs/papers/
+papers/
 scripts/paperkit.py
 scripts/build_paper_*.py

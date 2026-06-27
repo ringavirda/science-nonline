@@ -11,8 +11,9 @@ signatures, arguments, return types, and behavior.
 > **Looking for the experimental adaptations** (`fit_lsi_basis`, `fit_joint`,
 > `boosted_fit`)? Those live in the separate `dtfit-experimental` package -- see
 > [../experimental/adaptations-api.md](Experimental-Adaptations-API).
-> (The overlapping-window ensemble `ensemble_fit` has been promoted -- it's in
-> [fitting.md](API-Fitting#ensemble_fit).) This page covers the **stable** `dtfit` API.
+> (The overlapping-window ensemble `ensemble_fit` and the **stochastic-series**
+> solution have been promoted -- see [fitting.md](API-Fitting#ensemble_fit) and
+> [stochastic.md](API-Stochastic).) This page covers the **stable** `dtfit` API.
 
 ## Conventions
 
@@ -35,6 +36,7 @@ signatures, arguments, return types, and behavior.
 | **sklearn estimator** | `NonlineRegressor` | [estimator.md](API-Estimator) |
 | **One-call entry points** | `auto_estimate`, `auto_forecast` | [auto.md](API-Auto) |
 | **Model framework** | `models`, `Model`, `suggest_models` (+ catalog families) | [models.md](API-Models) |
+| **Stochastic series** | `fit_stochastic`, `StochasticModel`, `StochasticFilter`, `Stochastic`, `stochastic` (estimators) | [stochastic.md](API-Stochastic) |
 | **Streaming / online** | `EACFilter`, `LSIFilter`, `FilterBank`, `FusedChiSquareDetector` | [streaming.md](API-Streaming) |
 | **Scaling backends** | `fit_many`, `FittingProblem`, `BatchFittingResult` (alias of `FittingResult`), `PartitionedLSI`, `PartitionedEAC`, `PartitionedBatchLSI`, `fit_lsi_batched` (`project_spectra` lives in `dtfit.scale`) | [scaling.md](API-Scaling) |
 | **Diagnostics** | `fit_report`, `residual_diagnostics`, `FitDisplay`, `ResidualsDisplay` | [diagnostics.md](API-Diagnostics) |
@@ -52,6 +54,11 @@ from dtfit import auto_estimate, auto_forecast
 
 # model framework
 from dtfit import models, Model, suggest_models
+
+# stochastic series (characterize / forecast / generate / track random data)
+from dtfit import fit_stochastic, StochasticModel, StochasticFilter, Stochastic
+from dtfit.stochastic import (hurst_spectral, ar1_reversion, garch_persistence,
+                              cycle_period, decompose_trend_cycle, FORECASTERS)
 
 # sklearn estimator
 from dtfit import NonlineRegressor

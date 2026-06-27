@@ -86,7 +86,12 @@ from dtfit.auto import auto_estimate, auto_forecast
 # Model framework: a catalog of self-seeding model families + a recommender,
 # so users pick structure (not sympy strings) and can infer the right model.
 from dtfit import models
-from dtfit.models import Model, suggest_models
+from dtfit.models import Model, Stochastic, suggest_models
+# Stochastic-series: fit the deterministic functionals of a random process to
+# characterize / forecast / generate it (fit_stochastic) and track it online
+# (StochasticFilter); the Stochastic model wraps it in the .fit() convention.
+from dtfit import stochastic
+from dtfit.stochastic import fit_stochastic, StochasticModel, StochasticFilter
 
 __all__ = [
     "NonlineRegressor",
@@ -95,6 +100,11 @@ __all__ = [
     "models",
     "Model",
     "suggest_models",
+    "stochastic",
+    "Stochastic",
+    "fit_stochastic",
+    "StochasticModel",
+    "StochasticFilter",
     "EACFilter",
     "LSIFilter",
     "FilterBank",

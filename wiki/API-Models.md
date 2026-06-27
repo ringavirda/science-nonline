@@ -9,6 +9,7 @@ choice ergonomic.
 - [`Model`](#model) -- a model family (expression + self-seeder + fit)
 - [`suggest_models`](#suggest_models) / [`Suggestion`](#suggestion) -- fit & rank candidates
 - [the catalog](#catalog) -- the built-in families
+- [`Stochastic`](#stochastic) -- the stochastic-series model in the same `.fit()` convention
 
 ```python
 from dtfit import models
@@ -16,6 +17,8 @@ fit = models.logistic().fit(x, y)                    # self-seeded
 fit = (models.linear() + models.sine()).fit(x, y)    # compose trend + cycle
 for s in suggest_models(x, y)[:3]:
     print(s.name, s.r2, s.aic)
+
+m = models.Stochastic().fit(series)                  # a random series -> StochasticModel
 ```
 
 ---
@@ -128,6 +131,32 @@ models.damped_oscillation()  # oscillatory, carries a freq_param
 Each constructor accepts no required arguments and reads its parameter ranges off
 the data at `fit` time, so the typical use is a one-liner:
 `models.<family>().fit(x, y)`.
+
+---
+
+<a name="stochastic"></a>
+## `Stochastic`
+
+```python
+Stochastic(*, period=None, max_harmonics=4, forecaster="auto", **gates)
+Stochastic.fit(x, y=None) -> StochasticModel
+```
+
+The stochastic-series model in the catalog `.fit()` convention. Unlike the families
+above it does **not** fit a `y = f(x)` curve -- it characterizes a *random series*
+across the stochastic routes (trend / cycle / long memory / mean reversion /
+volatility) behind significance gates -- but it is driven the same way. `fit`
+accepts `fit(series)` or `fit(t, series)` and returns a `StochasticModel` (also on
+`.model_`) that forecasts and generates. It is not a `Model` subclass (no sympy
+expression) and is not in the AIC catalog -- it just shares the convention; full
+reference in [stochastic.md](API-Stochastic). Available as `dtfit.Stochastic` and
+`dtfit.models.Stochastic`.
+
+```python
+from dtfit import Stochastic
+m = Stochastic().fit(series)        # -> a fitted StochasticModel
+print(m.regime); m.forecast(12); m.simulate(200)
+```
 
 ---
 

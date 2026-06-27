@@ -57,6 +57,71 @@ def polyfit_predict(x, y, x_eval, deg=5):
     return np.polyval(c, x_eval)
 
 
+# --------------------------------------------------------------------------- #
+# Hurst-exponent baselines (the established long-memory estimators)
+# --------------------------------------------------------------------------- #
+def hurst_rs(x, *, n_scales=12):
+    """Classic **rescaled-range (R/S) analysis** Hurst estimator (Mandelbrot).
+
+    For each scale ``m`` the average rescaled range ``E[R/S]`` over the
+    non-overlapping windows scales as ``m^H``; ``H`` is the log-log slope.
+    """
+    x = np.asarray(x, dtype=float)
+    N = x.size
+    scales = np.unique(np.round(np.geomspace(8, max(16, N // 4), n_scales)).astype(int))
+    scales = scales[scales >= 8]
+    rs, used = [], []
+    for m in scales:
+        nb = N // m
+        if nb < 1:
+            continue
+        vals = []
+        for b in range(nb):
+            seg = x[b * m:(b + 1) * m]
+            z = np.cumsum(seg - seg.mean())
+            s = seg.std()
+            if s > 0:
+                vals.append((z.max() - z.min()) / s)
+        if vals:
+            rs.append(float(np.mean(vals)))
+            used.append(m)
+    if len(used) < 3:
+        return float("nan")
+    return float(np.polyfit(np.log(used), np.log(rs), 1)[0])
+
+
+def hurst_dfa(x, *, n_scales=12, order=1):
+    """**Detrended fluctuation analysis (DFA)** Hurst estimator (Peng et al.).
+
+    The integrated profile is split into windows of size ``m``; the RMS of the
+    order-``order`` polynomial-detrended fluctuation scales as ``m^H`` (for the
+    cumulative profile the DFA exponent equals the Hurst exponent). ``H`` is the
+    log-log slope.
+    """
+    x = np.asarray(x, dtype=float)
+    N = x.size
+    y = np.cumsum(x - x.mean())
+    scales = np.unique(np.round(np.geomspace(8, max(16, N // 4), n_scales)).astype(int))
+    scales = scales[scales >= 8]
+    F, used = [], []
+    for m in scales:
+        nb = N // m
+        if nb < 1:
+            continue
+        rms = []
+        tt = np.arange(m)
+        for b in range(nb):
+            seg = y[b * m:(b + 1) * m]
+            fit = np.polyval(np.polyfit(tt, seg, order), tt)
+            rms.append(float(np.mean((seg - fit) ** 2)))
+        if rms:
+            F.append(float(np.sqrt(np.mean(rms))))
+            used.append(m)
+    if len(used) < 3:
+        return float("nan")
+    return float(np.polyfit(np.log(used), np.log(F), 1)[0])
+
+
 def mlp_curve(x, y, x_eval, *, hidden=(64, 64), max_iter=2000, seed=0):
     """A black-box neural-net regressor f(x)->y (1-D curve fitting)."""
     from sklearn.neural_network import MLPRegressor

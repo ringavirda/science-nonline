@@ -30,6 +30,7 @@
 - [Estimator](API-Estimator)
 - [Auto](API-Auto)
 - [Models](API-Models)
+- [Stochastic](API-Stochastic)
 - [Streaming](API-Streaming)
 - [Scaling](API-Scaling)
 - [Diagnostics](API-Diagnostics)
@@ -46,6 +47,7 @@
 - [Filter bank](Methods-Filter-Bank)
 - [Scaling](Methods-Scaling)
 - [Auto](Methods-Auto)
+- [Stochastic](Methods-Stochastic)
 
 **Experimental**
 

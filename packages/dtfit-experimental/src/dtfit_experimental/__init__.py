@@ -26,7 +26,11 @@ have already cleared the promotion gate and now live in :mod:`dtfit`:
   ``oscillatory=True`` / ``freq_param=`` (plus ``dtfit.fft_frequency_seed``);
 * the fused multi-axis ``FusedChiSquareDetector`` for a streaming ``FilterBank``;
 * #3 the overlapping-window **ensemble** ``ensemble_fit`` / ``EnsembleResult``
-  (``from dtfit import ensemble_fit``) -- robust to outliers on contaminated data.
+  (``from dtfit import ensemble_fit``) -- robust to outliers on contaminated data;
+* the **stochastic-series** solution -- fit dtfit's deterministic fitters to the
+  deterministic functionals of a random process to characterize / forecast /
+  generate it (``dtfit.stochastic.fit_stochastic`` / ``StochasticModel`` /
+  ``dtfit.Stochastic``) and track it online (``dtfit.stochastic.StochasticFilter``).
 
 The three adaptations below remain here on purpose. #2 ``fit_lsi_basis`` was
 evaluated as a *vocabulary* (it makes periodic/decay models expressible) but **not
@@ -46,6 +50,11 @@ from dtfit._core._backend import available_backends, resolve_backend, Backend
 from .basis_lsi import fit_lsi_basis
 from .joint import fit_joint, JointResult
 from .boosting import boosted_fit, BoostedModel
+
+# The stochastic-series adaptations were promoted into stable ``dtfit`` -- they now
+# live physically there (``from dtfit.stochastic import fit_stochastic,
+# StochasticModel, StochasticFilter, ...`` / ``from dtfit import Stochastic``) and
+# are no longer re-exported from here. The domain harness consumes them from dtfit.
 
 __all__ = [
     "fit_lsi_basis",

@@ -29,6 +29,7 @@ routes to the right variant automatically.
 | **streaming** | **FilterBank / Fusedchi^2** -- multi-stream | [filter_bank.md](Methods-Filter-Bank) | numeric (online) | many streams in lockstep + pooled multi-axis fault detection |
 | **scale** | **Partitioned / Batched** -- map-reduce & GEMM | [scaling.md](Methods-Scaling) | numeric (offline) | one-pass / distributed / many-channel batch fitting |
 | **compose** | **auto_estimate / auto_forecast** | [auto.md](Methods-Auto) | numeric (offline) | shape-routed estimation and structured forecasting |
+| **stochastic** | **Stochastic series** -- fit the functionals of a *random* process | [stochastic.md](Methods-Stochastic) | numeric (offline + online) | characterize / forecast / generate / track random (economic, financial) data |
 
 The production methods (LSI, EAC, the filters, the scale backends) are **numeric
 successors** to the symbolic originals (DSBI -> LSI, DSBE -> EAC). DSB is kept as
