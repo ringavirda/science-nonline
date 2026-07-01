@@ -461,7 +461,8 @@ def load_external(path, *, lat="lat", lon="lon", truth_lat="truth_lat",
     rows = list(csv.DictReader(open(path)))
     if not rows:
         raise ValueError(f"no rows in {path}")
-    g = lambda r, k: float(r[k])
+    def g(r, k):
+        return float(r[k])
     lat0, lon0 = g(rows[0], truth_lat), g(rows[0], truth_lon)
     cl = np.cos(np.radians(lat0)); md = 111320.0
     n = len(rows)
