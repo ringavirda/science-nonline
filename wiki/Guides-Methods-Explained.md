@@ -18,6 +18,7 @@ Quick map:
 - [LSI -- the accurate batch fitter](#lsi)
 - [EAC -- the robust, fast batch fitter](#eac)
 - [The streaming filters -- real-time tracking](#streaming)
+- [Stochastic -- fitting the functionals of a random series](#stochastic)
 
 ---
 
@@ -228,6 +229,12 @@ lowering the variance of the estimate -- and it lets EAC report a parameter
   set near the size of a clean window's area residual (the default `1.0` usually
   dwarfs them, silently behaving like plain least squares). See the worked
   discussion in [example 02](Example-02-Fitting-Methods).
+- `robust=True` (+ `huber_c`) -- a **self-scaling** robust *integral* loss.
+  Instead of tuning `f_scale`, it IRLS-winsorizes each sample's residual to the
+  current model (at `huber_c` MADs) and re-solves a few times, so you get outlier
+  resistance with no scale to guess. The single-fit robustness path of choice when
+  contamination is moderate; for densely corrupted records still prefer
+  `ensemble_fit`.
 - `bounds` -- constrained fits (switches to a trust-region solver).
 - **Curvature windows** (`fit_eac(..., window_mode="curvature")`): instead of the
   default uniform windows, place window edges by **curvature** -- narrow where the
@@ -314,6 +321,81 @@ are detailed in [../methods/equal_areas_filter.md](Methods-Equal-Areas-Filter).
 - **`FilterBank` + `FusedChiSquareDetector`** -- run many streams in lockstep and
   pool their surprises to catch a fault that's too weak in any single stream but
   strong across all of them. -> [api/streaming.md](API-Streaming)
+- **Coasting through gaps** (`filter.coast(x, order=)`, `coast_cov`) -- when
+  measurements drop out, roll the current parameter model forward
+  (dead-reckoning) and grow the uncertainty band with the length of the gap,
+  instead of freezing the last estimate or letting a raw extrapolation diverge.
+- **Sensor fusion / distributed streaming** (`InformationFilter`) -- the
+  inverse-covariance ("information") form of the recursive fit. Its updates are
+  purely **additive**, so independent estimators `fuse()` **exactly** and in any
+  order -- the natural state object for multi-sensor combination and streaming
+  map-reduce. -> [api/streaming.md](API-Streaming)
+
+---
+
+<a name="stochastic"></a>
+## Stochastic -- fitting the functionals of a random series
+
+Full math: [../methods/stochastic.md](Methods-Stochastic).
+
+### The intuition
+
+Everything above fits a *deterministic* law `y = f(t; theta)`. But some series --
+asset returns, interest rates, river levels -- are genuinely **random**: there is
+no smooth `f` to match, and asking a batch method for one is a category error (it
+just fits the noise). The insight is that a random process still has
+**deterministic functionals** -- its autocorrelation, its spectrum, its
+aggregated variance, its trend-plus-cycle -- and *those* have exactly the shapes
+dtfit is built for: an autocorrelation that decays like `exp(-k/tau)`, a
+low-frequency spectrum that follows a power law, a damped cosine. So you fit the
+**functional** with LSI/EAC and read the process's parameters out of its shape.
+
+### How it works
+
+1. Compute a deterministic functional of the series (the sample autocorrelation,
+   or the aggregated-variance curve across block sizes, or the low-frequency
+   spectrum).
+2. Fit that functional with `fit_lsi` / `fit_eac` -- the same machinery as any
+   curve, because its shape is a decaying exponential / power law / damped cosine.
+3. Read the stochastic parameter off the fitted shape: the AR(1) mean-reversion
+   `phi` from the ACF decay, the long-memory **Hurst** exponent from the
+   aggregated-variance (or spectral) slope, the **GARCH** volatility persistence
+   from the ACF of `|returns|`, a stochastic cycle's period from a damped-cosine
+   ACF fit.
+
+### The merged solution
+
+`fit_stochastic(y)` composes these routes behind significance gates into one
+`StochasticModel`: a unit-root test decides stationary vs. random-walk, then the
+trend / seasonal / long-memory / mean-reversion / volatility stages each fire only
+when their signal clears a gate -- so a plain random walk is **not** handed a
+spurious trend or cycle. The model **identifies the regime**, **forecasts** by
+picking the best regime-appropriate model on a rolling backtest (`.forecast`), and
+can **generate** fresh realizations of the same process (`.simulate`, with
+Gaussian or fat-tailed Student-t innovations). `StochasticFilter` is the
+per-sample streaming twin (online regime tracking + change detection). The
+individual estimators -- `hurst_aggvar`, `hurst_spectral`, `ar1_reversion`,
+`garch_persistence`, `cycle_period`, `decompose_trend_cycle`, plus `ar_order` /
+`fit_ar` (finite-order AR, so an AR(2)/AR(3) isn't mistaken for long memory) and
+`fractional_difference` -- are all public in `dtfit.stochastic`.
+
+### Why it's correct
+
+The functionals are population quantities with known parametric forms: an AR(1)'s
+theoretical ACF *is* `phi^k`; an ARFIMA's spectrum *is* a power law near zero
+frequency. Matching the sample functional to that form is an ordinary curve fit,
+and the integral methods' noise-averaging is exactly what a jittery empirical ACF
+needs. The honest limit: dtfit recovers the **regime and its parameters**, not a
+path -- you cannot out-forecast a martingale, and on clean data a dedicated
+likelihood estimator (GARCH-QMLE) can be a touch sharper on the raw parameter. Its
+edge is blind **regime identification** and a single, coherent API from estimator
+to forecast to generator.
+
+### Knobs
+
+- `period=` / `max_harmonics=` -- seasonal control for the trend+cycle route.
+- `forecaster=` -- force a specific forecaster, or `"auto"` to let the backtest pick.
+- `dist="t"`, `df=` -- fat-tailed innovations for `simulate` / forecast intervals.
 
 ---
 

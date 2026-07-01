@@ -9,13 +9,14 @@ the .tracking() / .robust() presets instead of the ~20 raw knobs.
 - LSIFilter           -- streaming Legendre spectrum (twin of fit_lsi).
 - FilterBank          -- many independent streams updated in lockstep.
 - FusedChiSquareDetector -- pools a bank's innovations into one fault test.
+- InformationFilter   -- inverse-covariance form; additive updates fuse() exactly.
 
 Run headless:   python examples/05_streaming.py
 """
 
 import numpy as np
 
-from dtfit import EACFilter, FilterBank
+from dtfit import EACFilter, FilterBank, InformationFilter
 
 
 def track_drifting_parameter(rng) -> None:
@@ -80,12 +81,29 @@ def fused_detector(rng) -> None:
           " first flag at t =", round(fired[0], 1) if fired else None, "(fault at 20)")
 
 
+def information_filter(rng) -> None:
+    # Inverse-covariance ("information") form: updates are additive, so two
+    # estimators built from disjoint data fuse() into the exact state one
+    # estimator would reach seeing all of it -- the natural form for sensor fusion
+    # / streaming map-reduce. Here a line z = a0 + a1*x, streamed as rows h=[1, x],
+    # split across two "sensors" that are then fused.
+    x = np.linspace(0, 1, 200)
+    z = 0.5 + 2.0 * x + rng.normal(0, 0.05, x.size)
+    fa, fb = InformationFilter(2), InformationFilter(2)
+    for i in range(x.size):
+        (fa if i % 2 == 0 else fb).partial_fit([1.0, x[i]], z[i])
+    fused = fa.fuse(fb)
+    print("\n== InformationFilter: additive sensor fusion ==")
+    print("fused theta:", np.round(fused.theta_, 3), " (true [0.5, 2.0])")
+
+
 def main() -> None:
     rng = np.random.default_rng(0)
     track_drifting_parameter(rng)
     preset(rng)
     filter_bank(rng)
     fused_detector(rng)
+    information_filter(rng)
 
 
 if __name__ == "__main__":

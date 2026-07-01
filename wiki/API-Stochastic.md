@@ -22,8 +22,9 @@ exact call reference.
 from dtfit import fit_stochastic, StochasticModel, StochasticFilter, Stochastic
 from dtfit import stochastic            # submodule namespace
 from dtfit.stochastic import (sample_acf, hurst_aggvar, hurst_spectral,
-                              ar1_reversion, garch_persistence, cycle_period,
-                              decompose_trend_cycle, FORECASTERS)
+                              ar1_reversion, ar_order, fit_ar,
+                              fractional_difference, garch_persistence,
+                              cycle_period, decompose_trend_cycle, FORECASTERS)
 from dtfit.models import Stochastic     # also here (catalog convention)
 ```
 
@@ -113,11 +114,15 @@ generator.
   the selected forecaster. With `return_conf_int` returns `(point, lower, upper)`
   whose band growth matches the forecaster (bounded for mean reversion, `~h^(2H)`
   for long memory, `~sqrt(h)` for a random walk / drift).
-- `simulate(n=None, *, seed=None, rng=None) -> ndarray` -- draw a **fresh
-  realization** from the detected components: the deterministic mean plus a
-  residual matched to the regime (AR(1) / ARFIMA long memory / GARCH / integrated
-  walk / white noise). Re-fitting a simulated path recovers the same regime -- the
-  honest test that the model is a faithful generator.
+- `simulate(n=None, *, seed=None, rng=None, dist="normal", df=7.0) -> ndarray` --
+  draw a **fresh realization** from the detected components: the deterministic mean
+  plus a residual matched to the regime (AR(1) / ARFIMA long memory / GARCH /
+  integrated walk / white noise). Re-fitting a simulated path recovers the same
+  regime -- the honest test that the model is a faithful generator. Pass
+  `dist="t"` (with `df` degrees of freedom) for **fat-tailed** Student-t
+  innovations -- a heavier-tailed generator for financial-style returns, so a
+  simulated path or forecast band reflects real tail risk instead of understating
+  it with a Gaussian.
 - `fingerprint() -> dict` -- the detected structure as a flat `{name: value}` map
   (for tables).
 - `summary() -> str` -- a human-readable multi-line summary.
@@ -211,10 +216,12 @@ for x in stream:
 <a name="estimators"></a>
 ## Estimators -- the individual functional routes
 
-Each recovers a stochastic-model parameter by feeding a deterministic functional of
+Most recover a stochastic-model parameter by feeding a deterministic functional of
 the series to [`fit_lsi`](API-Fitting#fit_lsi) / [`fit_eac`](API-Fitting#fit_eac).
 `method="lsi"` (default) / `"eac"` pick the engine; `"ols"` / `"acf1"` are plain
-baselines.
+baselines. The AR helpers (`ar_order` / `fit_ar`) are direct Yule-Walker instead,
+and `fractional_difference` is a transform -- together they let the router tell a
+finite-order AR(p) apart from genuine long memory.
 
 | function | recovers | functional fit |
 |---|---|---|
@@ -224,7 +231,10 @@ baselines.
 | `garch_persistence(returns, *, nlags=None, method="lsi", use="square")` | persistence `alpha+beta`, `tau` | exponential fit to the ACF of `\|returns\|` (`use="abs"`) or squared returns |
 | `cycle_period(x, *, nlags=None)` | cycle `period`, `w`, `damping` | damped-cosine fit to the ACF (oscillatory recipe) |
 | `decompose_trend_cycle(t, y, *, trend_deg=1, with_cycle=True)` | `slope`, `period`, `amp`, fitted `trend`/`cycle`/`residual`, a `forecast(h, dt)` closure | LSI trend + LSI cycle, leaving a stochastic residual |
-| `sample_acf(x, nlags) -> ndarray` | the biased sample autocorrelation `rho[0..nlags]` (the shared functional, FFT-based) |
+| `ar_order(x, *, max_order=8, ic="aic") -> int` | AR order `p` | Yule-Walker AR(k) for `k=0..max_order`, order chosen by `ic` (`"aic"`/`"bic"`) |
+| `fit_ar(x, order=None, *, max_order=8, ic="aic") -> dict` | `order`, `phi`, `sigma` | Yule-Walker AR(p) coefficients + innovation std (order auto-selected if `None`) |
+| `fractional_difference(x, d, *, ntrunc=None) -> ndarray` | the differenced series `(1-B)^d x` | truncated binomial `(1-B)^d` filter -- whitens ARFIMA long memory / stationarizes |
+| `sample_acf(x, nlags) -> ndarray` | the biased sample autocorrelation `rho[0..nlags]` (the shared functional, FFT-based) | |
 
 ```python
 from dtfit.stochastic import hurst_spectral, ar1_reversion

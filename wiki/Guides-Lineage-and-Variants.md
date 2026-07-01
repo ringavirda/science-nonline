@@ -65,6 +65,13 @@ rewritten as **numeric** methods for production, and finally extended to a
   the numeric methods are checked against (not for fitting noisy data).
 - **LSIFilter / EACFilter** are the streaming twins of LSI / EAC -- the same
   matching run recursively per sample.
+- **Stochastic** (`fit_stochastic`, `StochasticModel`, `StochasticFilter`) is a
+  layer built *on top of* LSI/EAC, not a new matcher. A random series has no
+  deterministic `f`, but its **functionals** (autocorrelation, spectrum,
+  aggregated variance, trend+cycle) do -- and they have the exp/power-law/cosine
+  shapes the numeric methods fit. So the stochastic tier fits those functionals
+  with the same LSI/EAC machinery and reads the process parameters out. See
+  [methods-explained.md#stochastic](Guides-Methods-Explained#stochastic).
 
 ---
 
@@ -155,15 +162,23 @@ the complete list across the stable API.
 | **LSI, global search** | `fit_lsi(..., bounds=...)` | differential-evolution -> L-BFGS-B, escapes bad local minima |
 | **LSI oscillatory recipe** | `fit_lsi(..., freq_param="w")` or `oscillatory=True` | smoothing off, order raised to resolve a cycle, frequency seeded from the FFT -- recovers sinusoids to <1% |
 | **EAC (default)** | `fit_eac(...)` | overdetermined equal-areas, most robust/fastest |
-| **EAC, robust loss** | `fit_eac(..., loss="soft_l1", f_scale=...)` | down-weights outlier-contaminated windows |
+| **EAC, robust loss** | `fit_eac(..., loss="soft_l1", f_scale=...)` | down-weights outlier-contaminated windows (needs `f_scale` tuned to the window) |
+| **EAC, robust IRLS** | `fit_eac(..., robust=True, huber_c=...)` | **self-scaling** winsorized integral loss -- outlier resistance with no `f_scale` to guess |
 | **EAC, bounded** | `fit_eac(..., bounds=...)` | constrained trust-region fit |
 | **Curvature EAC** | `fit_eac(..., window_mode="curvature")` | curvature-placed windows for peaks/saturating shapes |
+| **Missing data** | `fit_lsi/fit_eac(..., nan_policy="omit")` | drop NaNs instead of raising |
 | **Ensemble** | `ensemble_fit(...)` | overlapping-window median + spread -- outlier-robust, no `f_scale` tuning |
 | **DSB** | `fit_dsb(...)` | symbolic exact balance (reference only) |
 | **EACFilter** | `EACFilter(...)` | streaming EAC (area measurement) |
 | **LSIFilter** | `LSIFilter(...)` | streaming LSI (spectrum measurement) -- for oscillatory plants |
+| **Gap coasting** | `filter.coast(...)`, `coast_cov(...)` | dead-reckon a streaming fit through measurement dropouts (uncertainty grows with the gap) |
+| **Information filter** | `InformationFilter(...)` | inverse-covariance streaming form; additive, exact `fuse()` for sensor fusion / streaming map-reduce |
 | **Filter bank** | `FilterBank.from_model(...)` | many streams in lockstep |
 | **Fused detector** | `bank.fused_detector(...)` | pool stream innovations for a shared-fault test |
+| **Stochastic fit** | `fit_stochastic(...)` -> `StochasticModel` | detect the regime of a *random* series (long-memory / mean-reversion / GARCH / cycle), forecast it, and `.simulate` it -- by fitting its functionals |
+| **Stochastic streaming** | `StochasticFilter(...)` | per-sample regime tracking + change detection |
+| **Stochastic estimators** | `hurst_aggvar`, `hurst_spectral`, `ar1_reversion`, `garch_persistence`, `cycle_period`, `ar_order`, `fit_ar`, `fractional_difference` | read one process parameter from a functional (all in `dtfit.stochastic`) |
+| **Model wrapper** | `Stochastic().fit(series)` | the catalog `.fit()` convention over `fit_stochastic` |
 | **sklearn estimator** | `NonlineRegressor(..., method=)` | LSI/EAC/DSB behind `fit`/`predict`/`score` |
 | **Auto-estimate** | `auto_estimate(...)` | routes to the variant matching the signal's shape |
 | **Auto-forecast** | `auto_forecast(...)` | structured fit-then-extrapolate, with guards |
@@ -230,6 +245,10 @@ dtfit (stable, public)
 +-- one-call entry points  auto_estimate . auto_forecast
 +-- model framework        models.<family> . Model . suggest_models
 +-- streaming / online     EACFilter . LSIFilter . FilterBank . FusedChiSquareDetector
+|                          InformationFilter   (coast/coast_cov dead-reckon through gaps)
++-- stochastic (random)    fit_stochastic . StochasticModel . StochasticFilter . Stochastic
+|                          estimators: hurst_aggvar/spectral . ar1_reversion . garch_persistence
+|                          cycle_period . decompose_trend_cycle . ar_order . fit_ar . fractional_difference
 +-- scaling backends       fit_many . Partitioned{LSI,EAC,BatchLSI}
 |                          fit_lsi_batched   (dtfit.scale.project_spectra low-level)
 +-- diagnostics            fit_report . residual_diagnostics . FitDisplay . ResidualsDisplay

@@ -8,6 +8,24 @@ choose deliberately.
 
 ---
 
+## 0. A deterministic curve, or a random series?
+
+The first split decides everything else: does your series follow a
+**deterministic law** `y = f(t; theta)` (a decay, growth curve, oscillation,
+saturating rise), or is it genuinely **random** -- asset returns, interest rates,
+river levels -- with no smooth curve to fit?
+
+- **Random series** -> use the **stochastic tier**. `fit_stochastic(y)` detects the
+  regime (long-memory / mean-reversion / GARCH volatility / stochastic cycle /
+  trend+cycle), forecasts it on a rolling backtest, and can `simulate` fresh paths;
+  `StochasticFilter` is the per-sample streaming twin. Fitting a deterministic
+  curve to a martingale is a category error -- you would just fit the noise. See
+  [api/stochastic.md](API-Stochastic) and
+  [methods-explained.md#stochastic](Guides-Methods-Explained#stochastic).
+- **Deterministic curve** -> continue below.
+
+---
+
 ## 1. Which fitting method?
 
 ```
@@ -47,6 +65,13 @@ production fitter (see [methods-explained.md#dsb](Guides-Methods-Explained#dsb))
   `ensemble_fit` fits overlapping windows and takes the median, rejecting whole
   corrupted windows with no `f_scale` tuning -- more reliable than the EAC robust
   loss on spiky data. It's a specialised tool: on clean data prefer a single fit.
+  (For a *single* fit, the self-scaling `fit_eac(..., robust=True)` is the simpler
+  outlier defence -- no `f_scale` to tune.)
+- **Streaming with dropouts or multiple sensors?** Use `filter.coast(...)` /
+  `coast_cov` to dead-reckon through measurement gaps (the uncertainty band grows
+  with the gap) instead of freezing or diverging, and `InformationFilter`
+  (additive updates, exact `fuse()`) when you need to combine several estimators
+  or sensors into one state.
 
 ---
 

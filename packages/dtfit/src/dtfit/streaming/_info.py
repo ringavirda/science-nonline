@@ -74,8 +74,11 @@ class InformationFilter:
             raise ValueError("forgetting must be in (0, 1]")
         self.forgetting = float(forgetting)
         self._prior = float(prior_precision)
-        self.Y = np.eye(self.n) * self._prior   # information matrix (P^-1)
-        self.yv = np.zeros(self.n)              # information vector (P^-1 p)
+        # Annotated as bare ``np.ndarray`` (shape-agnostic): the 3.10 numpy stubs
+        # otherwise pin these to a 1-D ``tuple[int]`` shape, and the shape-widening
+        # ``self.yv = self.yv + other.yv`` in ``fuse`` then fails mypy --python-version 3.10.
+        self.Y: np.ndarray = np.eye(self.n) * self._prior   # information matrix (P^-1)
+        self.yv: np.ndarray = np.zeros(self.n)              # information vector (P^-1 p)
         self.n_updates = 0
 
     def partial_fit(self, h, z, r: float = 1.0) -> "InformationFilter":

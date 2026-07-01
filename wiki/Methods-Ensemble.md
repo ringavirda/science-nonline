@@ -20,9 +20,9 @@ chosen base method (EAC by default, or LSI). This yields a set of per-window
 coefficient vectors $\{\hat\theta_1,\dots,\hat\theta_K\}$, aggregated as
 
 $$
-\hat\theta \;=\; \operatorname*{median}_k \hat\theta_k,
+\hat\theta \;=\; \mathop{\mathrm{median}}_k \hat\theta_k,
 \qquad
-\sigma_j \;=\; \operatorname{std}_k\big(\hat\theta_{k,j}\big),
+\sigma_j \;=\; \mathrm{std}_k\big(\hat\theta_{k,j}\big),
 $$
 
 The **median** is the robustness mechanism: a window that happens to contain
