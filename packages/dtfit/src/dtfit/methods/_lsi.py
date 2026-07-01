@@ -39,7 +39,9 @@ from scipy.signal import savgol_filter
 from dtfit.log import echo
 from dtfit._core._kernels import legendre_project
 from dtfit.types import FittingResult, InitialGuess
-from ._common import model_params, _covariance, information_criteria, _validate_xy
+from ._common import (
+    model_params, _covariance, information_criteria, _validate_xy, _validate_p0
+)
 
 
 def fft_frequency_seed(x: np.ndarray, y: np.ndarray) -> float:
@@ -104,6 +106,9 @@ def fit_lsi(
     oscillatory: bool = False,
     freq_param: str | None = None,
     random_state: int | None = 0,
+    robust: bool = False,
+    huber_c: float = 3.0,
+    nan_policy: str = "raise",
 ) -> FittingResult:
     """Fit ``expr`` to ``(data_x, data_y)`` using the integral least-squares
     criterion in the reconditioned (Legendre) differential-transformation scheme.
@@ -141,6 +146,14 @@ def fit_lsi(
             the bounded path, for reproducibility; ``None`` draws from NumPy's
             global RNG (non-deterministic). Defaults to ``0`` (deterministic). Has
             no effect on the unbounded local solve, which is already deterministic.
+        robust: If True, robustify the **empirical spectrum** via IRLS: each
+            sample's residual to the current model is winsorized within ``huber_c``
+            robust sigmas (MAD) before re-projecting, so an outlier sample cannot
+            distort the Legendre coefficients. Forces ``filter_data=False`` (a
+            linear pre-smoother would smear outliers first). The robust integral
+            lever for LSI -- a handful of cheap re-solves, no tuning.
+        huber_c: Robust winsorization threshold in residual sigmas for
+            ``robust=True`` (~3 leaves clean samples untouched).
 
     Returns:
         FittingResult with the fitted coefficients, callable model and a
@@ -152,7 +165,7 @@ def fit_lsi(
     if not params:
         raise RuntimeError("Model expression has no free parameters to fit.")
 
-    x, y = _validate_xy(data_x, data_y)
+    x, y = _validate_xy(data_x, data_y, nan_policy=nan_policy)
 
     oscillatory = oscillatory or freq_param is not None
     if oscillatory:
@@ -162,6 +175,11 @@ def fit_lsi(
         filter_data = False
         if k_star is None:
             k_star = _osc_order(x, y)
+    if robust:
+        # Robust mode winsorizes each sample toward the model (below); a linear
+        # pre-smoother would smear an outlier across its neighbours first, so turn
+        # it off and let the winsorization handle the noise + outliers.
+        filter_data = False
 
     # 1. Optional smoothing to tame noise before the spectral projection.
     if filter_data and y.size >= 5:
@@ -216,7 +234,7 @@ def fit_lsi(
             return np.full(order + 1, 1e6)
         return sqrt_w * (beta_data - spec)
 
-    guess = np.ones(len(params)) if p0 is None else np.asarray(p0, float).copy()
+    guess = _validate_p0(p0, params)
 
     # Seed the angular-frequency parameter from the data's FFT peak so the local
     # solve locks onto the right cycle (the bounds path runs a global search and
@@ -273,11 +291,39 @@ def fit_lsi(
         jac = sol.jac
         converged, message = bool(sol.success), str(sol.message)
 
+    if robust:
+        # Robust integral via IRLS: winsorize each sample's residual to the
+        # current model (within huber_c robust sigmas) and recompute the empirical
+        # Legendre spectrum, so an outlier sample cannot distort the projection.
+        # ``beta_data`` is reassigned and the ``residual`` closure reads it lazily.
+        for _ in range(3):
+            mv = np.asarray(f_func(x, *coeffs), dtype=float)
+            if mv.ndim == 0:
+                mv = np.full_like(x, float(mv))
+            r = y - mv
+            med = float(np.median(r))
+            sigma = 1.4826 * float(np.median(np.abs(r - med)))
+            if sigma <= 0.0:
+                break
+            clip = huber_c * sigma
+            y_eff = mv + (med + np.clip(r - med, -clip, clip))
+            beta_data = Legendre.fit(x, y_eff, order, domain=domain).coef
+            if bounds is not None:
+                sol = least_squares(residual, coeffs,
+                                    bounds=([b[0] for b in bounds],
+                                            [b[1] for b in bounds]), method="trf")
+            else:
+                sol = least_squares(residual, coeffs, method="lm")
+            coeffs = np.asarray(sol.x, dtype=np.float64)
+            jac = sol.jac
+        converged, message = True, "robust IRLS"
+
     echo("LSI fitted coefficients:", coeffs)
     cov = _covariance(jac, residual(coeffs), len(params))
 
-    model = sp.lambdify(t, f_sym.subs(dict(zip(params, coeffs))), "numpy")
-    return FittingResult(model=model, coeffs=coeffs, cov=cov,
+    # FittingResult lambdifies the fitted model lazily from expr+coeffs (and
+    # drops it on pickling); skip the eager compile here.
+    return FittingResult(coeffs=coeffs, cov=cov,
                          expr=expr, var=var, names=tuple(str(p) for p in params),
                          converged=converged, message=message,
                          x_range=(float(np.min(x)), float(np.max(x))))

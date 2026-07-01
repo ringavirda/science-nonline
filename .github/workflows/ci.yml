@@ -70,7 +70,7 @@ jobs:
       - name: Type check + test — dtfit
         run: |
           mypy --python-version ${{ matrix.python-version }}
-          pytest --cov --cov-report=term-missing --cov-report=xml
+          pytest --cov --cov-report=term-missing --cov-report=xml --cov-fail-under=70
         working-directory: packages/dtfit
 
       - name: Type check + test — dtfit-experimental

@@ -12,6 +12,7 @@ from dtfit.methods import fit_lsi, fit_eac
 
 __all__ = [
     "sample_acf", "hurst_aggvar", "hurst_spectral", "ar1_reversion",
+    "ar_order", "fit_ar", "fractional_difference",
     "garch_persistence", "cycle_period", "decompose_trend_cycle",
 ]
 
@@ -94,7 +95,8 @@ def hurst_aggvar(
         if nb < 8:  # need enough blocks for a stable per-scale variance
             continue
         bmean = x[: nb * m].reshape(nb, m).mean(axis=1)
-        v = float(bmean.var())
+        v = float(bmean.var(ddof=1))  # unbiased: block counts vary across scales,
+        #                               and ddof=0 tilts the log-log slope
         if v > 0:
             ms.append(float(m))
             vs.append(v)
@@ -150,7 +152,11 @@ def hurst_spectral(
     if f.size < 3:
         raise RuntimeError("too few usable frequencies for spectral Hurst")
 
-    lf, lp = np.log(f), np.log(p)
+    # Exact GPH design variable: log|2 sin(lambda/2)| with the *angular*
+    # frequency lambda = 2*pi*f, not log(f). The two agree only as f -> 0 (there
+    # 2 sin(pi f) ~ 2 pi f, a constant offset absorbed by the intercept); over a
+    # non-tiny bandwidth (~n^0.6 bins) the sin curvature biases a log(f) slope.
+    lf, lp = np.log(2.0 * np.sin(np.pi * f)), np.log(p)
     if method == "ols":
         slope = float(np.polyfit(lf, lp, 1)[0])
     else:
@@ -223,6 +229,106 @@ def _phi_from_acf(acf: np.ndarray, n: int, *, method: str = "lsi") -> float:
 
 
 # --------------------------------------------------------------------------- #
+# higher-order autoregression: AR(p) order selection + Yule-Walker fit.
+#
+# The AR(1) route above whitens with a single lag; a genuine AR(2)/AR(3) then
+# leaves structure in the residual that can be mistaken for long memory. These
+# estimate the *order* (so the caller can tell a low-order AR apart from true
+# long memory) and the AR coefficients directly, from the sample ACF.
+# --------------------------------------------------------------------------- #
+def ar_order(x: np.ndarray, *, max_order: int = 8, ic: str = "aic") -> int:
+    """Select an AR(p) order for ``x`` by an information criterion.
+
+    Fits Yule-Walker AR(k) for ``k = 0..max_order`` and returns the ``k``
+    minimizing AIC (``ic="aic"``) or BIC (``ic="bic"``) -- the standard order
+    gate. A value ``>1`` means a single-lag AR(1) whitening would leave residual
+    structure, so the series is a higher-order autoregression, **not** long
+    memory. Returns ``0`` for (near-)white input.
+    """
+    from scipy.linalg import toeplitz
+
+    x = np.asarray(x, dtype=float)
+    x = x - x.mean()
+    n = x.size
+    cap = int(min(max_order, n // 2 - 1))
+    if cap < 1:
+        return 0
+    acf = sample_acf(x, cap)
+    gamma0 = float(x @ x) / n if n else 0.0
+    if gamma0 <= 0.0:
+        return 0
+    pen = 2.0 if ic == "aic" else float(np.log(n))
+    best_k, best_score = 0, n * float(np.log(gamma0)) + pen  # k=0: 1 param (sigma)
+    for k in range(1, cap + 1):
+        R = toeplitz(acf[:k])
+        r = acf[1:k + 1]
+        try:
+            phi = np.linalg.solve(R, r)
+        except np.linalg.LinAlgError:
+            continue
+        sigma2 = gamma0 * (1.0 - float(phi @ r))
+        if sigma2 <= 0.0:
+            continue
+        score = n * float(np.log(sigma2)) + pen * (k + 1)
+        if score < best_score:
+            best_k, best_score = k, score
+    return best_k
+
+
+def fit_ar(
+    x: np.ndarray, order: int | None = None, *, max_order: int = 8, ic: str = "aic"
+) -> dict[str, object]:
+    """Fit an AR(p) model ``x_t = sum_j phi_j x_{t-j} + eps`` by Yule-Walker.
+
+    When ``order`` is ``None`` it is chosen by :func:`ar_order` (AIC/BIC). Returns
+    ``{"order", "phi", "sigma"}`` with the AR coefficients (lag 1..p) and the
+    innovation standard deviation. Complements :func:`ar1_reversion` (the AR(1)
+    reversion read-out) with the general order.
+    """
+    from scipy.linalg import toeplitz
+
+    x = np.asarray(x, dtype=float)
+    xc = x - x.mean()
+    n = xc.size
+    if order is None:
+        order = ar_order(xc, max_order=max_order, ic=ic)
+    order = int(max(0, min(order, n - 2)))
+    gamma0 = float(xc @ xc) / n if n else 0.0
+    if order == 0 or gamma0 <= 0.0:
+        return {"order": 0, "phi": np.zeros(0), "sigma": float(np.sqrt(max(gamma0, 0.0)))}
+    acf = sample_acf(xc, order)
+    phi = np.linalg.solve(toeplitz(acf[:order]), acf[1:order + 1])
+    sigma2 = gamma0 * (1.0 - float(phi @ acf[1:order + 1]))
+    return {"order": order, "phi": np.asarray(phi, dtype=float),
+            "sigma": float(np.sqrt(max(sigma2, 0.0)))}
+
+
+def fractional_difference(
+    x: np.ndarray, d: float, *, ntrunc: int | None = None
+) -> np.ndarray:
+    """Apply the **fractional-difference** filter ``(1 - B)^d`` to ``x``.
+
+    The ARFIMA differencing operator: differencing a long-memory series by its
+    fractional order ``d`` (from the Hurst read-out, ``d = H - 1/2``; see
+    :func:`hurst_spectral`) whitens it, so the residual can be checked or modeled
+    with a short-memory model. Uses the truncated binomial expansion
+    ``w_0 = 1``, ``w_k = w_{k-1} (k - 1 - d) / k``, applied causally. Returns a
+    same-length array. ``d = 1`` recovers the ordinary first difference (prepended
+    with the first value), ``d = 0`` is the identity.
+    """
+    x = np.asarray(x, dtype=float)
+    n = x.size
+    if n == 0:
+        return x.copy()
+    trunc = int(min(n, ntrunc if ntrunc is not None else 1000))
+    w = np.empty(trunc)
+    w[0] = 1.0
+    for k in range(1, trunc):
+        w[k] = w[k - 1] * (k - 1 - d) / k
+    return np.asarray(np.convolve(x, w)[:n], dtype=float)
+
+
+# --------------------------------------------------------------------------- #
 # volatility clustering: GARCH(1,1) persistence alpha+beta -- ACF of squared
 # returns decays geometrically (alpha+beta)^k.
 # --------------------------------------------------------------------------- #
@@ -250,19 +356,36 @@ def garch_persistence(
     if nlags is None:
         nlags = int(np.clip(n // 8, 10, 50))
     acf = sample_acf(z, nlags)
-    persistence = _persistence_from_acf(acf, method=method)
+    persistence = _persistence_from_acf(acf, method=method, n=n)
     tau = -1.0 / np.log(persistence) if 0.0 < persistence < 1.0 else np.inf
     return {"persistence": persistence, "tau": float(tau)}
 
 
-def _persistence_from_acf(acf: np.ndarray, *, method: str = "lsi") -> float:
+def _persistence_from_acf(
+    acf: np.ndarray, *, method: str = "lsi", n: int | None = None
+) -> float:
     """Volatility persistence from a **decaying-exponential dtfit fit to the ACF
     of |returns| / squared returns**. Shared by the batch :func:`garch_persistence`
-    and the streaming filter (which feeds the EWMA ACF of its |residual|)."""
+    and the streaming filter (which feeds the EWMA ACF of its |residual|).
+
+    The amplitude ``A`` is kept free (unlike the AR(1) fit): the squared-return
+    ACF of a GARCH process does *not* pass through 1 at lag 1 -- it has a level
+    offset -- so the geometric decay must be read as ``A*exp(-g*k)``; only the
+    *ratio* ``exp(-g)`` is the persistence. When ``n`` is known, restrict the fit
+    to lags above the white-noise band (~``2/sqrt(n)``), as :func:`_phi_from_acf`
+    does: beyond it the ACF is sampling noise that only drags the decay rate.
+    """
     nlags = acf.size - 1
-    k = np.arange(1, nlags + 1, dtype=float)
+    keff = nlags
+    if n is not None:
+        band = max(0.05, 2.0 / np.sqrt(max(int(n), 1)))
+        above = np.where(np.abs(acf[1:]) >= band)[0]
+        keff = int(above[-1] + 1) if above.size else nlags
+        keff = int(np.clip(keff, 3, nlags))
+    k = np.arange(1, keff + 1, dtype=float)
     fitter = fit_eac if method == "eac" else fit_lsi
-    rr = fitter(k, acf[1:], "A*exp(-g*k)", "k", p0=[float(acf[1]) or 0.2, 0.1])
+    rr = fitter(k, acf[1: keff + 1], "A*exp(-g*k)", "k",
+                p0=[float(acf[1]) or 0.2, 0.1])
     g = float(rr.coeffs[1])
     return float(np.clip(np.exp(-abs(g)), 0.0, 0.9999))
 

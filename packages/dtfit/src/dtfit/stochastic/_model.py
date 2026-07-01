@@ -39,6 +39,7 @@ import numpy as np
 from dtfit.methods import fit_lsi
 from ._estimators import (
     sample_acf, hurst_spectral, ar1_reversion, garch_persistence,
+    ar_order, fit_ar,
 )
 from ._stats import (
     _is_nonstationary, _ols_line, _cycle_strength, _fit_seasonal, _seasonal_design,
@@ -47,7 +48,9 @@ from ._forecast import (
     _bind_forecaster, _fc_rw, _fc_drift, _fc_meanrev, _fc_trend,
     _make_seasonal_fc, _make_seasonal_fc_anchored, _resolve_forecaster,
 )
-from ._simulate import _sim_ar1, _sim_long_memory, _sim_garch
+from ._simulate import (
+    _sim_ar1, _sim_long_memory, _sim_garch, make_innovations,
+)
 
 __all__ = ["StochasticModel", "fit_stochastic"]
 
@@ -133,33 +136,50 @@ class StochasticModel:
         lines.append(f"  forecaster: {self.forecaster_name}")
         return "\n".join(lines)
 
-    def forecast(self, h: int, *, return_conf_int: bool = False, alpha: float = 0.05):
+    def forecast(self, h: int, *, return_conf_int: bool = False,
+                 alpha: float = 0.05, dist: str = "normal", df: float = 7.0):
         """Forecast ``h`` steps with the **backtest-selected** forecaster
         (:attr:`forecaster_name`). With ``return_conf_int`` also returns
-        ``(lower, upper)`` bands whose growth matches that forecaster (bounded for
+        ``(lower, upper)`` bands whose growth matches that forecaster: bounded for
         mean reversion, ``h^(2H)`` for long memory, ``~sqrt(h)`` for a random
-        walk / drift)."""
+        walk / drift, and ~**constant** for a trend-stationary (trend/seasonal)
+        forecast. ``dist="t"`` widens the band with a Student-t (``df``) quantile
+        instead of the Gaussian one, for fat-tailed innovations."""
         steps = np.arange(1, h + 1, dtype=float)
         point = np.asarray(self._forecaster(h), dtype=float)
         if not return_conf_int:
             return point
-        from scipy.stats import norm
+        from scipy.stats import norm, t as student_t
+        # Key the band growth off the SELECTED forecaster, not detected flags: a
+        # trend+seasonal forecast whose residual is stationary must not fan out
+        # just because a long-memory *component* was also flagged.
         name = self.forecaster_name
-        if name == "mean-reversion" and 0.0 < self.ar1_phi < 1.0:
+        if name.startswith("mean-reversion") and 0.0 < self.ar1_phi < 1.0:
             var = (self.sigma ** 2) * (1.0 - self.ar1_phi ** (2 * steps)) \
                 / (1.0 - self.ar1_phi ** 2)
-        elif name in ("random walk", "drift"):
+        elif name.startswith(("random walk", "drift")):
             var = (self.sigma_walk ** 2) * steps
-        elif self.has_long_memory:
-            var = (self.sigma ** 2) * steps ** (2.0 * self.hurst)
-        else:                                   # trend / seasonal
-            var = (self.sigma ** 2) * steps
-        z = float(norm.ppf(1.0 - alpha / 2.0))
+        else:
+            # Deterministic-mean forecasters (trend / seasonal / trend+seasonal,
+            # incl. the "(anchored)" variants): the residual around the fitted
+            # mean is (trend-)STATIONARY, so its h-step forecast-error variance is
+            # ~constant sigma^2 -- NOT the random-walk sigma^2 * h that fans the
+            # bands out and massively over-covers. (Parameter-estimation leverage
+            # adds a slow extra growth; it needs the fit covariance and is omitted
+            # here -- documented rather than faked with an h-linear term.)
+            var = (self.sigma ** 2) * np.ones_like(steps)
+        if dist == "t":
+            z = float(student_t.ppf(1.0 - alpha / 2.0, df))
+        elif dist == "normal":
+            z = float(norm.ppf(1.0 - alpha / 2.0))
+        else:
+            raise ValueError(f"dist must be 'normal' or 't', got {dist!r}")
         sd = np.sqrt(np.clip(var, 0.0, None))
         return point, point - z * sd, point + z * sd
 
     def simulate(self, n: int | None = None, *, seed: int | None = None,
-                 rng: np.random.Generator | None = None) -> np.ndarray:
+                 rng: np.random.Generator | None = None,
+                 dist: str = "normal", df: float = 7.0) -> np.ndarray:
         """Draw a fresh **realization** of length ``n`` from the fitted model.
 
         This is what makes :class:`StochasticModel` a *generative* model -- the
@@ -184,19 +204,23 @@ class StochasticModel:
         Args:
             n: Length of the realization (defaults to the fitted ``n``).
             seed / rng: Randomness control (``rng`` takes precedence).
+            dist / df: Innovation distribution -- ``"normal"`` (default) or a
+                unit-variance Student-t (``"t"``, ``df`` degrees of freedom) for a
+                fat-tailed generator (financial-style tail risk).
         """
         n = int(self.n if n is None else n)
         if rng is None:
             rng = np.random.default_rng(seed)
+        noise = make_innovations(dist, df)
         sig = (self.sigma if np.isfinite(self.sigma) and self.sigma > 0.0
                else (self.sigma_walk if np.isfinite(self.sigma_walk)
                      and self.sigma_walk > 0.0 else 1.0))
         # unit-root level: integrate drift + innovations (the mean is the walk).
         if "unit-root" in self.components:
             if self.has_vol_clustering and np.isfinite(self.vol_persistence):
-                steps = _sim_garch(n, self.vol_persistence, sig, rng)
+                steps = _sim_garch(n, self.vol_persistence, sig, rng, noise=noise)
             else:
-                steps = rng.standard_normal(n) * sig
+                steps = noise(rng, n) * sig
             drift = self.trend_slope if np.isfinite(self.trend_slope) else 0.0
             return self.level + np.cumsum(drift + steps)
         # stationary / trend-stationary: deterministic mean + a regime residual.
@@ -209,14 +233,29 @@ class StochasticModel:
         # long-memory series also trips the mean-reversion flag, but simulating it
         # as a bare AR(1) would erase the long memory and break the round-trip).
         if self.has_long_memory and np.isfinite(self.hurst):
-            resid = _sim_long_memory(n, self.hurst, sig, rng)
+            resid = _sim_long_memory(n, self.hurst, sig, rng, noise=noise)
         elif self.has_mean_reversion and 0.0 < self.ar1_phi < 1.0:
-            resid = _sim_ar1(n, self.ar1_phi, sig, rng)
+            resid = _sim_ar1(n, self.ar1_phi, sig, rng, noise=noise)
         elif self.has_vol_clustering and np.isfinite(self.vol_persistence):
-            resid = _sim_garch(n, self.vol_persistence, sig, rng)
+            resid = _sim_garch(n, self.vol_persistence, sig, rng, noise=noise)
         else:
-            resid = rng.standard_normal(n) * sig
+            resid = noise(rng, n) * sig
         return mean + resid
+
+
+def _ar_whiten(e: np.ndarray, *, max_order: int = 5) -> np.ndarray:
+    """Innovations of an AR(p) fit to ``e`` (order chosen by AIC); the de-meaned
+    series if ``p == 0``. Used to distinguish a genuine higher-order AR from long
+    memory: an AR(p) is white after AR(p) whitening, long memory is not."""
+    p = ar_order(e, max_order=max_order)
+    ec = np.asarray(e, dtype=float) - float(np.mean(e))
+    if p < 1 or ec.size <= p:
+        return ec
+    phi = np.asarray(fit_ar(e, order=p)["phi"], dtype=float)
+    inn = ec[p:].copy()
+    for j in range(1, p + 1):
+        inn = inn - phi[j - 1] * ec[p - j:ec.size - j]
+    return inn
 
 
 def fit_stochastic(
@@ -402,12 +441,27 @@ def fit_stochastic(
     innov = e[1:] - phi * e[:-1] if has_mr else (e - e.mean())
     sigma = float(np.std(innov)) if innov.size else float(np.std(e))
 
+    # Long memory: read the Hurst of the RAW residual (its true long-range
+    # strength) and gate it with a finite-order-AR **veto**. Testing the Hurst of
+    # the AR(1)-whitened innovations -- the old approach -- both under-detects
+    # strong long memory (AR(1) whitening removes part of it) and does not stop a
+    # higher-order AR(2)/AR(3) whose AR(1) residual still looks long-range. The
+    # veto instead whitens with a LOW-order AR (cap 3): a genuine finite-order
+    # AR(1..3) -- including a near-unit-root AR(1) -- is driven back to WHITE
+    # (Hurst ~0.5), while a hyperbolic-ACF ARFIMA survives it (no finite AR
+    # captures a hyperbolic ACF). So the veto cleanly separates a mean-reverting
+    # autoregression from true long memory, at any AR order.
     hurst = float("nan")
     has_lm = False
     try:
-        target = innov if innov.size > 128 else e
-        hurst = float(hurst_spectral(target)["H"])
+        hurst = float(hurst_spectral(e - e.mean())["H"])
         has_lm = hurst > lm_hurst
+        if has_lm and ar_order(e, max_order=3) >= 1:
+            inn_p = _ar_whiten(e, max_order=3)
+            veto_h = 0.5 + 0.5 * (lm_hurst - 0.5)  # midpoint 0.5 <-> the LM gate
+            if inn_p.size > 128 and float(hurst_spectral(inn_p)["H"]) <= veto_h:
+                has_lm = False
+                has_mr = True  # a stationary finite-order AR reverts to its mean
     except Exception:
         pass
 

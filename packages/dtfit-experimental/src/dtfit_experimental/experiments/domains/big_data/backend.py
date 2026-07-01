@@ -68,8 +68,9 @@ __all__ = [
     "DOMAIN", "SCENARIOS", "Panel",
     "fit_resident", "fit_streaming", "fit_distributed",
     "fit_per_channel_nlls", "poly_lstsq_batched", "sgd_incremental",
+    "numpy_projection_vectorised",
     "param_err", "scenario_func", "time_call", "peak_memory", "metrics", "fmt",
-    "scaling_memory", "memory_wall", "surrogate_trap", "numerics",
+    "scaling_memory", "memory_wall", "surrogate_trap", "numerics", "numerics_both",
     "robustness", "online_filter", "load_electricity", "realdata_projection",
     "HAS_SKLEARN",
 ]
@@ -218,6 +219,40 @@ def poly_lstsq_batched(x, Y, deg=6):
     V = np.vander(x, deg + 1)
     C = np.linalg.lstsq(V, Y, rcond=None)[0]
     return V, C
+
+
+def _legendre_projection_operator(x, order):
+    """The exact linear operator ``M`` (n x n_coef) of dtfit's empirical Legendre
+    projection, built once in plain NumPy: ``M = diag(w) @ P @ diag((2j+1)/n)``
+    where ``P`` is the raw-Legendre design on ``x`` mapped to [-1, 1] and ``w`` is
+    the trapezoidal-rule weight. ``spectra = M.T @ Y`` then reproduces
+    ``project_spectra(x, Y, order)`` to machine precision -- so a single matmul is
+    a *fair* vectorised per-channel comparator (see :func:`numpy_projection_vectorised`)."""
+    from numpy.polynomial import legendre as L
+    x = np.asarray(x, float)
+    n = x.size
+    u = 2.0 * (x - x[0]) / (x[-1] - x[0]) - 1.0
+    P = np.column_stack([L.legval(u, [0] * j + [1]) for j in range(order + 1)])
+    w = np.full(n, n / (n - 1.0))                    # trapezoidal interior weight
+    w[0] *= 0.5
+    w[-1] *= 0.5
+    scal = np.array([(2 * j + 1) / n for j in range(order + 1)])
+    return (P * w[:, None]) @ np.diag(scal)          # (n, n_coef)
+
+
+def numpy_projection_vectorised(x, Y, order=6):
+    """The **fair vectorised-NumPy per-channel baseline** for the projection: build
+    the Legendre projection operator once (plain NumPy) and apply it to all
+    channels in a single matmul. This is what a competent practitioner writes -- it
+    isolates dtfit's contribution to its optimised batched-GEMM / backend dispatch,
+    rather than crediting dtfit for beating a per-channel *Python loop* that
+    needlessly rebuilds the basis every iteration. It is the honest comparator used
+    in :func:`realdata_projection`. Reproduces ``project_spectra`` to ~1e-15."""
+    Y = np.asarray(Y)
+    M = _legendre_projection_operator(x, order)      # (n, n_coef)
+    single = Y.ndim == 1
+    S = M.T @ (Y[:, None] if single else Y)          # (n_coef, B)
+    return S[:, 0] if single else S.T                # (B, n_coef) to match project_spectra
 
 
 def sgd_incremental(x, Y, deg=6, chunk=2048):
@@ -397,17 +432,10 @@ def surrogate_trap(panel):
 # --------------------------------------------------------------------------- #
 # 4. numerical stability of the streaming reduction
 # --------------------------------------------------------------------------- #
-def numerics(N, chunk_counts):
-    """Accumulate the projection integral ``int y*phi`` of a high-dynamic-range
-    signal in a growing number of chunks, comparing naive **float32**, the dtfit
-    **float64** additive reduce, and a compensated **Kahan** sum against an exact
-    (``math.fsum``) reference. Returns ``(rows, f32, f64, kahan)`` where the lists
-    are max relative error per chunk-count and ``rows`` is DataFrame-ready."""
-    x = np.linspace(*DOMAIN, N)
-    # high-dynamic-range integrand (exp blow-up * a Legendre-ish weight)
-    y = np.exp(2.5 * x) * np.cos(12 * x)
-    phi = (2 * (x - DOMAIN[0]) / (DOMAIN[1] - DOMAIN[0]) - 1)        # P1 Legendre
-    integrand = y * phi
+def _reduce_errors(integrand, N, chunk_counts):
+    """Chunked additive reduce of ``integrand`` in naive float32 / float64 / Kahan,
+    vs an exact ``math.fsum`` reference. Returns ``(rows_partial, f32, f64, kahan)``
+    where the lists are max relative error per chunk-count."""
     exact = math.fsum(integrand.tolist())
     rows, f32c, f64c, kahc = [], [], [], []
     for k in chunk_counts:
@@ -427,13 +455,56 @@ def numerics(N, chunk_counts):
         e64 = abs(s64 - exact) / abs(exact)
         ek = abs(ks - exact) / abs(exact)
         f32c.append(e32); f64c.append(e64); kahc.append(ek)
-        rows.append({
-            f"# chunks (over {N:,} samples)": f"{k:,}",
-            "naive float32": e32,
-            "dtfit float64": e64,
-            "Kahan (compensated)": ek,
-        })
+        rows.append({"# chunks": f"{k:,}", "naive float32": e32,
+                     "dtfit float64": e64, "Kahan (compensated)": ek})
     return rows, f32c, f64c, kahc
+
+
+def _integrand(N, kind):
+    """The reduce-test integrand ``y*phi`` on ``N`` samples over :data:`DOMAIN`.
+
+    ``kind="adversarial"`` -> the high-dynamic-range ``exp(2.5 x) cos(12 x)``
+    (values span ~e^3.75), the pathological case that stresses the additive
+    reduce. ``kind="realistic"`` -> an O(1)-magnitude ``cos(12 x) + 1.5``, the
+    well-scaled operating point of the streaming / **embedded** routes (ENU-metre
+    / normalised signals)."""
+    x = np.linspace(*DOMAIN, N)
+    phi = (2 * (x - DOMAIN[0]) / (DOMAIN[1] - DOMAIN[0]) - 1)        # P1 Legendre
+    if kind == "realistic":
+        return (np.cos(12 * x) + 1.5) * phi
+    return (np.exp(2.5 * x) * np.cos(12 * x)) * phi                  # adversarial
+
+
+def numerics(N, chunk_counts, *, kind="adversarial"):
+    """Accumulate the projection integral ``int y*phi`` in a growing number of
+    chunks, comparing naive **float32**, the dtfit **float64** additive reduce, and
+    a compensated **Kahan** sum against an exact (``math.fsum``) reference. Returns
+    ``(rows, f32, f64, kahan)`` -- max relative error per chunk-count.
+
+    ``kind`` selects the integrand (see :func:`_integrand`): the default
+    **adversarial** high-dynamic-range case (where naive float32 visibly degrades
+    -- the "float32 is unsafe at scale" demo), or the **realistic** O(1)-magnitude
+    case. Pair them via :func:`numerics_both` to scope the claim honestly and keep
+    it consistent with the embedded domain's *float32 deployment* (float32 is
+    unsafe for pathological dynamic range, safe for the well-scaled magnitudes the
+    on-MCU filter actually runs on)."""
+    integrand = _integrand(N, kind)
+    rows, f32c, f64c, kahc = _reduce_errors(integrand, N, chunk_counts)
+    header = f"# chunks (over {N:,} samples)"
+    rows = [{header: r["# chunks"], **{k: v for k, v in r.items() if k != "# chunks"}}
+            for r in rows]
+    return rows, f32c, f64c, kahc
+
+
+def numerics_both(N, chunk_counts):
+    """Run :func:`numerics` for BOTH the adversarial and the realistic integrand,
+    so the notebook can show the float32-instability claim side by side with its
+    honest scope. Returns ``{"adversarial": (rows, f32, f64, kahan),
+    "realistic": (rows, f32, f64, kahan)}``. The realistic curve demonstrates that
+    naive float32 stays accurate on well-scaled data -- consistent with the
+    embedded domain shipping float32."""
+    return {kind: numerics(N, chunk_counts, kind=kind)
+            for kind in ("adversarial", "realistic")}
 
 
 # --------------------------------------------------------------------------- #
@@ -591,18 +662,28 @@ def load_electricity(rows):
 
 
 def realdata_projection(x, Y, *, order=6, n_chunks=12):
-    """Project all real channels three ways (batched GEMM, per-channel loop,
-    streaming accumulator) plus the polynomial lstsq surrogate for scale. They
-    must all agree. Returns a list of DataFrame-ready dicts and the per-method
-    timings dict (for the bar figure)."""
+    """Project all real channels several ways (batched GEMM, the FAIR vectorised-
+    NumPy per-channel baseline, streaming accumulator) plus the polynomial lstsq
+    surrogate for scale. They must all agree. Returns a list of DataFrame-ready
+    dicts and the per-method timings dict (for the bar figure).
+
+    The headline speed-up is dtfit's batched GEMM vs the **fair vectorised
+    baseline** (build the projection operator once, one matmul -- what a competent
+    practitioner writes). We deliberately do NOT report against a naive per-channel
+    Python loop that rebuilds the basis every channel: that comparator inflates the
+    speed-up with loop overhead any vectorised implementation would remove, and does
+    not change the verdict. If dtfit's optimised GEMM and the fair vectorised
+    baseline land at near-parity, that is the honest result -- dtfit's win here is
+    exactness across routes, not beating a competently vectorised matmul."""
     B = Y.shape[1]
 
     spec_res, t_res = time_call(lambda: project_spectra(x, Y, order=order))
     _, mem_res = peak_memory(lambda: project_spectra(x, Y, order=order))
 
-    def per_channel():
-        return np.array([project_spectra(x, Y[:, c], order=order) for c in range(B)])
-    spec_loop, t_loop = time_call(per_channel)
+    # fair comparator: one plain-NumPy vectorised projection over all channels
+    spec_vec, t_vec = time_call(lambda: numpy_projection_vectorised(x, Y, order=order))
+    _, mem_vec = peak_memory(lambda: numpy_projection_vectorised(x, Y, order=order))
+
     _, t_poly = time_call(lambda: poly_lstsq_batched(x, Y, deg=order))
 
     edges = np.linspace(0, Y.shape[0], n_chunks + 1).astype(int)
@@ -616,22 +697,25 @@ def realdata_projection(x, Y, *, order=6, n_chunks=12):
     spec_str, t_str = time_call(stream_spectra)
     _, mem_str = peak_memory(stream_spectra)
 
-    d_loop = float(np.max(np.abs(spec_res - spec_loop)))
+    d_vec = float(np.max(np.abs(spec_res - spec_vec)))
     d_str = float(np.max(np.abs(spec_res - spec_str)))
     rows = [
         {"method": "dtfit batched GEMM (project_spectra)", "time (s)": t_res,
          "peak mem (MiB)": fmt(mem_res, "{:.1f}"), "max |delta| vs batched": "0 (ref)",
          "speed-up": "1x (ref)"},
-        {"method": "per-channel projection loop", "time (s)": t_loop,
-         "peak mem (MiB)": "-", "max |delta| vs batched": fmt(d_loop, "{:.1e}"),
-         "speed-up": fmt(t_loop / t_res, "{:.0f}x slower")},
+        {"method": "vectorised NumPy projection (FAIR baseline)", "time (s)": t_vec,
+         "peak mem (MiB)": fmt(mem_vec, "{:.1f}"),
+         "max |delta| vs batched": fmt(d_vec, "{:.1e}"),
+         "speed-up": fmt(t_vec / t_res, "{:.2f}x")},
         {"method": "dtfit streaming accumulator", "time (s)": t_str,
          "peak mem (MiB)": fmt(mem_str, "{:.1f}"),
          "max |delta| vs batched": fmt(d_str, "{:.1e}"), "speed-up": "flat memory"},
         {"method": "polynomial lstsq (established)", "time (s)": t_poly,
          "peak mem (MiB)": "-", "max |delta| vs batched": "n/a (surrogate)",
-         "speed-up": fmt(t_loop / t_poly, "{:.0f}x vs loop")},
+         "speed-up": fmt(t_poly / t_res, "{:.2f}x")},
     ]
-    timings = dict(batched=t_res, loop=t_loop, streaming=t_str, poly=t_poly,
-                   B=B, ratio=t_loop / t_res)
+    timings = dict(batched=t_res, vectorised=t_vec, streaming=t_str,
+                   poly=t_poly, B=B,
+                   # the HEADLINE fair number: fair vectorised NumPy / batched GEMM.
+                   ratio_fair=t_vec / t_res)
     return rows, timings

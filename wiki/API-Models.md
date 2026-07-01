@@ -44,12 +44,18 @@ angular-frequency parameter, and an optional data-driven `seeder` that produces
 Fit this family to the data, **self-seeding** `p0`/`bounds` from the model's
 seeder unless you override them.
 
-| `method` | engine |
-|---|---|
-| `"auto"` (default) | routes by `shape` through [`auto_estimate`](API-Auto#auto_estimate) |
-| `"lsi"` | [`fit_lsi`](API-Fitting#fit_lsi) (passing `freq_param`) |
-| `"eac"` | [`fit_eac`](API-Fitting#fit_eac) |
-| `"adaptive"` | [`fit_eac`](API-Fitting#fit_eac) with `window_mode="curvature"` |
+| `method` | engine | bounds forwarded? |
+|---|---|---|
+| `"auto"` (default) | routes by `shape` through [`auto_estimate`](API-Auto#auto_estimate) | yes |
+| `"lsi"` | [`fit_lsi`](API-Fitting#fit_lsi) (passing `freq_param`) | yes |
+| `"eac"` | [`fit_eac`](API-Fitting#fit_eac) | yes (as `(lower, upper)` tuples) |
+| `"adaptive"` | [`fit_eac`](API-Fitting#fit_eac) with `window_mode="curvature"` | **no -- bounds are dropped** |
+
+> **Bounds on the `"adaptive"` path.** Unlike `"eac"` (and every other method),
+> `method="adaptive"` forwards only `p0` to [`fit_eac`](API-Fitting#fit_eac) -- the
+> seeded (or explicitly passed) `bounds` are **silently ignored**, so the
+> curvature-window fit is unconstrained. If you need the fit constrained, use
+> `method="eac"` (uniform windows, honours bounds) or apply the bounds another way.
 
 ### `seed(x, y) -> dict`
 The data-driven `{name: (p0, lo, hi)}` seed map (empty if the family has no

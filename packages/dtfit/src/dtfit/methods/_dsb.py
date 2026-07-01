@@ -27,7 +27,7 @@ from scipy.optimize import least_squares
 
 from dtfit.log import echo
 from dtfit.types import FittingResult, InitialGuess
-from ._common import model_params, taylor_coeffs
+from ._common import model_params, taylor_coeffs, _validate_p0
 
 
 def fit_dsb(
@@ -104,9 +104,9 @@ def fit_dsb(
         else None
     )
 
-    subs_map = [(p, float(c)) for p, c in zip(params, coeffs)]
-    model = sp.lambdify(t, f_sym.subs(subs_map), "numpy")
-    return FittingResult(model=model, coeffs=coeffs, cov=cov,
+    # FittingResult lambdifies the fitted model lazily from expr+coeffs; skip
+    # the eager compile here.
+    return FittingResult(coeffs=coeffs, cov=cov,
                          expr=expr, var=var, names=tuple(str(p) for p in params),
                          converged=converged, message=message)
 
@@ -125,7 +125,7 @@ def _solve_balance(
     refinement/fallback when one runs, else the symbolic solve found a real root.
     """
     square = balance[:n]
-    guess = np.ones(n) if p0 is None else np.asarray(p0, dtype=float)
+    guess = _validate_p0(p0, params)
 
     try:
         solutions = _solve_symbolic(square, params)

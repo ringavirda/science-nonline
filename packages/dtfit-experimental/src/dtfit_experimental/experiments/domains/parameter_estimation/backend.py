@@ -55,9 +55,11 @@ __all__ = [
     "est_lsi", "est_eac", "est_adaptive", "est_ensemble", "est_merged",
     "est_nlls", "est_robust_nlls", "est_moment", "mlp_curve", "gp_curve",
     "prony_fit", "matrix_pencil_fit", "varpro_fit", "moment_match_fit",
-    "A_METHODS", "DT_LABELS", "applicability_verdict",
+    "A_METHODS", "DT_LABELS", "DT_DIAGNOSTIC_LABELS", "applicability_verdict",
+    "family_recovery_row",
     "noise_sweep", "outlier_sweep", "learner_curve_fit",
     "regime_rows", "joint_channels", "subspace_rate_recovery", "load_data",
+    "load_puromycin", "real_puromycin", "exp_model_mismatch",
     "f_expgrow",
 ]
 
@@ -326,16 +328,76 @@ A_METHODS = [("dtfit LSI", est_lsi), ("dtfit EAC", est_eac),
              # the honest "what does the Legendre reconditioning buy?" foil (it
              # is expected to trail on the higher-parameter families).
              ("Method of moments", est_moment)]
-DT_LABELS = ["dtfit LSI", "dtfit EAC", "dtfit adaptive-EAC (#6)", "dtfit merged"]
+# The per-method dtfit *diagnostic* breakdown -- the estimators whose min is the
+# honest "best explicit dtfit method". ``est_merged`` is a SELECTOR OVER these
+# (LSI/EAC by in-sample fit); pooling it into the same min would double-count its
+# own inputs and flatter the "best dtfit" number (a min-over-4 that includes the
+# min-over-2 of two of the four). So ``merged`` is reported *separately* as the
+# single deployable answer -- see :func:`family_recovery_row`.
+DT_DIAGNOSTIC_LABELS = ["dtfit LSI", "dtfit EAC", "dtfit adaptive-EAC (#6)"]
+# Back-compat alias (the min-pool for "best dtfit"); now excludes the selector so
+# it is no longer double-counted. (Was [LSI, EAC, adaptive, merged].)
+DT_LABELS = DT_DIAGNOSTIC_LABELS
 
 
 def applicability_verdict(best_dt_err, nlls_err):
-    """Categorical verdict comparing the best dtfit error against NLLS."""
-    if best_dt_err <= nlls_err * 1.5:
+    """Categorical verdict comparing the best dtfit error against NLLS.
+
+    The tie band is deliberately tight (~1.15x the NLLS error, not the earlier
+    generous 1.5x): "ties" should mean genuinely comparable, not "within 50%".
+    A dtfit error between 1.15x and 2x NLLS is reported as the mild loss it is;
+    beyond 2x is a clear NLLS win. The numeric ratio ``dtfit_err/nlls_err`` is the
+    quantitative version and is surfaced directly by :func:`family_recovery_row`.
+    """
+    if nlls_err <= 0:
+        return "dtfit ties/beats NLLS" if best_dt_err <= 1e-9 else "NLLS wins"
+    ratio = best_dt_err / nlls_err
+    if ratio <= 1.15:
         return "dtfit ties/beats NLLS"
-    if best_dt_err <= nlls_err * 3.0:
-        return "NLLS better (both <1%)"
+    if ratio <= 2.0:
+        return "NLLS slightly better"
     return "NLLS wins"
+
+
+def family_recovery_row(err_row, method_names):
+    """Per-family recovery summary from one row of the ``err`` matrix (aligned to
+    ``method_names`` = the labels of :data:`A_METHODS`).
+
+    Returns a dict that (1) reports each explicit dtfit method's error so the
+    reader sees *which single method wins* rather than only the min-over-methods,
+    (2) reports the ``merged`` selector's error *separately* as the single
+    deployable answer (not pooled into the diagnostic min -- see
+    :data:`DT_DIAGNOSTIC_LABELS`), and (3) surfaces the numeric
+    ``dtfit/NLLS`` ratio alongside the categorical verdict. NaN-safe.
+    """
+    idx = {nm: j for j, nm in enumerate(method_names)}
+
+    def _get(label):
+        j = idx.get(label)
+        return float(err_row[j]) if j is not None else float("nan")
+
+    per_method = {lbl: _get(lbl) for lbl in DT_DIAGNOSTIC_LABELS}
+    diag_vals = [v for v in per_method.values() if np.isfinite(v)]
+    best_dt = float(np.min(diag_vals)) if diag_vals else float("nan")
+    best_label = (min(per_method, key=lambda k: (np.inf if not np.isfinite(per_method[k])
+                                                 else per_method[k]))
+                  if diag_vals else None)
+    merged = _get("dtfit merged")
+    nlls = _get("SciPy NLLS (gold)")
+    ratio = (best_dt / nlls) if (np.isfinite(best_dt) and np.isfinite(nlls)
+                                 and nlls > 0) else float("nan")
+    row = {
+        "best dtfit method": best_label,
+        "best dtfit err %": best_dt,
+        "merged (deployable) err %": merged,
+        "NLLS err %": nlls,
+        "dtfit/NLLS ratio": ratio,
+        "verdict": applicability_verdict(best_dt, nlls),
+    }
+    # the per-method diagnostic breakdown (which explicit method wins)
+    for lbl in DT_DIAGNOSTIC_LABELS:
+        row[f"{lbl} err %"] = per_method[lbl]
+    return row
 
 
 # --------------------------------------------------------------------------- #
@@ -544,6 +606,155 @@ def load_data(name, col=1):
     import csv
     rows = list(csv.reader((EXPERIMENTS_DIR / "data" / name).open()))[1:]
     return np.array([float(r[col]) for r in rows])
+
+
+def load_puromycin():
+    """Load the canonical **Puromycin** enzyme-kinetics dataset (Bates & Watts
+    1988, *treated* group) bundled as ``experiments/data/puromycin.csv``.
+
+    Twelve measurements (six substrate concentrations, in replicate) of the
+    initial reaction velocity of an enzyme with vs. without puromycin. This is a
+    textbook Michaelis-Menten dataset -- *real*, sparse and replicated -- native
+    to the ``mm``/``hill`` families (unlike the COVID / FX growth-rate curves in
+    D1/D2, which only exercise the exponential form). Returns
+    ``(conc, velocity)`` as float arrays (header ``conc,velocity``)."""
+    import csv
+    rows = list(csv.reader((EXPERIMENTS_DIR / "data" / "puromycin.csv").open()))[1:]
+    conc = np.array([float(r[0]) for r in rows])
+    velocity = np.array([float(r[1]) for r in rows])
+    return conc, velocity
+
+
+def real_puromycin():
+    """Fit the Michaelis-Menten law ``Vmax*t/(Km+t)`` (the ``mm`` family) to the
+    real Puromycin data with dtfit LSI, dtfit EAC and SciPy NLLS.
+
+    There is no ground-truth parameter vector for real data, so validity is shown
+    by the methods *agreeing* on ``{Vmax, Km}`` and fitting well. The reported
+    ``RMSE`` is the *in-sample* curve residual (velocity units); ``R2`` its
+    normalised twin. The wide bounds/seed below suit the actual scale of the data
+    (conc in [0.02, 1.1] mM, velocity up to ~210), unlike the synthetic ``mm``
+    entry in :data:`MODELS`. Returns a list of
+    ``{"method", "Vmax", "Km", "RMSE", "R2"}`` rows."""
+    conc, velocity = load_puromycin()
+    # A Puromycin-scaled copy of the ``mm`` family: same expr/func/name layout,
+    # data-appropriate seed and bounds (Vmax ~ max velocity, Km ~ mid-range conc).
+    mmr = dict(_model("mm"),
+               true={"Km": 0.1, "Vmax": 210.0}, t=(conc.min(), conc.max()),
+               p0=[0.1, 200.0], bounds=[(1e-3, 5.0), (50.0, 500.0)])
+    rows = []
+    for label, fn in [("dtfit LSI", est_lsi), ("dtfit EAC", est_eac),
+                      ("SciPy NLLS", est_nlls)]:
+        try:
+            est = fn(mmr, conc, velocity)
+            pred = _f_mm(conc, est["Km"], est["Vmax"])
+            sc = metrics(velocity, pred)
+            rows.append({"method": label, "Vmax": float(est["Vmax"]),
+                         "Km": float(est["Km"]), "RMSE": sc["RMSE"], "R2": sc["R2"]})
+        except Exception:
+            rows.append({"method": label, "Vmax": float("nan"), "Km": float("nan"),
+                         "RMSE": float("nan"), "R2": float("nan")})
+    return rows
+
+
+# --------------------------------------------------------------------------- #
+# Part E -- model-mismatch negative control. Fit the WRONG structural model to
+# data from a known generator to show (a) NO estimator rescues a mis-specified
+# model -- both dtfit AND NLLS degrade sharply -- and (b) an in-sample goodness
+# stat (R2) flags the mismatch, which is what a blind selector would key on.
+# --------------------------------------------------------------------------- #
+def _fit_rmse_r2(model, fn, t, y):
+    """Fit ``model`` to ``(t, y)`` with estimator ``fn`` and return the in-sample
+    curve ``(RMSE, R2)`` (NaN on failure). Curve accuracy, not param accuracy --
+    the only comparable currency when the fitted model is the wrong structure."""
+    try:
+        est = fn(model, t, y)
+        pred = model["func"](t, *[est[k] for k in model["names"]])
+        sc = metrics(y, pred)
+        return float(sc["RMSE"]), float(sc["R2"])
+    except Exception:
+        return float("nan"), float("nan")
+
+
+# The negative-control cases: data generated from ``true`` fitted with both the
+# CORRECT structure and a structurally WRONG one. Each wrong model must accept the
+# same 1-D ``t`` support as the truth. ``param`` names a physical quantity present
+# (and comparable) in both models, for a param-error column; ``None`` if none is.
+_MISMATCH_CASES = [
+    dict(name="biexp truth, fitted as single-exp decay",
+         true="biexp", correct="biexp", wrong="decay_offset", param=None,
+         note="two decay rates collapsed onto one -- the fast/slow split is lost"),
+    dict(name="damped truth, fitted as exp growth",
+         true="damped", correct="damped", wrong="expgrow", param=None,
+         note="an oscillation forced onto a monotone exponential -- no cycle"),
+    dict(name="logistic truth, fitted as exp growth",
+         true="logistic", correct="logistic", wrong="expgrow", param=None,
+         note="a saturating sigmoid forced onto unbounded growth -- no plateau"),
+]
+
+
+def exp_model_mismatch(seeds=5):
+    """Model-mismatch **negative control**: fit the wrong structural model and
+    show that no estimator rescues it.
+
+    For each case in :data:`_MISMATCH_CASES` the same data (from a known
+    generator) is fitted with the CORRECT structure and a structurally WRONG one,
+    for both dtfit-LSI and SciPy NLLS. It reports the in-sample curve
+    ``RMSE``/``R2`` of correct vs wrong for each estimator, and the **R2 gap**
+    (correct minus wrong) that a blind selector would use to flag the mismatch.
+    Averaged over ``seeds``. Returns a list of one dict per case::
+
+        {"case", "correct model", "wrong model",
+         "LSI correct RMSE", "LSI wrong RMSE",
+         "NLLS correct RMSE", "NLLS wrong RMSE",
+         "wrong/correct RMSE ratio",              # >> 1 == mismatch (worst est)
+         "correct R2", "wrong R2", "R2 gap (flags mismatch)", "note"}
+    """
+    rows = []
+    for case in _MISMATCH_CASES:
+        true_m = _model(case["true"])
+        correct_m = _model(case["correct"])
+        wrong_m = _model(case["wrong"])
+        acc: dict[str, list[float]] = {k: [] for k in (
+            "lsi_c_rmse", "lsi_w_rmse", "nlls_c_rmse", "nlls_w_rmse",
+            "lsi_c_r2", "lsi_w_r2", "nlls_c_r2", "nlls_w_r2")}
+        for s in range(seeds):
+            t, y, _ = gen(true_m, np.random.default_rng(1000 + s), n=200, noise=0.05)
+            lc_rmse, lc_r2 = _fit_rmse_r2(correct_m, est_lsi, t, y)
+            lw_rmse, lw_r2 = _fit_rmse_r2(wrong_m, est_lsi, t, y)
+            nc_rmse, nc_r2 = _fit_rmse_r2(correct_m, est_nlls, t, y)
+            nw_rmse, nw_r2 = _fit_rmse_r2(wrong_m, est_nlls, t, y)
+            acc["lsi_c_rmse"].append(lc_rmse); acc["lsi_w_rmse"].append(lw_rmse)
+            acc["nlls_c_rmse"].append(nc_rmse); acc["nlls_w_rmse"].append(nw_rmse)
+            acc["lsi_c_r2"].append(lc_r2); acc["lsi_w_r2"].append(lw_r2)
+            acc["nlls_c_r2"].append(nc_r2); acc["nlls_w_r2"].append(nw_r2)
+
+        def _m(key):
+            return float(np.nanmean(acc[key]))
+
+        # correct/wrong RMSE from whichever estimator fits the wrong model best --
+        # the honest worst case for the "a good estimator rescues it" claim.
+        wrong_rmse = min(_m("lsi_w_rmse"), _m("nlls_w_rmse"))
+        correct_rmse = min(_m("lsi_c_rmse"), _m("nlls_c_rmse"))
+        ratio = (wrong_rmse / correct_rmse
+                 if correct_rmse > 0 else float("inf"))
+        correct_r2 = max(_m("lsi_c_r2"), _m("nlls_c_r2"))
+        wrong_r2 = max(_m("lsi_w_r2"), _m("nlls_w_r2"))
+        rows.append({
+            "case": case["name"],
+            "correct model": case["correct"],
+            "wrong model": case["wrong"],
+            "LSI correct RMSE": _m("lsi_c_rmse"),
+            "LSI wrong RMSE": _m("lsi_w_rmse"),
+            "NLLS correct RMSE": _m("nlls_c_rmse"),
+            "NLLS wrong RMSE": _m("nlls_w_rmse"),
+            "wrong/correct RMSE ratio": ratio,
+            "correct R2": correct_r2,
+            "wrong R2": wrong_r2,
+            "R2 gap (flags mismatch)": correct_r2 - wrong_r2,
+            "note": case["note"],
+        })
+    return rows
 
 
 # --------------------------------------------------------------------------- #

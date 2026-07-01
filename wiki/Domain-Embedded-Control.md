@@ -123,6 +123,8 @@ With gross outliers (sensor spikes, GPS multipath) the picture **inverts**: a si
 
 Dropout is handled gracefully by **all** the recursive estimators (a missing sample is simply an update that does not happen / an integral over whatever lands in the window on its true irregular timestamps) -- the integral filters stay accurate and the EKF is, if anything, flatter. So dropout is *not* where the filters differ; **outliers are** (2b). What matters is that none of them degrade catastrophically as a fifth-plus of the stream vanishes -- what real sensors actually deliver.
 
+For a *sustained* gap (a run of missing samples while the query time advances), evaluating the fitted model off its support diverges for higher-order models. Both filters expose [`coast(x, *, order=1)`](API-Streaming#coast) for exactly this: it anchors at the last in-window sample and Taylor dead-reckons across the gap (`order=1` constant-velocity, `order=2` constant-acceleration), reducing to `predict` once samples resume -- bounded gap extrapolation instead of a runaway fit. (Not available for models with external regressors, whose future value across the gap is unknown.)
+
 ![Gaussian noise: EKF best (left). Outliers: the integral filters stay bounded while the pointwise EKF explodes (right, log scale).](figures/robustness.png)
 
 *Gaussian noise: EKF best (left). Outliers: the integral filters stay bounded while the pointwise EKF explodes (right, log scale).*

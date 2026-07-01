@@ -21,7 +21,10 @@ class NonlineRegressor(RegressorMixin, BaseEstimator):
     """Fit a model that is nonlinear in its parameters to 1-D data.
 
     Args:
-        expr: Model expression, e.g. ``"a0 + a1*x + a2*exp(a3*x)"``.
+        expr: Model expression, e.g. ``"a0 + a1*x + a2*exp(a3*x)"``. Defaults to a
+            simple affine model so the estimator is constructible with no
+            arguments (the scikit-learn estimator contract: ``NonlineRegressor()``
+            must work for ``clone`` / meta-estimator introspection).
         var: Main variable name in ``expr`` (the single input feature).
         method: ``"lsi"``, ``"eac"`` or ``"dsb"``.
         k_star: (LSI) number of spectral discretes to match.
@@ -33,6 +36,10 @@ class NonlineRegressor(RegressorMixin, BaseEstimator):
         poly_degree: (DSB) polynomial degree for the required pre-fit; if
             ``None`` it is selected automatically (BIC).
         p0: Optional initial guess for the parameters.
+        random_state: (LSI) seed for the deterministic global / differential-
+            evolution search when ``bounds`` are given, so a bounded fit is
+            reproducible under ``GridSearchCV``/``clone``. ``None`` uses the
+            global RNG.
 
     Fitted attributes:
         coef_: Fitted coefficients (ordered by parameter name).
@@ -49,7 +56,7 @@ class NonlineRegressor(RegressorMixin, BaseEstimator):
 
     def __init__(
         self,
-        expr,
+        expr="a0 + a1*x",
         var="x",
         method="lsi",
         k_star=5,
@@ -59,6 +66,7 @@ class NonlineRegressor(RegressorMixin, BaseEstimator):
         active_ratio=0.8,
         poly_degree=None,
         p0=None,
+        random_state=0,
     ):
         self.expr = expr
         self.var = var
@@ -70,6 +78,7 @@ class NonlineRegressor(RegressorMixin, BaseEstimator):
         self.active_ratio = active_ratio
         self.poly_degree = poly_degree
         self.p0 = p0
+        self.random_state = random_state
 
     def __sklearn_tags__(self):
         tags = super().__sklearn_tags__()
@@ -113,6 +122,7 @@ class NonlineRegressor(RegressorMixin, BaseEstimator):
                 filter_data=self.filter_data,
                 bounds=self.bounds,
                 p0=self.p0,
+                random_state=self.random_state,
             )
         elif self.method == "eac":
             result = fit_eac(
@@ -126,7 +136,8 @@ class NonlineRegressor(RegressorMixin, BaseEstimator):
         elif self.method == "dsb":
             # The polynomial must carry at least as many coefficients as the
             # nonlinear spectrum, else the transfer system is underdefined.
-            n_params = len(model_params(sp.sympify(self.expr), sp.Symbol(self.var)))
+            expr_sym = cast(sp.Expr, sp.sympify(self.expr))
+            n_params = len(model_params(expr_sym, sp.Symbol(self.var)))
             min_degree = max(1, n_params - 1)
             degree = self.poly_degree
             if degree is None:

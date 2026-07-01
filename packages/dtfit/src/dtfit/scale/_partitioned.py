@@ -131,13 +131,29 @@ class PartitionedEAC:
         self.m = int(n_windows)
         self.edges = np.linspace(self.x0, self.xn, self.m + 1)
         self._areas = np.zeros(self.m)
-        self._last: tuple[float, float] | None = None
+        self._first: tuple[float, float] | None = None  # accumulator's first sample
+        self._last: tuple[float, float] | None = None    # ...and its last sample
         self.n_samples = 0
+
+    def _add_interval(self, xa: float, ya: float, xb: float, yb: float) -> None:
+        """Add the single trapezoid interval ``[xa, xb]`` into the window(s) that
+        contain it, matching the per-window masking of :meth:`update`."""
+        if xb <= xa:
+            return
+        cx = np.array([xa, xb])
+        cy = np.array([ya, yb])
+        for k in range(self.m):
+            lo, hi = self.edges[k], self.edges[k + 1]
+            if (cx >= lo).all() and (cx <= hi).all():
+                self._areas[k] += float(np.trapezoid(cy, cx))
+                return
 
     def update(self, x_chunk: np.ndarray, y_chunk: np.ndarray) -> "PartitionedEAC":
         x = np.asarray(x_chunk, dtype=float)
         y = np.asarray(y_chunk, dtype=float)
         n_orig = x.size
+        if self._first is None and x.size:
+            self._first = (float(x[0]), float(y[0]))
         if self._last is not None and x.size:
             x = np.concatenate([[self._last[0]], x])
             y = np.concatenate([[self._last[1]], y])
@@ -155,8 +171,28 @@ class PartitionedEAC:
         return self
 
     def merge(self, other: "PartitionedEAC") -> "PartitionedEAC":
+        """Associative reduce, made **exact** by stitching the partition boundary.
+
+        Summing ``_areas`` alone drops the trapezoid interval connecting one
+        partition's last sample to the next's first sample (that interval was
+        never integrated by either accumulator) -- a partition-boundary error
+        that makes the reduce order-dependent. Here the connecting interval is
+        added explicitly (the reduce twin of :meth:`update`'s boundary carry), so
+        merging disjoint domain-ordered partitions equals processing them in one
+        pass. Partitions must be disjoint; order between the two is inferred.
+        """
+        left, right = self, other
+        if (self._first is not None and other._last is not None
+                and other._last[0] <= self._first[0]):
+            left, right = other, self  # `other` lies before `self` on the domain
+        if left._last is not None and right._first is not None:
+            self._add_interval(left._last[0], left._last[1],
+                               right._first[0], right._first[1])
         self._areas += other._areas
         self.n_samples += other.n_samples
+        # extend this accumulator's boundary span to cover both partitions
+        self._first = left._first if left._first is not None else self._first
+        self._last = right._last if right._last is not None else self._last
         return self
 
     def fit(self, *, p0: InitialGuess = None) -> FittingResult:
@@ -190,8 +226,7 @@ class PartitionedEAC:
         sol = least_squares(residual, guess, method="lm")
         coeffs = np.asarray(sol.x, dtype=np.float64)
         cov = _covariance(sol.jac, residual(coeffs), n)
-        model = sp.lambdify(t, f_sym.subs(dict(zip(params, coeffs))), "numpy")
-        return FittingResult(model=model, coeffs=coeffs, cov=cov,
+        return FittingResult(coeffs=coeffs, cov=cov,
                              expr=self.expr, var=self.var, names=tuple(str(p) for p in params))
 
 

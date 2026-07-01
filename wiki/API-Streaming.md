@@ -10,6 +10,7 @@ math: [../methods/equal_areas_filter.md](Methods-Equal-Areas-Filter).
 - [`LSIFilter`](#lsifilter) -- spectrum-measurement filter (oscillatory plants)
 - [`FilterBank`](#filterbank) -- many streams in lockstep
 - [`FusedChiSquareDetector`](#fused) -- pooled multi-stream fault detection
+- [`InformationFilter`](#informationfilter) -- inverse-covariance (info-form) linear estimator; additive/associative fusion
 
 Each filter is the **streaming twin of a batch method**: `EACFilter` <->
 [`fit_eac`](API-Fitting#fit_eac), `LSIFilter` <-> [`fit_lsi`](API-Fitting#fit_lsi).
@@ -20,22 +21,38 @@ Each filter is the **streaming twin of a batch method**: `EACFilter` <->
 ## `EACFilter`
 
 ```python
-EACFilter(expr, var, *, p0=None, window_size=50, q_diag=None, r=1.0,
-          alpha=0.001, cusum_k=0.5, cusum_h=5.0, n_sub=1,
-          adapt_r=False, drift_reset="full", drift_inflation=100.0)
+EACFilter(expr, var, *, regressors=None, p0=None, window_size=50,
+          min_window=None, adaptive_window=False, window_tol=0.02,
+          q_diag=None, r=1.0, alpha=0.001, cusum_k=0.5, cusum_h=5.0, n_sub=1,
+          adapt_r=False, robust=False, huber_c=3.0,
+          drift_reset="full", drift_inflation=100.0)
 ```
 
 Kalman-style recursive estimator whose **measurement is the area innovation**
 (data minus model, integrated over a sliding window). Tracks time-varying
 parameters and detects drift.
 
+**Quick-start presets** -- most callers should start from a preset classmethod
+and only pass overrides, rather than tuning the full knob set below:
+
+- `EACFilter.tracking(expr, var, **overrides)` -- responsive auto-sized window for
+  drifting parameters. Equivalent to `EACFilter(expr, var, adaptive_window=True,
+  ...)`; any keyword in `overrides` wins over the preset.
+- `EACFilter.robust(expr, var, **overrides)` -- outlier/anomaly-resilient gains.
+  Equivalent to `EACFilter(expr, var, robust=True, adapt_r=True,
+  drift_reset="inflate", ...)`; `overrides` win.
+
 **Constructor arguments**
 
 | name | default | meaning |
 |---|---|---|
-| `expr`, `var` | -- | model expression and main variable, e.g. `"A*sin(w*t)"` |
+| `expr`, `var` | -- | model expression and main variable, e.g. `"A*sin(w*t)"`; `expr` may also reference [external regressors](#regressors) |
+| `regressors` | `None` | name(s) of [external-regressor](#regressors) channels appearing in `expr` (everything else free is a parameter); when given, each `partial_fit` / `predict` supplies the regressor value(s) for that sample |
 | `p0` | `None` | initial parameter estimate (defaults to ones) |
-| `window_size` | `50` | sliding-window length for the area integration (smoothing vs responsiveness) |
+| `window_size` | `50` | target (**maximum**) sliding-window length for the area integration; the window **grows** from `min_window` up to this size as samples arrive, then slides. Larger => smoother/more rigid, smaller => more responsive |
+| `min_window` | `None` | smallest window at which the filter starts producing an estimate (the area measurement is accumulative, so it does not idle until `window_size` samples arrive). Defaults to **half** `window_size` (a scalar area over few noisy points is unreliable); with `adaptive_window` a small floor so the window can collapse here on a drift. Clamped to `[2*n_sub, window_size]` |
+| `adaptive_window` | `False` | size the window **automatically from the data**, using `window_size` as the maximum: grow from `min_window` while the state covariance is still shrinking, collapse back to `min_window` on a detected drift. Best-effort for the area filter -- it cannot size a *global*-parameter model (a polynomial's intercept) well; for robust auto-sizing use [`LSIFilter`](#lsifilter) |
+| `window_tol` | `0.02` | covariance-reduction threshold for `adaptive_window` -- the window stops growing once successive updates shrink `trace(P)` by less than this fraction (default 2%) |
 | `q_diag` | `None` | per-parameter process-noise variances; larger => faster drift. Defaults to 0.01 each |
 | `r` | `1.0` | measurement-noise variance of the area innovation |
 | `alpha` | `0.001` | significance level for the NIS sudden-jump test |
@@ -43,14 +60,26 @@ parameters and detects drift.
 | `cusum_h` | `5.0` | CUSUM decision threshold; larger => fewer false alarms, slower detection |
 | `n_sub` | `1` | sub-window area measurements per step; `>1` gives a *vector* measurement (better observability for coupled multi-parameter models) |
 | `adapt_r` | `False` | adapt `R` online from an EWMA of the squared innovation (Mehra-style); pair with `n_sub>1` |
+| `robust` | `False` | gate each update by the normalized innovation -- a window whose per-dof Mahalanobis innovation exceeds `huber_c` has its measurement-noise inflated (gain shrunk) by a Huber weight, so an outlier-corrupted window cannot yank the estimate. The drift detector still sees the raw innovation, so a genuine regime shift is still detected |
+| `huber_c` | `3.0` | robust gate threshold in innovation standard deviations (per dof); ~3 keeps clean windows unweighted |
 | `drift_reset` | `"full"` | on a detected drift, `"full"` resets covariance + clears the window; `"inflate"` multiplies covariance by `drift_inflation` and keeps the estimate (gentler) |
 | `drift_inflation` | `100.0` | covariance inflation factor for `drift_reset="inflate"` |
 
 **Methods & attributes**
 
-- `partial_fit(t_new, y_new) -> self` -- ingest one sample; returns early until the
-  window fills. `update` is an alias (recursive-filter naming).
-- `predict(x) -> ndarray` -- evaluate the current model at `x`.
+- `partial_fit(t_new, y_new, regressors=None) -> self` -- ingest one sample; returns
+  early until the window reaches `min_window`. `update` is an alias
+  (recursive-filter naming). Pass [`regressors=`](#regressors) iff the model
+  declares external regressors.
+- `predict(x, regressors=None) -> ndarray` -- evaluate the current model at `x`.
+- [`coast(x, *, order=1)`](#coast) -- dead-reckon *past the fitted window* (gap
+  extrapolation).
+- [`coast_cov(x, *, order=1)`](#coast_cov) -- predictive variance of `coast(x)`;
+  the band **grows with gap length** (confidence decays while coasting), so a gap
+  dead-reckon can be fused as `coast(x) +/- sqrt(coast_cov(x))`.
+- [`predict_cov(x, regressors=None)`](#predict_cov) -- predictive variance of the
+  model **output** at `x` (the delta method); gives the `predict(x) +/-
+  sqrt(predict_cov(x))` band.
 - `params_ -> dict[str, float]` -- current parameter estimate.
 - `param_cov_ -> ndarray` -- the running parameter covariance `P` (the Kalman
   state covariance), shape `(n_params, n_params)` -- the streaming analogue of
@@ -84,9 +113,11 @@ print(flt.params_)
 ## `LSIFilter`
 
 ```python
-LSIFilter(expr, var, *, p0=None, window_size=50, order=5, q_diag=None, r=1.0,
-          alpha=0.001, cusum_k=0.5, cusum_h=5.0,
-          adapt_r=False, drift_reset="full", drift_inflation=100.0)
+LSIFilter(expr, var, *, regressors=None, p0=None, window_size=50,
+          min_window=None, adaptive_window=False, window_tol=0.001, order=5,
+          q_diag=None, r=1.0, alpha=0.001, cusum_k=0.5, cusum_h=5.0,
+          adapt_r=False, adapt_noise=False, robust=False, huber_c=3.0,
+          drift_reset="full", drift_inflation=100.0)
 ```
 
 Drop-in sibling of `EACFilter` with the same `partial_fit` / `predict` / `params_`
@@ -95,14 +126,158 @@ API, but the measurement is the window's **Legendre spectrum** (the first
 oscillations the area criterion partly cancels, so **use `LSIFilter` for
 oscillatory plants**.
 
-Differs from `EACFilter` only in:
+**Quick-start presets** -- as with `EACFilter`, prefer a preset classmethod over
+the full knob set:
+
+- `LSIFilter.tracking(expr, var, **overrides)` -- responsive auto-sized window.
+  Equivalent to `LSIFilter(expr, var, adaptive_window=True, ...)`; `overrides` win.
+- `LSIFilter.robust(expr, var, **overrides)` -- outlier/anomaly-resilient gains.
+  Equivalent to `LSIFilter(expr, var, robust=True, adapt_noise=True,
+  drift_reset="inflate", ...)`; `overrides` win.
+
+It shares `EACFilter`'s `regressors`, `p0`, `window_size` (target/**maximum**,
+window grows from `min_window`), `min_window`, `adaptive_window`, `q_diag`, `r`,
+`alpha`, `cusum_k`, `cusum_h`, `adapt_r`, `robust`, `huber_c`, `drift_reset` and
+`drift_inflation` arguments, and the same [`coast`](#coast) /
+[`predict_cov`](#predict_cov) / [external-regressor](#regressors) methods. It
+differs in:
 
 | name | default | meaning |
 |---|---|---|
-| `order` | `5` | Legendre spectral order; measurement is the first `order+1` coefficients (richer observability, larger measurement vector). Clamped so `order+1 <= window_size` |
+| `window_tol` | `0.001` | relative-movement threshold for `adaptive_window` (**not** 0.02 as for EAC): the window stops growing once successive updates move the estimate by less than this (EWMA of `|dp|/|p|`, default 0.1%). Its adaptive window is *bidirectional* -- it also **shrinks** when the forecast residual becomes systematically autocorrelated (a lagging fit) -- and, unlike EAC's, is safe for global-parameter models |
+| `order` | `5` | Legendre spectral order; measurement is the first `order+1` coefficients (richer observability, larger measurement vector). Clamped so `order+1 <= window_size`. `min_window` defaults to `order + 2` |
 | `r` | `1.0` | *base* measurement-noise variance; per-coefficient variance is `r*(2j+1)` (the LSI orthonormal weighting, down-weighting noisier high orders) |
+| `adapt_noise` | `False` | set the measurement-noise covariance **entirely** from the data (`R_diag = v * diag(proj @ proj.T)`, `v` an online EWMA of the residual variance) -- the statistically correct self-tuning noise, overriding `r`. Damps the gain on noisy streams, frees it on clean ones; pairs naturally with `robust=True` |
 
 (No `n_sub` -- the spectral order plays that role.)
+
+---
+
+<a name="coast"></a>
+## Shared: `coast(x, *, order=1, regressors=None)` -- dead-reckoning past the window
+
+Both filters (via the shared base) expose `coast`, which **extrapolates beyond
+the fitted window by dead-reckoning** instead of evaluating the model off its
+support. `predict(x)` evaluates the fitted `f(x)` directly -- exact inside the
+window the parameters were identified on, but a higher-order model *diverges* once
+`x` runs past it (a fitted cubic's `c3*x**3` blows up), so a measurement gap (no
+`partial_fit` while `x` advances) turns a good fit into an unbounded extrapolation.
+
+`coast` anchors at the last in-window sample `a = self._t[-1]` and propagates a
+Taylor expansion from there:
+
+- `order=1` (default) -- position + velocity `f(a) + f'(a)*(x - a)`
+  (constant-velocity / frozen rate); bounded for any model, the safe default.
+- `order=2` -- also `+ 0.5*f''(a)*(x - a)**2` (constant acceleration).
+
+It **reduces to `predict` at and before the anchor** (`x <= a`), so it is a
+drop-in for the whole track: exact where the window supports `x`, bounded
+dead-reckoning past it.
+
+**With [external regressors](#regressors)**, pass `regressors=` the *future*
+regressor value(s) at `x` (e.g. an IMU-propagated motion basis). The model is
+split into its **extrapolable** part (terms containing a regressor, rolled forward
+with the supplied future regressor) and its **nuisance** drift (time-only terms,
+which would blow up if extrapolated); only the nuisance drift is dead-reckoned.
+This rolls a *fused* model forward using the sensed regressor instead of a crude
+finite difference -- the honest way to coast through a GPS/IMU dropout. Without
+`regressors`, a regressor model raises `NotImplementedError` (the future regressor
+is unknown); call `predict` there instead.
+
+```python
+# fused drift + IMU model: coast forward with the caller-propagated accel
+future = flt.coast(t_gap, order=1, regressors={"acc": imu_accel_at_t_gap})
+```
+
+```python
+from dtfit import EACFilter
+flt = EACFilter("a + b*t + c*t**2", "t", window_size=40)
+for t, y in stream:            # ... fit up to the last received sample
+    flt.partial_fit(t, y)
+future = flt.coast(t_gap, order=2)   # constant-acceleration coast across a dropout
+```
+
+See [Domain: embedded control -- sample dropout](Domain-Embedded-Control) for where
+this matters.
+
+---
+
+<a name="predict_cov"></a>
+## Shared: `predict_cov(x, regressors=None)` -- output variance for fusion
+
+`predict_cov` returns the **predictive variance of the model output** at `x`,
+propagated from the parameter covariance by the delta method:
+`Var[f(x)] = J(x)^T P J(x)` where `J(x) = df/dparams`. Where [`stderr_`](#edafilter)
+gives the uncertainty of each *parameter*, `predict_cov` maps that covariance into
+*output* space, so the streamed estimate carries a calibrated one-sigma band:
+
+```python
+mu = flt.predict(x)
+sigma = np.sqrt(flt.predict_cov(x))
+band = (mu - sigma, mu + sigma)          # predict(x) +/- sqrt(predict_cov(x))
+```
+
+That is what lets a downstream consumer **fuse** the dtfit output (as a
+pseudo-measurement with a known variance) or gate on its confidence. It is nearly
+free (the parameter Jacobian is already compiled). Note this is the variance from
+the *estimate's* uncertainty only -- add the measurement-noise floor separately for
+a full predictive interval. With external regressors, `regressors=` supplies their
+value(s) at `x` (as for `predict`). Returns an array shaped like `x`.
+
+---
+
+<a name="coast_cov"></a>
+## Shared: `coast_cov(x, *, order=1)` -- gap-growing uncertainty band
+
+`coast_cov` is to [`coast`](#coast) what [`predict_cov`](#predict_cov) is to
+`predict`: the predictive variance of the dead-reckoned value across a measurement
+gap. The coasted value `c(x) = f(a) + f'(a)*dt [+ 1/2 f''(a)*dt^2]` (anchor
+`a = last sample`, `dt = x - a`) is a function of the parameters, so its variance
+is `J_c(x)^T P J_c(x)` with the coast Jacobian
+`J_c[k] = df/dp_k(a) + d f'/dp_k(a)*dt [+ 1/2 d f''/dp_k(a)*dt^2]`. The `dt`/`dt^2`
+factors make the band **grow with gap length** -- confidence correctly decays the
+longer the filter coasts without a measurement:
+
+```python
+mu = flt.coast(x)                       # dead-reckon through the gap
+sigma = np.sqrt(flt.coast_cov(x))       # widening band
+band = (mu - sigma, mu + sigma)         # honest, gap-growing pseudo-measurement
+```
+
+At and before the anchor (`x <= a`) it returns `predict_cov`, so it is a drop-in
+for the whole track. Match its `order` to the `coast` call. Not defined for models
+with external regressors (as `coast`).
+
+---
+
+<a name="regressors"></a>
+## Shared: external regressors (exogenous side-channels)
+
+Both filters accept **external regressors** -- measured exogenous signals the model
+depends on in addition to `t` (e.g. an IMU-derived motion basis fused into a GPS
+track). Declare them at construction and the model becomes `f(t, regressors,
+params)`; everything else free in `expr` is still a fitted parameter, and the model
+is still scored by the *same* area / Legendre-spectrum measurement:
+
+```python
+# expr references the regressor name(s); `S` here is a measured side-channel.
+flt = LSIFilter("c0 + c1*t + S", "t", regressors="S")
+for t, y, s in stream:
+    flt.partial_fit(t, y, regressors={"S": s})   # mapping ...
+    # ... or an array/sequence ordered like `regressors`:
+    # flt.partial_fit(t, y, regressors=[s])
+mu = flt.predict(t_query, regressors={"S": s_query})   # or (len(x), n_reg) array
+```
+
+- `regressors=` in the constructor is a name or sequence of names appearing in
+  `expr`.
+- `partial_fit(t, y, regressors=...)` and `predict(x, regressors=...)` /
+  `predict_cov(x, regressors=...)` each take a `{name: value}` **mapping** or a
+  value **sequence/array** ordered like the declared `regressors` (an
+  `(len(x), n_reg)` array for `predict`). Required iff the model declares
+  regressors.
+- [`coast`](#coast) is **excluded** for regressor models (the regressor's value
+  across a gap is unknown) and raises `NotImplementedError`.
 
 ---
 
@@ -175,4 +350,57 @@ det = bank.fused_detector(alpha=1e-4, inflate=4.0)
 for i, (t, y) in enumerate(stream):       # y length K
     if det.update(t, y):
         handle_fault(i, det.statistic_)
+```
+
+---
+
+<a name="informationfilter"></a>
+## `InformationFilter` -- inverse-covariance (information-form) linear estimator
+
+The covariance-form Kalman update the trackers run inverts the innovation
+covariance (dimension = measurement size) every step. `InformationFilter`
+maintains the **inverse** `Y = P^-1` (the *information matrix*) and `yv = P^-1 p`
+(the *information vector*) instead, which flips three properties that matter for
+embedded / sensor-fusion use:
+
+- **the measurement update is purely additive** -- `Y += H^T R^-1 H`,
+  `yv += H^T R^-1 z` -- so absorbing a measurement needs no inverse, and
+  independent estimators **fuse by adding information** (exact, associative,
+  order-independent);
+- **you invert the smaller matrix**: a readout solves the `n_params x n_params`
+  system `Y theta = yv` once, rather than inverting an `m x m` innovation
+  covariance each step (a win when the measurement dimension `m` exceeds the
+  state dimension `n`);
+- it is **fixed-point friendlier** -- adding information never suffers the
+  covariance-collapse conditioning of `(I - K H) P`.
+
+This is the linear-Gaussian primitive (recursive least squares in information
+form, with an optional forgetting factor) -- the on-MCU / fusion building block.
+
+```python
+InformationFilter(n_params, *, prior_precision=1e-6, forgetting=1.0)
+```
+
+| name | default | meaning |
+|---|---|---|
+| `n_params` | -- | state dimension |
+| `prior_precision` | `1e-6` | diagonal of the initial information matrix `Y0 = prior_precision * I` (weak prior; `~0` is uninformative but leaves `Y` singular until enough data arrives) |
+| `forgetting` | `1.0` | exponential forgetting in `(0, 1]` (`1` = none); down-weights accumulated information each step so slowly-varying parameters are tracked |
+
+**Methods & attributes**
+
+- `partial_fit(h, z, r=1.0) -> self` -- absorb one measurement `z = h . theta +
+  noise` (variance `r`). `h` is a length-`n` row for scalar `z`, or `(m, n)` for a
+  vector `z` (with scalar or length-`m` `r`).
+- `theta_` / `p` -- current estimate (the small solve `Y theta = yv`).
+- `cov_` / `P` -- covariance `P = Y^-1` (inverts the small `n x n`).
+- `fuse(other) -> self` -- add another estimator's information (exact, associative
+  fusion; the shared prior is subtracted once).
+
+```python
+from dtfit import InformationFilter
+f = InformationFilter(n_params=2)
+for h, z in stream:            # h: (2,) row, z: scalar
+    f.partial_fit(h, z, r=0.04)
+theta = f.theta_               # estimate;  fused = a.fuse(b)  # any order
 ```

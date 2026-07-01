@@ -287,6 +287,29 @@ class EACFilter(_RecursiveFilter):
             sp.lambdify([t_sym, *reg_syms, *self.params], sp.diff(model, p), "numpy")
             for p in self.params
         ]
+        # Time derivatives, for coast() dead-reckoning through gaps. Only
+        # meaningful without external regressors (a measured regressor has no
+        # closed-form time derivative); coast() guards on that.
+        self._dfdt: Callable[..., Any] = sp.lambdify(
+            [t_sym, *reg_syms, *self.params], sp.diff(model, t_sym), "numpy"
+        )
+        self._d2fdt2: Callable[..., Any] = sp.lambdify(
+            [t_sym, *reg_syms, *self.params], sp.diff(model, t_sym, 2), "numpy"
+        )
+        # Mixed derivatives d/dp_k(df/dt) and d/dp_k(d2f/dt2), for coast_cov()'s
+        # gap-growing uncertainty band (no-regressor models only).
+        self._dfdt_jac: list[Callable[..., Any]] = [
+            sp.lambdify([t_sym, *reg_syms, *self.params],
+                        sp.diff(sp.diff(model, t_sym), p), "numpy")
+            for p in self.params
+        ]
+        self._d2fdt2_jac: list[Callable[..., Any]] = [
+            sp.lambdify([t_sym, *reg_syms, *self.params],
+                        sp.diff(sp.diff(model, t_sym, 2), p), "numpy")
+            for p in self.params
+        ]
+        # Extrapolable/nuisance split for coast() on regressor models.
+        self._compile_regressor_coast(model, t_sym, reg_syms)
 
     def _area_jac(self, j: int, t_arr: np.ndarray, reg_cols=None) -> np.ndarray:
         if reg_cols is None:
@@ -406,6 +429,13 @@ class EACFilter(_RecursiveFilter):
         step = gain @ e_vec
         p_new = self.p + step
         P_new = (np.eye(np_params) - gain @ h_mat) @ self.P + self.Q
+        # Keep the covariance symmetric. ``(I - K H) P`` is the algebraically
+        # minimal but numerically least stable update: rounding makes ``P`` drift
+        # asymmetric and can push an eigenvalue negative over a long (effectively
+        # infinite-horizon) stream, which then surfaces as negative ``stderr_`` /
+        # ``predict_cov``. Projecting onto the symmetric part each step is O(n^2)
+        # and prevents that accumulation.
+        P_new = 0.5 * (P_new + P_new.T)
         if not (np.all(np.isfinite(p_new)) and np.all(np.isfinite(P_new))):
             return self  # reject an ill-conditioned (non-finite) update
         self.p = p_new
@@ -417,6 +447,11 @@ class EACFilter(_RecursiveFilter):
             self._r_ewma = 0.95 * self._r_ewma + 0.05 * float(
                 (e_vec @ e_vec) / len(sub)
             )
+            # Floor the adaptive noise so a very clean stream cannot drive R -> 0.
+            # A vanishing R saturates the gain (S ~= H P H^T), so the next outlier
+            # gets full authority over the estimate. LSI floors its analogous
+            # scale (max(_v_est, 1e-9)); keep EAC consistent.
+            self._r_ewma = max(self._r_ewma, 1e-6 * self.R)
         # Automatic window sizing: keep widening while more data still moves the
         # estimate, capped at the maximum; once the estimate stabilizes the window
         # stops growing and slides. A global-parameter model widens on its own; a

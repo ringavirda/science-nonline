@@ -84,6 +84,66 @@ def test_drift_detected_downward():
     assert direction == -1  # downward shift
 
 
+@pytest.mark.parametrize("cls", [EACFilter, LSIFilter])
+def test_coast_matches_predict_in_support(cls):
+    """coast() reduces to predict() at and before the anchor (in-window)."""
+    rng = np.random.default_rng(0)
+    t = np.arange(40) * 0.1
+    y = 2.0 + 3.0 * t + 0.5 * t**2 + rng.normal(0, 0.05, t.size)
+    flt = cls("c0 + c1*t + c2*t**2", "t", p0=[y[0], 0.0, 0.0], window_size=15)
+    for ti, yi in zip(t, y):
+        flt.partial_fit(ti, yi)
+    xin = t[-5:]  # all at or before the anchor
+    assert np.allclose(flt.coast(xin), flt.predict(xin))
+
+
+def test_coast_stays_bounded_where_cubic_diverges():
+    """Past the window a fitted cubic's predict() runs away; the order-1 coast
+    (constant velocity) stays close to a straight-line extrapolation."""
+    rng = np.random.default_rng(1)
+    t = np.arange(40) * 0.1
+    y = 2.0 + 3.0 * t - 0.1 * t**3 + rng.normal(0, 0.05, t.size)
+    flt = LSIFilter("c0 + c1*t + c2*t**2 + c3*t**3", "t",
+                    p0=[y[0], 0.0, 0.0, 0.0], window_size=15, order=5)
+    for ti, yi in zip(t, y):
+        flt.partial_fit(ti, yi)
+    a = t[-1]
+    gap = a + np.arange(1, 21) * 0.1  # 2 s past support
+    c1 = flt.coast(gap, order=1)
+    assert np.all(np.isfinite(c1))
+    # an order-1 coast is exactly linear in (x - a): its second difference is ~0,
+    # whereas the raw cubic predict() curves away
+    assert np.allclose(np.diff(c1, 2), 0.0, atol=1e-9)
+    assert not np.allclose(np.diff(flt.predict(gap), 2), 0.0, atol=1e-9)
+
+
+def test_coast_rejects_regressor_models():
+    flt = LSIFilter("c0 + c1*t + S", "t", regressors="S")
+    with pytest.raises(NotImplementedError):
+        flt.coast(np.array([1.0]))
+
+
+@pytest.mark.parametrize("cls", [EACFilter, LSIFilter])
+def test_predict_cov_is_nonneg_shaped_and_contracts(cls):
+    """predict_cov maps the parameter covariance into output space: non-negative,
+    shaped like x, and it contracts as the estimate becomes identified."""
+    rng = np.random.default_rng(0)
+    t = np.linspace(0, 20, 800)
+    y = 2.0 + 0.5 * t + rng.normal(0, 0.05, t.size)
+    flt = cls("c0 + c1*t", "t", p0=[0.0, 0.0], window_size=40, q_diag=[1e-4, 1e-4])
+    flt.partial_fit(t[0], y[0])
+    early = float(flt.predict_cov(np.array([10.0]))[0])
+    for ti, yi in zip(t[1:], y[1:]):
+        flt.partial_fit(ti, yi)
+    v = flt.predict_cov(np.array([5.0, 10.0, 15.0]))
+    assert v.shape == (3,)
+    assert np.all(v >= 0.0)
+    assert float(flt.predict_cov(np.array([10.0]))[0]) < early   # uncertainty shrank
+    # one-sigma band is finite and usable alongside predict()
+    band = np.sqrt(flt.predict_cov(np.array([10.0])))
+    assert np.all(np.isfinite(band))
+
+
 def test_no_false_drift_on_stable_signal():
     rng = np.random.default_rng(0)
     t = np.linspace(0, 40, 2000)
@@ -385,6 +445,31 @@ def test_adaptive_window_collapses_and_regrows_on_drift():
     assert post_min <= flt.min_window + 2           # collapsed to ~min_window after
     assert W[-1] > post_min + 5                      # then re-grew past the collapse
     assert abs(flt.params_["A"] - 3.5) < 0.4         # re-acquired the new regime
+
+
+def test_adaptive_window_shrinks_on_maneuver():
+    """The window auto-SHRINKS when the model lags time-varying dynamics (its
+    forecast residual becomes systematically same-sign), while a static fit keeps a
+    wide window -- so a maneuvering signal is tracked with a shorter, more
+    responsive window than the same model gets on a static one, no hand-tuning."""
+    rng = np.random.default_rng(0)
+    t = np.linspace(0, 40, 1500)
+    # static: the line model matches the data exactly -> white residuals -> wide window
+    y_static = 2.0 + 0.5 * t + rng.normal(0, 0.05, t.size)
+    fs = LSIFilter("c0 + c1*t", "t", p0=[2.0, 0.5], window_size=120,
+                   adaptive_window=True, order=3, q_diag=[1e-3, 1e-3], adapt_noise=True)
+    for ti, yi in zip(t, y_static):
+        fs.partial_fit(ti, yi)
+    # maneuvering: the same line model must chase a curving signal -> it lags, the
+    # residual autocorrelates (runs of one sign) -> the window shrinks
+    y_man = 3.0 * np.sin(0.4 * t) + rng.normal(0, 0.05, t.size)
+    fm = LSIFilter("c0 + c1*t", "t", p0=[0.0, 0.0], window_size=120,
+                   adaptive_window=True, order=3, q_diag=[1e-3, 1e-3], adapt_noise=True)
+    for ti, yi in zip(t, y_man):
+        fm.partial_fit(ti, yi)
+    assert fm._W_eff < fs._W_eff // 2          # maneuver -> much shorter than static
+    assert fm._resid_corr > fs._resid_corr      # driven by residual autocorrelation
+    assert fs._W_eff > 3 * fs.min_window        # static still grows wide (unchanged)
 
 
 def test_eac_adaptive_window_is_stable_and_finite():

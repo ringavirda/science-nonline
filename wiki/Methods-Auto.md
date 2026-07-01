@@ -41,17 +41,33 @@ grid, behind two safety guards.
 
 ### Model routing (`model="auto"`)
 
-| condition | model class |
+Under `model="auto"` the router (`_auto_model`) picks one of three model classes
+from the data's shape:
+
+| condition | model class (`model=` value) |
 |---|---|
-| saturating positive growth (monotone, large ratio, all positive) | **logistic** $L/(1+e^{-k(x-x_0)})$ |
-| a detected seasonal cycle (strength above `season_strength`) | **linear + seasonal** $a_0+a_1x+A\sin(wx+p)$ |
-| otherwise | **quadratic level** $a_0+a_1x+a_2x^2$ |
+| saturating positive growth (monotone, large ratio, all positive) | **logistic** (`"logistic"`) $L/(1+e^{-k(x-x_0)})$ |
+| a detected seasonal cycle (strength above `season_strength`) | **linear + seasonal** (`"linear_seasonal"`) $a_0+a_1x+A\sin(wx+p)$ |
+| otherwise | **poly** (`"poly"`, a quadratic level) $a_0+a_1x+a_2x^2$ |
 
 Each class is fit with the matching stable lever -- the logistic and seasonal fits
 use [`fit_lsi`](Methods-LSI) with **data-driven seeds and bounds** (the growth rate is
 bracketed by the time span; the seasonal frequency is seeded from
 [`fft_frequency_seed`](API-Fitting#fft_frequency_seed)), so the global search
 is well-posed.
+
+**Forcing a class.** `model=` also accepts an explicit class, bypassing the router.
+The full set is `"auto"` (route by structure), `"logistic"`, `"linear"` (a plain
+$a_0+a_1x$ trend), `"poly"` (the quadratic level), `"linear_seasonal"`, and
+`"random_walk"`. Note the router only ever chooses among `logistic` /
+`linear_seasonal` / `poly`; `linear` and `random_walk` are reachable only by
+naming them explicitly (`linear` is also the internal fallback for a failed or
+diverging fit).
+
+**Persistence-fallback guard.** Whichever class is chosen, `auto_forecast` first
+checks the **no-structure guard** (below); if it fires -- or `model="random_walk"`
+is requested outright -- the forecast is just naive persistence of the last value,
+with no fitting.
 
 ### The two guards
 

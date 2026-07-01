@@ -32,6 +32,8 @@ recovery error plus a categorical verdict (VIABLE / MARGINAL / NOT VIABLE):
 
 from __future__ import annotations
 
+from typing import Callable
+
 import numpy as np
 
 from dtfit.stochastic import (
@@ -43,6 +45,9 @@ from dtfit.stochastic import (
     decompose_trend_cycle,
     fit_stochastic,
     StochasticFilter,
+    ar_order,
+    fit_ar,
+    fractional_difference,
 )
 from dtfit_experimental.experiments.common import EXPERIMENTS_DIR, metrics
 from dtfit_experimental.experiments.common import baselines as bl
@@ -61,6 +66,8 @@ __all__ = [
     "exp_online_filter", "filter_trace",
     "exp_simulate_roundtrip", "simulate_example",
     "filter_break_demo", "filter_characteristics",
+    "exp_ar_discrimination", "exp_ar_order_recovery",
+    "exp_fracdiff_whitening", "exp_student_t",
     "run", "summary",
 ]
 
@@ -930,6 +937,245 @@ def filter_characteristics(lengths: tuple[int, ...] = (1000, 10000, 100000)) -> 
     except Exception:
         pass
     return {"rows": rows, "lsifilter_us_per_sample": ref}
+
+
+# --------------------------------------------------------------------------- #
+# E13 / E14 -- the reworked regime router (finite-order-AR VETO) and the new
+# estimator capabilities (ar_order / fit_ar / fractional_difference /
+# Student-t innovations). None of this was exercised by the notebook before.
+# --------------------------------------------------------------------------- #
+def gen_arp(n: int, phi: tuple[float, ...], rng: np.random.Generator,
+            *, sigma: float = 1.0, burn: int = 300) -> np.ndarray:
+    """General AR(p): ``x_t = sum_j phi_j x_{t-j} + e_t`` (lag 1..p)."""
+    p = len(phi)
+    N = n + burn
+    e = rng.normal(0.0, sigma, N)
+    x = np.zeros(N)
+    phi_a = np.asarray(phi, dtype=float)
+    for t in range(p, N):
+        x[t] = float(phi_a @ x[t - p:t][::-1]) + e[t]
+    return x[burn:]
+
+
+# The ground-truth zoo for the AR-vs-long-memory discrimination guard. Each
+# entry is ``(name, expect_long_memory, generator(seed) -> series)``. The AR(2)
+# complex-root case and the AR(3) case are exactly the ones the old, un-vetoed
+# router used to mislabel as long memory (their slowly-decaying ACF spoofs the
+# Hurst read-out); the veto whitens with a capped AR(p<=3) fit first.
+def _ar_discrim_cases(
+    n: int,
+) -> list[tuple[str, bool, Callable[[int], np.ndarray]]]:
+    # ARFIMA is generated at the canonical long-memory sample size (4096, as in
+    # E1/E2) where the Hurst read-out is reliable; the short-memory AR processes
+    # use the router's own default working length ``n``.
+    n_lm = 4096
+    return [
+        ("AR(1) phi=0.70", False,
+         lambda s: gen_ar1(n, 0.70, np.random.default_rng(s))),
+        ("AR(1) phi=0.95", False,
+         lambda s: gen_ar1(n, 0.95, np.random.default_rng(s))),
+        ("AR(2) cycle (P~16, r=0.97)", False,
+         lambda s: gen_ar2_cycle(n, 16.0, 0.97, np.random.default_rng(s))),
+        ("AR(3)", False,
+         lambda s: gen_arp(n, (0.5, -0.3, 0.2), np.random.default_rng(s))),
+        ("ARFIMA d=0.3", True,
+         lambda s: gen_arfima(n_lm, 0.3, np.random.default_rng(s))),
+        ("ARFIMA d=0.4", True,
+         lambda s: gen_arfima(n_lm, 0.4, np.random.default_rng(s))),
+    ]
+
+
+def exp_ar_discrimination(seeds: int = 8, n: int = 1500) -> dict:
+    """The headline regression guard for ``fit_stochastic``'s finite-order-AR
+    VETO. A short-memory AR(2)/AR(3) has a slowly-decaying ACF that spoofs the
+    raw Hurst read-out into "long memory"; the reworked gate whitens with a
+    capped AR(p<=3) fit and, if the whitened Hurst falls back toward white,
+    reclassifies as mean-reverting. This experiment simulates each process over
+    several seeds and records how often ``fit_stochastic`` flags long memory.
+
+    Contract (asserted by the verdict): every AR(1/2/3) must be **0%**
+    long-memory (they are mean-reverting) -- this is the load-bearing regression
+    guard, so it is strict; and both ARFIMA d=0.3 / d=0.4 must be a strong
+    long-memory majority (>=75%; a lone borderline realization of ARFIMA d=0.4
+    can genuinely read as short-memory near the detector's boundary, honest
+    sampling noise, not a router bug). A regression that reintroduces the
+    mislabel shows up as a non-zero long-memory fraction on an AR row."""
+    rows = []
+    ok = True
+    for name, is_lm, gen in _ar_discrim_cases(n):
+        lm = mr = 0
+        for s in range(seeds):
+            try:
+                m = fit_stochastic(gen(1300 + s))
+                lm += int(bool(m.has_long_memory))
+                mr += int(bool(m.has_mean_reversion))
+            except Exception:
+                pass
+        lm_frac = 100.0 * lm / seeds
+        mr_frac = 100.0 * mr / seeds
+        # contract per row: AR must be *strictly* 0% LM (the veto); ARFIMA must
+        # be a strong LM majority.
+        if is_lm:
+            row_ok = lm_frac >= 75.0
+        else:
+            row_ok = lm_frac == 0.0
+        ok = ok and row_ok
+        rows.append({"process": name, "expect": "long-memory" if is_lm
+                     else "mean-reverting", "long-memory %": lm_frac,
+                     "mean-reverting %": mr_frac, "pass": row_ok})
+    return {
+        "id": "E13", "name": "AR(p) vs long-memory discrimination (veto guard)",
+        "param": "regime", "metric": "long-memory %",
+        "rows": rows, "contract_holds": ok,
+        "verdict": "PASS (veto holds)" if ok else "FAIL (regime mislabel)",
+        "method": "fit_stochastic finite-order-AR (p<=3) whitening veto",
+    }
+
+
+def exp_ar_order_recovery(seeds: int = 8) -> dict:
+    """Order + coefficient recovery for the new ``ar_order`` / ``fit_ar``.
+
+    AR(1), AR(2) and AR(3) with known coefficients; per true order we report how
+    often ``ar_order`` (AIC) picks the true ``p``, the mean per-coefficient
+    recovery error ``mean|phi_hat - phi|`` (over the min shared length), and the
+    mean recovered innovation ``sigma`` (truth = 1.0)."""
+    specs = [
+        ("AR(1)", (0.6,)),
+        ("AR(2)", (0.5, -0.3)),
+        ("AR(3)", (0.5, -0.3, 0.2)),
+    ]
+    rows = []
+    for name, phi in specs:
+        p = len(phi)
+        phi_a = np.asarray(phi, dtype=float)
+        order_hits = 0
+        coef_err: list[float] = []
+        sig: list[float] = []
+        for s in range(seeds):
+            x = gen_arp(2000, phi, np.random.default_rng(1400 + s))
+            try:
+                order_hits += int(ar_order(x, max_order=8, ic="aic") == p)
+            except Exception:
+                pass
+            try:
+                fa = fit_ar(x, order=p)
+                phi_hat = np.asarray(fa["phi"], dtype=float)
+                coef_err.append(float(np.mean(np.abs(phi_hat - phi_a))))
+                sig.append(float(np.asarray(fa["sigma"], dtype=float)))
+            except Exception:
+                coef_err.append(np.nan)
+                sig.append(np.nan)
+        rows.append({
+            "process": name, "true order": p,
+            "order picked %": 100.0 * order_hits / seeds,
+            "mean|phi err|": _mean(coef_err), "mean sigma (truth 1.0)": _mean(sig),
+        })
+    return {"id": "E14a", "name": "AR order + coefficient recovery (ar_order/fit_ar)",
+            "rows": rows,
+            "method": "Yule-Walker AR(p), order gate by AIC"}
+
+
+def exp_fracdiff_whitening(seeds: int = 8, n: int = 2048) -> dict:
+    """``fractional_difference`` as the long-memory whitener.
+
+    For ARFIMA(0,d,0) with d in {0.3, 0.4} (Hurst ``H = d + 1/2`` ~ 0.8 / 0.9):
+    read ``d_hat = hurst_spectral(x)["H"] - 0.5`` off the series, apply
+    ``(1 - B)^d_hat``, and measure the Hurst BEFORE vs AFTER. A working
+    fractional difference should drive the after-Hurst back toward 0.5 (white)."""
+    rows = []
+    for d in (0.3, 0.4):
+        H = d + 0.5
+        h_before: list[float] = []
+        h_after: list[float] = []
+        d_hats: list[float] = []
+        for s in range(seeds):
+            x = gen_arfima(n, d, np.random.default_rng(1500 + s))
+            try:
+                hb = float(hurst_spectral(x)["H"])
+                d_hat = hb - 0.5
+                w = fractional_difference(x, d_hat)
+                ha = float(hurst_spectral(w)["H"])
+                h_before.append(hb)
+                h_after.append(ha)
+                d_hats.append(d_hat)
+            except Exception:
+                h_before.append(np.nan)
+                h_after.append(np.nan)
+                d_hats.append(np.nan)
+        rows.append({
+            "process": f"ARFIMA d={d}", "true H": H,
+            "d_hat (mean)": _mean(d_hats),
+            "H before": _mean(h_before), "H after": _mean(h_after),
+        })
+    return {"id": "E14b", "name": "fractional differencing whitens long memory",
+            "rows": rows,
+            "method": "d_hat = H_spectral - 0.5 ; (1 - B)^d_hat filter"}
+
+
+def exp_student_t(seeds: int = 6, n: int = 4000) -> dict:
+    """Student-t innovations in ``StochasticModel.simulate``.
+
+    Fit a fat-tailed AR(1) (driven by heavy-tailed Student-t shocks) with
+    ``fit_stochastic``, then draw a Gaussian path (``dist="normal"``) and a
+    Student-t path (``dist="t", df=5``). Report that both paths keep unit-ish
+    variance (they share the same fitted second-order scale) but the Student-t
+    path carries markedly heavier tails -- higher excess kurtosis. Honest and
+    simple: this checks the *innovation distribution knob*, not a forecast."""
+    def _excess_kurtosis(a: np.ndarray) -> float:
+        """Fisher excess kurtosis (0 for a Gaussian); numpy-only, no scipy dep."""
+        a = np.asarray(a, dtype=float)
+        m = a.mean()
+        s2 = a.var()
+        if s2 <= 0:
+            return float("nan")
+        return float(np.mean((a - m) ** 4) / s2 ** 2 - 3.0)
+
+    var_n: list[float] = []
+    var_t: list[float] = []
+    kurt_n: list[float] = []
+    kurt_t: list[float] = []
+    for s in range(seeds):
+        r = np.random.default_rng(1600 + s)
+        # AR(1) with heavy-tailed (Student-t, df=4) innovations -> fat tails
+        shocks = r.standard_t(4, n + 200)
+        x = np.empty(n + 200)
+        x[0] = shocks[0]
+        for t in range(1, n + 200):
+            x[t] = 0.5 * x[t - 1] + shocks[t]
+        x = x[200:]
+        try:
+            m = fit_stochastic(x)
+            sn = np.asarray(m.simulate(n, seed=s, dist="normal"), dtype=float)
+            st = np.asarray(m.simulate(n, seed=s, dist="t", df=5.0), dtype=float)
+            # compare on the stationary innovation scale (first difference of the
+            # residual is dominated by the innovation) -- but variance of the path
+            # itself is the honest "matches" check the brief asks for.
+            var_n.append(float(np.var(sn)))
+            var_t.append(float(np.var(st)))
+            kurt_n.append(_excess_kurtosis(sn))
+            kurt_t.append(_excess_kurtosis(st))
+        except Exception:
+            var_n.append(np.nan)
+            var_t.append(np.nan)
+            kurt_n.append(np.nan)
+            kurt_t.append(np.nan)
+    vn, vt = _mean(var_n), _mean(var_t)
+    kn, kt = _mean(kurt_n), _mean(kurt_t)
+    var_ratio = vt / vn if np.isfinite(vn) and vn != 0 else float("nan")
+    return {
+        "id": "E14c", "name": "Student-t innovations (fatter tails, matched scale)",
+        "rows": [
+            {"dist": "normal", "path variance": vn, "excess kurtosis": kn},
+            {"dist": "t (df=5)", "path variance": vt, "excess kurtosis": kt},
+        ],
+        "var_ratio_t_over_normal": var_ratio,
+        "kurt_gain": kt - kn,
+        "verdict": ("VIABLE (fatter tails, matched variance)"
+                    if np.isfinite(kt) and np.isfinite(kn) and kt > kn
+                    and np.isfinite(var_ratio) and 0.5 < var_ratio < 2.0
+                    else "MARGINAL"),
+        "method": "fit_stochastic -> simulate(dist=normal) vs simulate(dist=t, df=5)",
+    }
 
 
 # --------------------------------------------------------------------------- #

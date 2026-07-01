@@ -240,6 +240,10 @@ class FourierBasis(Basis):
         self.n_coef = 2 * self.K + 1
         self._nq = max(8 * (self.K + 1), 64)
         self._tg = np.linspace(self.x0, self.xn, self._nq)  # dense model grid
+        # The model-grid design matrix is constant (it does not depend on the
+        # coefficients), so factor it once: model_spectrum is then a single GEMV
+        # instead of an lstsq (SVD) on every optimizer residual evaluation.
+        self._model_pinv = np.linalg.pinv(self._design(self._tg))  # (n_coef, nq)
 
     def _design(self, x: np.ndarray) -> np.ndarray:
         ph = 2.0 * np.pi * (np.asarray(x, float) - self.x0) / self.P
@@ -252,9 +256,9 @@ class FourierBasis(Basis):
         return self._tg
 
     def model_spectrum(self, fv: np.ndarray) -> np.ndarray:
-        # least-squares coefficients of the model sampled on the dense grid
-        D = self._design(self._tg)
-        return np.linalg.lstsq(D, fv, rcond=None)[0]
+        # least-squares coefficients of the model sampled on the dense grid, via
+        # the precomputed pseudo-inverse of the (constant) design matrix.
+        return self._model_pinv @ np.asarray(fv, dtype=float)
 
     def empirical(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
         return np.linalg.lstsq(self._design(x), y, rcond=None)[0]
@@ -404,8 +408,8 @@ def solve_spectral(
         coeffs = np.asarray(sol.x, dtype=np.float64)
         jac = sol.jac
     cov = _covariance(jac, residual(coeffs), len(params))
-    model = sp.lambdify(t, f_sym.subs(dict(zip(params, coeffs))), "numpy")
-    return FittingResult(model=model, coeffs=coeffs, cov=cov,
+    # FittingResult lambdifies the fitted model lazily from expr+coeffs.
+    return FittingResult(coeffs=coeffs, cov=cov,
                          expr=expr, var=var, names=tuple(str(p) for p in params))
 
 

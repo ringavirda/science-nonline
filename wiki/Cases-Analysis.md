@@ -19,7 +19,7 @@ each one across all the experiments that exercised it.
 | [03_overlapping_ensemble.md](Cases-Analysis-03-Overlapping-Ensemble) | #3 overlapping-window ensemble | Experimental -- partial |
 | [04_joint_multichannel.md](Cases-Analysis-04-Joint-Multichannel) | #4 joint shared-parameter fit | Experimental -- loss where tested |
 | [05_stagewise_boosting.md](Cases-Analysis-05-Stagewise-Boosting) | #5 stage-wise boosting | Experimental -- win, 1 domain |
-| [06_adaptive_window_eac.md](Cases-Analysis-06-Adaptive-Window-EAC) | #6 adaptive-window EAC | **Promoted** (`dtfit.fit_eac_adaptive`) -- domain-validated on transients/peaks |
+| [06_adaptive_window_eac.md](Cases-Analysis-06-Adaptive-Window-EAC) | #6 adaptive-window EAC | **Promoted** (`dtfit.fit_eac(window_mode="curvature")`) -- domain-validated on transients/peaks |
 
 ## Performance & parallelization optimizations
 

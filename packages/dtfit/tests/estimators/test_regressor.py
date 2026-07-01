@@ -76,3 +76,33 @@ def test_feature_names_in_(arctan_data):
     reg = _reg().fit(df, y)
     assert list(reg.feature_names_in_) == ["x"]
     assert reg.n_features_in_ == 1
+
+
+def test_zero_arg_constructible_and_clonable():
+    """scikit-learn contract: an estimator must be constructible with no args and
+    every ``__init__`` parameter must have a default (so ``clone`` and
+    meta-estimator introspection work)."""
+    import inspect
+
+    sig = inspect.signature(NonlineRegressor.__init__)
+    required = [
+        name for name, p in sig.parameters.items()
+        if name != "self" and p.default is inspect._empty
+    ]
+    assert not required, f"__init__ params without defaults: {required}"
+
+    reg = NonlineRegressor()          # zero-arg construction
+    cloned = clone(reg)               # relies on get_params/set_params round-trip
+    assert isinstance(cloned, NonlineRegressor)
+    assert cloned.get_params() == reg.get_params()
+    assert not hasattr(cloned, "coef_")
+
+
+def test_default_estimator_fits_affine():
+    """The default model is a runnable affine fit (so ``NonlineRegressor()`` is a
+    usable estimator, not merely constructible)."""
+    rng = np.random.default_rng(0)
+    x = np.linspace(-2.0, 2.0, 80)
+    y = 1.5 + 0.7 * x + 0.01 * rng.standard_normal(x.size)
+    reg = NonlineRegressor().fit(x, y)
+    assert reg.score(x, y) > 0.99

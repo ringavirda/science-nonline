@@ -29,6 +29,9 @@ Streaming (online, partial_fit):
     EACFilter / LSIFilter: real-time parameter trackers (streaming twins of
         fit_eac / fit_lsi); start from the ``.tracking()`` / ``.robust()``
         presets. FilterBank / FusedChiSquareDetector drive many streams at once.
+        InformationFilter: the inverse-covariance (information-form) linear
+        primitive -- additive, associative fusion (add information) and an
+        n_params-sized readout, for embedded / sensor-fusion use.
 
 Scale (same methods, run big):
     PartitionedLSI / PartitionedEAC / PartitionedBatchLSI (one-pass / distributed
@@ -70,6 +73,7 @@ from dtfit.streaming import (
     LSIFilter,
     FilterBank,
     FusedChiSquareDetector,
+    InformationFilter,
 )
 from dtfit.scale._parallel import fit_many, FittingProblem
 # Promoted after the experiment suite validated them across the big-data and
@@ -110,6 +114,7 @@ __all__ = [
     "LSIFilter",
     "FilterBank",
     "FusedChiSquareDetector",
+    "InformationFilter",
     "PartitionedLSI",
     "PartitionedEAC",
     "PartitionedBatchLSI",

@@ -134,16 +134,28 @@ class LSIFilter(_RecursiveFilter):
                 filter, instead of after a full-window dead time. Clamped to
                 ``[order + 2, window_size]``.
             adaptive_window: If True, size the window **automatically from the
-                data** instead of using a fixed ``window_size``. The window grows
-                from ``min_window`` while *more data still moves the estimate* (the
-                EWMA of the relative update step exceeds ``window_tol``) and stops
-                once the estimate has stabilized, capped at ``window_size`` (now
-                the maximum). A model with global parameters keeps shifting as the
-                window widens, so it grows a wide window on its own; a
-                locally-observable one stabilizes quickly and keeps a short window
-                -- no per-model hand-tuning. On a detected drift the window
-                collapses back to ``min_window`` and re-grows, so it re-acquires a
-                new regime from the freshest samples.
+                data** instead of using a fixed ``window_size`` (which becomes the
+                maximum). The window is sized by two opposing signals:
+
+                * it **grows** from ``min_window`` while *more data still moves the
+                  estimate* (the EWMA of the relative update step exceeds
+                  ``window_tol``) *and* the fit stays consistent -- the reliable
+                  signal that the window is not yet wide enough to identify the
+                  (static) parameters. A global-parameter model keeps shifting as
+                  the window widens (so it grows wide); a locally-observable one
+                  stabilizes quickly (so it keeps a short window).
+                * it **shrinks** when the one-step forecast residual becomes
+                  *systematically autocorrelated* (persistent runs of the same
+                  sign) -- the fingerprint of a model that is *lagging changing
+                  dynamics* (a maneuver / time-varying parameters). A well-matched
+                  fit leaves white (sign-alternating) residuals, so this never
+                  fires on a static model; a lagging fit does, and the window
+                  shrinks to stay responsive. This tracks a time-varying signal
+                  with a short window and a static one with a wide window -- no
+                  per-regime hand-tuning either way.
+
+                On a detected drift the window also collapses back to ``min_window``
+                and re-grows, re-acquiring a new regime from the freshest samples.
             window_tol: Relative-movement threshold for ``adaptive_window``; the
                 window stops growing once successive updates move the estimate by
                 less than this (EWMA of ``|Δp|/|p|``, default 0.1%). Smaller grows
@@ -239,6 +251,21 @@ class LSIFilter(_RecursiveFilter):
         self._W_eff = self.min_window           # current effective window (adaptive)
         self._W_ref = 2 * (self.order + 1)       # comfortable measurement size
         self._move_ewma = 1.0                    # EWMA of relative estimate movement
+        # Bidirectional-sizing state: the EWMA sign-autocorrelation of the one-step
+        # forecast residual. A well-matched model leaves *white* residuals (signs
+        # alternate ~50/50 -> correlation ~0); a model that *lags* changing dynamics
+        # (a maneuver / time-varying parameters) leaves runs of *same-sign*
+        # residuals (correlation -> +1). This signal is scale-free, so it does not
+        # self-normalize away a sustained maneuver and never fires on static noise.
+        # When it stays above ``_shrink_corr`` the window shrinks; see partial_fit.
+        self._resid_sign = 0.0
+        self._resid_corr = 0.0
+        # Shrink when the residual sign-autocorrelation persistently exceeds this.
+        # White residuals give an EWMA(0.1) correlation of mean 0, std ~0.23; a
+        # continuously-curving-but-static oscillation sits ~0.2 (a mild, legitimate
+        # lag). 0.35 clears both -- no spurious shrink on a static model -- yet is
+        # well below the ~+1 a genuine sustained maneuver-lag produces.
+        self._shrink_corr = 0.35
 
         # Per-coefficient measurement variance: the LSI orthonormal weight.
         j = np.arange(self.order + 1)
@@ -251,6 +278,13 @@ class LSIFilter(_RecursiveFilter):
         tau = np.linspace(-1.0, 1.0, self.W)
         vander = L.legvander(tau, self.order)          # (W, order+1)
         self._proj = np.linalg.pinv(vander)            # (order+1, W)
+        # Projections for below-cap window lengths (warm-up + every step of an
+        # adaptive window) are cached per length: the pinv is an SVD of an
+        # (order+1, k) matrix and, with adaptive_window (the tracking() preset),
+        # the below-cap branch is the *common* case, not the exception. The
+        # projection depends only on k and order (not on data), so the cache stays
+        # valid across drifts. Bounded by (W - min_window + 1) entries.
+        self._proj_cache: dict[int, np.ndarray] = {self.W: self._proj}
 
         # Model spectrum: Gauss-Legendre quadrature on [-1, 1] (model integrated
         # exactly, as in batch LSI).
@@ -313,6 +347,28 @@ class LSIFilter(_RecursiveFilter):
             sp.lambdify([t_sym, *reg_syms, *self.params], sp.diff(model, p), "numpy")
             for p in self.params
         ]
+        # Time derivatives, for coast() dead-reckoning through gaps. Only
+        # meaningful without external regressors (a measured regressor has no
+        # closed-form time derivative); coast() guards on that.
+        self._dfdt: Callable[..., Any] = sp.lambdify(
+            [t_sym, *reg_syms, *self.params], sp.diff(model, t_sym), "numpy"
+        )
+        self._d2fdt2: Callable[..., Any] = sp.lambdify(
+            [t_sym, *reg_syms, *self.params], sp.diff(model, t_sym, 2), "numpy"
+        )
+        # Mixed derivatives for coast_cov()'s gap-growing uncertainty band.
+        self._dfdt_jac: list[Callable[..., Any]] = [
+            sp.lambdify([t_sym, *reg_syms, *self.params],
+                        sp.diff(sp.diff(model, t_sym), p), "numpy")
+            for p in self.params
+        ]
+        self._d2fdt2_jac: list[Callable[..., Any]] = [
+            sp.lambdify([t_sym, *reg_syms, *self.params],
+                        sp.diff(sp.diff(model, t_sym, 2), p), "numpy")
+            for p in self.params
+        ]
+        # Extrapolable/nuisance split for coast() on regressor models.
+        self._compile_regressor_coast(model, t_sym, reg_syms)
 
     def _eval(self, func, t_arr, reg_cols=None):
         """Evaluate a compiled callable on the window, broadcasting scalars.
@@ -409,10 +465,10 @@ class LSIFilter(_RecursiveFilter):
         # Empirical spectrum vs model spectrum (quadrature). The projection is
         # cached only for the true maximum window; at any other length (a growing
         # warm-up or an adaptive window below the cap) recompute it (cheap).
-        if k == self.W:
-            proj = self._proj
-        else:
+        proj = self._proj_cache.get(k)
+        if proj is None:
             proj = np.linalg.pinv(L.legvander(np.linspace(-1.0, 1.0, k), self.order))
+            self._proj_cache[k] = proj
         beta_data = proj @ y_eff
         beta_model, h_mat = self._model_spectrum(t0, tn, t_arr, reg_cols, proj)
         e_vec = beta_data - beta_model
@@ -475,6 +531,10 @@ class LSIFilter(_RecursiveFilter):
         step = gain @ e_vec
         p_new = self.p + step
         P_new = (np.eye(len(self.p)) - gain @ h_mat) @ self.P + self.Q
+        # Keep the covariance symmetric: ``(I - K H) P`` drifts asymmetric (hence
+        # non-PD) over a long stream, surfacing as negative ``stderr_`` /
+        # ``predict_cov``. Project onto the symmetric part each step (O(n^2)).
+        P_new = 0.5 * (P_new + P_new.T)
         if not (np.all(np.isfinite(p_new)) and np.all(np.isfinite(P_new))):
             return self  # reject an ill-conditioned (non-finite) update
         self.p = p_new
@@ -484,16 +544,33 @@ class LSIFilter(_RecursiveFilter):
         if self.adapt_r and not self.adapt_noise and full:
             nis = float(e_vec @ (e_vec / r_diag)) / (self.order + 1)
             self._r_scale = 0.95 * self._r_scale + 0.05 * max(nis, 1e-3)
-        # Automatic window sizing: keep widening while *more data still moves the
-        # estimate* -- the reliable signal that the window is not yet wide enough
-        # (the belief covariance is not: a decaying oscillator stays uncertain yet
-        # is accurately identified). A model with global parameters keeps shifting
-        # as the window grows (so it widens); a locally-observable one stabilizes
-        # quickly (so it stops). EWMA of the relative update step, capped at W.
-        if self.adaptive_window and self._W_eff < self.W:
+        # Automatic window sizing (bidirectional). Two opposing signals decide the
+        # effective window each step:
+        #  * GROW while more data still moves the estimate AND the innovations stay
+        #    consistent with the noise -- the window is not yet wide enough to
+        #    identify the (static) parameters. A global-parameter model keeps
+        #    shifting as the window grows (so it widens); a locally-observable one
+        #    stabilizes quickly (so it stops). This is the original criterion.
+        #  * SHRINK when the one-step forecast innovation is *persistently larger*
+        #    than the measurement noise -- the window now straddles CHANGING
+        #    dynamics (a maneuver / time-varying parameters), so a wide window fits
+        #    stale data and lags; a shorter window is more responsive. A *lagging*
+        #    fit leaves a systematic (autocorrelated) forecast residual -- runs of
+        #    the same sign -- whereas a well-matched fit leaves *white* residuals
+        #    whose signs alternate. The EWMA sign-autocorrelation of the one-step
+        #    residual is therefore a scale-free mismatch signal: it does not
+        #    self-normalize away a sustained maneuver, and it stays ~0 on static
+        #    noise (so a static model still grows a wide window -- unchanged).
+        if self.adaptive_window and np.isfinite(self.last_residual_):
+            s = 1.0 if self.last_residual_ >= 0.0 else -1.0
+            if self._resid_sign != 0.0:
+                self._resid_corr = 0.9 * self._resid_corr + 0.1 * (s * self._resid_sign)
+            self._resid_sign = s
             mv = float(np.max(np.abs(step) / (np.abs(self.p) + 1e-9)))
             self._move_ewma = 0.9 * self._move_ewma + 0.1 * mv
-            if self._move_ewma > self.window_tol:
+            if self._resid_corr > self._shrink_corr and self._W_eff > self.min_window:
+                self._W_eff -= 1
+            elif self._move_ewma > self.window_tol and self._W_eff < self.W:
                 self._W_eff += 1
         return self
 
@@ -546,6 +623,10 @@ class LSIFilter(_RecursiveFilter):
         # re-determines the size, so there is nothing to remember from the old one).
         self._W_eff = self.min_window
         self._move_ewma = 1.0
+        # Recalibrate the bidirectional-sizing state so a stale old-regime residual
+        # sign cannot spuriously shrink (or block re-growth of) the fresh window.
+        self._resid_sign = 0.0
+        self._resid_corr = 0.0
         self._g_hi = 0.0
         self._g_lo = 0.0
         self._s_scale = 0.0

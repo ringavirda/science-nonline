@@ -141,11 +141,14 @@ class Model:
         if method == "lsi":
             return fit_lsi(x, y, self.expr, self.var, p0=p0, bounds=bounds,
                            freq_param=self.freq_param)
-        if method == "eac":
+        if method in ("eac", "adaptive"):
             eb = ([b[0] for b in bounds], [b[1] for b in bounds]) if bounds else None
-            return fit_eac(x, y, self.expr, self.var, p0=p0, bounds=eb)
-        if method == "adaptive":
-            return fit_eac(x, y, self.expr, self.var, window_mode="curvature", p0=p0)
+            wm = "curvature" if method == "adaptive" else "uniform"
+            # Both EAC paths forward the model's self-seeded bounds; the adaptive
+            # (curvature) path previously dropped them, so a seeded model fit
+            # silently ran unconstrained there.
+            return fit_eac(x, y, self.expr, self.var, window_mode=wm,
+                           p0=p0, bounds=eb)
         raise ValueError(
             f"unknown method {method!r}; expected auto/lsi/eac/adaptive"
         )

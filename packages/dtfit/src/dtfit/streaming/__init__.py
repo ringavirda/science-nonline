@@ -23,10 +23,12 @@ motion basis), not just on the sample position.
 from ._eac import EACFilter
 from ._lsi import LSIFilter
 from ._bank import FilterBank, FusedChiSquareDetector
+from ._info import InformationFilter
 
 __all__ = [
     "EACFilter",
     "LSIFilter",
     "FilterBank",
     "FusedChiSquareDetector",
+    "InformationFilter",
 ]

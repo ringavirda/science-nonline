@@ -49,13 +49,19 @@ def _validate_xy(
     data_y: np.ndarray,
     *,
     min_size: int = 2,
+    nan_policy: str = "raise",
 ) -> tuple[np.ndarray, np.ndarray]:
     """Coerce and validate a 1-D ``(x, y)`` sample pair.
 
     Returns float arrays. Raises :class:`ValueError` with a clear message on a
-    shape mismatch, a non-1-D input, fewer than ``min_size`` samples, or
-    non-finite values -- so every batch fitter (``fit_lsi`` / ``fit_eac``)
-    rejects malformed input the same way instead of failing obscurely deeper in.
+    shape mismatch, a non-1-D input, or fewer than ``min_size`` samples -- so
+    every batch fitter (``fit_lsi`` / ``fit_eac``) rejects malformed input the
+    same way instead of failing obscurely deeper in.
+
+    ``nan_policy`` controls non-finite handling: ``"raise"`` (default) rejects any
+    NaN/inf; ``"omit"`` drops the offending ``(x, y)`` pairs before fitting, so
+    gappy real-world telemetry (dropped GPS/sensor samples) can be fit directly
+    without external masking. The finite-count floor still applies after omission.
     """
     x = np.asarray(data_x, dtype=float)
     y = np.asarray(data_y, dtype=float)
@@ -67,15 +73,46 @@ def _validate_xy(
         raise ValueError(
             f"data_x and data_y must have the same length; got {x.size} and {y.size}."
         )
+    if nan_policy not in ("raise", "omit"):
+        raise ValueError(
+            f"nan_policy must be 'raise' or 'omit', got {nan_policy!r}."
+        )
+    if nan_policy == "omit":
+        good = np.isfinite(x) & np.isfinite(y)
+        x, y = x[good], y[good]
     if x.size < min_size:
         raise ValueError(
             f"need at least {min_size} samples to fit; got {x.size}."
+            + (" (after dropping non-finite pairs)" if nan_policy == "omit" else "")
         )
-    if not np.all(np.isfinite(x)):
-        raise ValueError("data_x contains non-finite values (NaN/inf).")
-    if not np.all(np.isfinite(y)):
-        raise ValueError("data_y contains non-finite values (NaN/inf).")
+    if nan_policy == "raise":
+        if not np.all(np.isfinite(x)):
+            raise ValueError("data_x contains non-finite values (NaN/inf).")
+        if not np.all(np.isfinite(y)):
+            raise ValueError("data_y contains non-finite values (NaN/inf).")
     return x, y
+
+
+def _validate_p0(p0, params: list) -> np.ndarray:
+    """Coerce an initial guess to a float vector and length-check it against the
+    parameter list.
+
+    ``None`` yields all-ones. A wrong-length ``p0`` raises :class:`ValueError`
+    naming the expected count *and order* -- parameters are laid out sorted by
+    name (:func:`model_params`), which surprises callers passing a positional
+    ``p0`` in source order, so the message spells the order out.
+    """
+    n = len(params)
+    if p0 is None:
+        return np.ones(n)
+    guess = np.array(p0, dtype=float).reshape(-1)  # copy: callers mutate it
+    if guess.size != n:
+        names = [str(p) for p in params]
+        raise ValueError(
+            f"p0 must have length {n} (one per parameter, in order {names}); "
+            f"got length {guess.size}."
+        )
+    return guess
 
 
 # numeric statistics
@@ -85,17 +122,29 @@ def _covariance(
     """Gauss-Newton covariance ``sigma^2 (J^T J)^-1`` from the residual
     Jacobian, scaled by the reduced chi-square.
 
+    Computed from the SVD of ``J`` directly rather than inverting ``J^T J``:
+    forming ``J^T J`` squares the condition number, so ``inv(J^T J)`` is both
+    slower and far less accurate exactly when the parameters are near-degenerate
+    -- the case a covariance is most needed. With ``J = U S V^T``,
+    ``(J^T J)^-1 = V diag(1/s^2) V^T``; singular values below a relative
+    tolerance are treated as null directions (Moore-Penrose), matching
+    ``scipy.optimize.curve_fit``'s SVD-based covariance.
+
     Returns ``None`` for an exactly- or under-determined system (``m <=
-    n_params``) or when ``J^T J`` is singular.
+    n_params``) or when ``J`` is entirely singular.
     """
     m = res.size
     if m <= n_params:
         return None
-    jtj = jac.T @ jac
     try:
-        jtj_inv = np.linalg.inv(jtj)
+        _, s, vt = np.linalg.svd(jac, full_matrices=False)
     except np.linalg.LinAlgError:
         return None
+    if s.size == 0 or s[0] == 0.0:
+        return None
+    tol = s[0] * max(jac.shape) * float(np.finfo(float).eps)
+    inv_s2 = np.where(s > tol, 1.0 / (s * s), 0.0)
+    jtj_inv = (vt.T * inv_s2) @ vt
     sigma2 = float(res @ res) / (m - n_params)
     return sigma2 * jtj_inv
 

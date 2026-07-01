@@ -21,9 +21,15 @@ _GOLDEN = json.loads(
     (Path(__file__).parents[1] / "accuracy" / "golden_baseline.json").read_text()
 )
 
-# Allowed drift from the snapshot before it counts as a regression.
-_PERR_SLACK = 0.03   # absolute relative-error worsening
-_R2_SLACK = 0.01     # absolute R^2 worsening
+# Allowed drift from the snapshot before it counts as a regression. A pure
+# absolute slack is nearly toothless here: most baseline param-errors are far
+# below 0.03 (many ~1e-3, or ~1e-15 at noise=0), so a method could regress 5-10x
+# and still pass. Guard RELATIVELY (allow ~50% worsening) with a small absolute
+# floor so a near-zero baseline is not held to machine precision.
+_PERR_REL = 1.5      # allow up to +50% relative param-error worsening ...
+_PERR_ABS = 0.01     # ... or +0.01 absolute, whichever is larger
+_R2_REL = 1.5        # allow the residual (1 - R^2) to grow up to 50% ...
+_R2_ABS = 1e-4       # ... plus a small absolute floor
 
 _CASES = [(s, noise) for s in SCENARIOS for noise in NOISE_LEVELS]
 _IDS = [f"{s.name}@{noise:g}" for s, noise in _CASES]
@@ -42,8 +48,13 @@ def test_no_accuracy_regression(scn, noise):
     base = _GOLDEN[key]
     now = metrics_for(scn, noise, seed=0)
     if base["metric"] == "params":
-        assert now["perr"] <= base["perr"] + _PERR_SLACK, (
-            f"{key}: param error regressed {base['perr']:.3f} -> {now['perr']:.3f}")
+        limit = max(base["perr"] * _PERR_REL, base["perr"] + _PERR_ABS)
+        assert now["perr"] <= limit, (
+            f"{key}: param error regressed {base['perr']:.4g} -> {now['perr']:.4g} "
+            f"(limit {limit:.4g})")
     else:
-        assert now["r2"] >= base["r2"] - _R2_SLACK, (
-            f"{key}: R2 regressed {base['r2']:.4f} -> {now['r2']:.4f}")
+        # guard the residual (1 - R^2) relatively so a 0.9999 -> 0.999 drop trips
+        limit = _R2_REL * (1.0 - base["r2"]) + _R2_ABS
+        assert (1.0 - now["r2"]) <= limit, (
+            f"{key}: R2 regressed {base['r2']:.5f} -> {now['r2']:.5f} "
+            f"(residual limit {limit:.4g})")

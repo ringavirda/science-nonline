@@ -21,8 +21,8 @@ The core batch fitters and their support functions. All return a
 fit_lsi(data_x, data_y, expr, var, *,
         k_star=None, alpha=0.0, filter_data=True,
         bounds=None, p0=None,
-        oscillatory=False, freq_param=None,
-        random_state=0) -> FittingResult
+        oscillatory=False, freq_param=None, random_state=0,
+        robust=False, huber_c=3.0, nan_policy="raise") -> FittingResult
 ```
 
 Fit `expr` to `(data_x, data_y)` by integral least-squares in the reconditioned
@@ -44,6 +44,9 @@ batch fitter.
 | `oscillatory` | bool | `False` | apply the oscillatory recipe (smoothing off, order raised to resolve the cycle) |
 | `freq_param` | str \| None | `None` | name of the angular-frequency parameter; seeds it from the data's FFT peak and **implies `oscillatory=True`** |
 | `random_state` | int \| None | `0` | seed for the deterministic global / differential-evolution search; `None` uses the global RNG |
+| `robust` | bool | `False` | robustify the **empirical spectrum** via IRLS: winsorize each sample's residual to the current model (within `huber_c` sigmas) before re-projecting, so an outlier sample cannot distort the Legendre coefficients. Forces `filter_data=False`. The robust-integral lever for LSI |
+| `huber_c` | float | `3.0` | winsorization threshold in residual sigmas for `robust=True` |
+| `nan_policy` | str | `"raise"` | `"raise"` rejects non-finite samples; `"omit"` drops NaN/inf `(x, y)` pairs before fitting (gappy telemetry) |
 
 **Notes**
 
@@ -72,7 +75,8 @@ print({k: round(v, 3) for k, v in res.params.items()})
 ```python
 fit_eac(data_x, data_y, expr, var, *,
         active_ratio=0.8, n_windows=None, window_mode="uniform",
-        bounds=None, loss="linear", f_scale=1.0, p0=None) -> FittingResult
+        bounds=None, loss="linear", f_scale=None, robust=False,
+        huber_c=3.0, p0=None, nan_policy="raise") -> FittingResult
 ```
 
 Fit `expr` by matching **integral areas** of model and data over windows. The
@@ -90,8 +94,11 @@ transient/saturating shapes.
 | `window_mode` | str | `"uniform"` | window placement: `"uniform"` (default, evenly spaced edges) or `"curvature"` (curvature-adaptive edges -- narrow where the signal bends, wide where it's smooth; best for localized transients/peaks and rational-saturating shapes) |
 | `bounds` | (lower, upper) \| None | `None` | parameter bounds (scipy `least_squares` form); switches to a trust-region solver |
 | `loss` | str | `"linear"` | least-squares loss; `"soft_l1"`/`"cauchy"`/`"huber"` for outlier robustness |
-| `f_scale` | float | `1.0` | soft margin of the robust `loss`: residuals below it stay quadratic, above it are down-weighted. **The robust loss acts on window-area residuals**, which are usually << 1, so the default `1.0` leaves a robust loss behaving like `"linear"` -- lower `f_scale` to a clean window's area-residual scale to actually engage it. Ignored when `loss="linear"` |
-| `p0` | array \| None | `None` | initial guess (defaults to ones) |
+| `f_scale` | float \| None | `None` | soft margin of the robust `loss`. **Auto-scaled by default**: a quick linear-loss seed fit is run and `f_scale` is set to a robust scale (`1.4826*MAD`) of that fit's window-area residuals, so a robust `loss` actually engages instead of sitting in its quadratic regime. (The historical fixed default `1.0` was far larger than typical window-area residuals and silently disabled the robustness.) Pass an explicit value to override. Ignored when `loss="linear"` |
+| `robust` | bool | `False` | robustify the **integrand itself** via IRLS: winsorize each *sample's* residual to the current model (within `huber_c` sigmas) and re-integrate, so an outlier sample cannot distort a window's area. Finer-grained than `loss=` (which down-weights whole window areas) and composes with it -- the "robust integral" lever; no `f_scale` tuning |
+| `huber_c` | float | `3.0` | winsorization threshold in residual sigmas for `robust=True` |
+| `p0` | array \| None | `None` | initial guess (defaults to ones); a wrong-length `p0` raises a `ValueError` naming the expected parameter order |
+| `nan_policy` | str | `"raise"` | `"raise"` rejects non-finite samples; `"omit"` drops NaN/inf `(x, y)` pairs before fitting (gappy sensor/GPS telemetry) |
 
 **Notes**
 

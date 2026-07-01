@@ -112,6 +112,14 @@ by `oscillatory=True` or by naming the angular-frequency parameter with
   [`fft_frequency_seed`](API-Fitting#fft_frequency_seed) -- the local solve
   cannot lock onto the right cycle without a frequency seed.
 
+**When `bounds` are supplied** the FFT frequency seed is *not* relied on: the
+bounded path runs a **global search** (`differential_evolution` over the bounds,
+polished by `L-BFGS-B`) that brackets the frequency by its bounds rather than
+starting from the seed. (It first tries a fast bounded *local* solve from the seed,
+but falls back to the global search whenever that seed-started solve does not
+converge or leaves a large residual, so a good frequency bound is what pins the
+cycle there -- not the seed.) The FFT seed matters for the *unbounded* local solve.
+
 With the recipe a sinusoid recovers to **<1 %**. The recipe was validated across
 the forecasting and parameter-estimation domain studies (see
 [../experimental/](Experimental)).

@@ -50,7 +50,8 @@ __all__ = [
     "OSC", "PLANTS", "MCUS", "FILTER_REASON",
     "gen_plant",
     "EAAd", "LegAd", "EKFAd", "RLSAd", "RefitAd", "perr", "drive", "adapters",
-    "sweep_perr", "dropout_perr",
+    "clean_accuracy",
+    "sweep_perr", "dropout_perr", "sweep_perr_all", "exp_model_mismatch",
     "make_multi", "MergedTracker", "run_tracker", "kalman_multi",
     "footprint_rows", "embedded_footprint",
     "load_fx", "fx_track",
@@ -260,6 +261,51 @@ def adapters(plant):
     return [EAAd(plant), LegAd(plant), EKFAd(plant), RLSAd(plant), RefitAd(plant)]
 
 
+def clean_accuracy(plant, seeds, *, noise=0.05):
+    """Multi-seed clean-accuracy (E1) for one plant: run every adapter over
+    ``seeds`` independent noisy realisations and report the **distribution** of
+    the recovered-parameter error (mean +/- std), so the headline number is not
+    single-seed luck. RMSE / latency are averaged too (both are stable across
+    seeds). Also returns, from seed 0, the noisy stream + best-dtfit / EKF tracks
+    the overlay figure draws. Returns ``{"rows": {name: {...}}, "overlay": {...}}``.
+
+    ``rows[name]`` carries: ``perr_mean``, ``perr_std`` (None for params-free
+    methods), ``rmse``, ``lat``, ``gp`` (gives physical params)."""
+    warm = plant["window"] + 15
+    names = [ad.name for ad in adapters(plant)]
+    acc = {nm: dict(perr=[], rmse=[], lat=[], gp=True) for nm in names}
+    overlay = None
+    for s in range(seeds):
+        rng = np.random.default_rng(s)
+        t, y, clean = gen_plant(plant, rng, noise=noise)
+        tracks = {}
+        for ad in adapters(plant):
+            rmse, lat, track = drive(ad, t, y, clean, warm)
+            acc[ad.name]["rmse"].append(rmse)
+            acc[ad.name]["lat"].append(lat)
+            acc[ad.name]["gp"] = ad.gives_params
+            acc[ad.name]["perr"].append(perr(ad.params(), plant["true"]))
+            tracks[ad.name] = track
+        if s == 0:
+            dt_names = ["dtfit EACFilter", "dtfit LSIFilter"]
+            bestf = min(dt_names,
+                        key=lambda nm: (np.inf if acc[nm]["perr"][0] is None
+                                        else acc[nm]["perr"][0]))
+            overlay = dict(t=t, y=y, clean=clean, bestf=bestf,
+                           dttrack=tracks[bestf],
+                           ekftrack=tracks["EKF (params-as-state)"])
+    rows = {}
+    for nm in names:
+        pe = [v for v in acc[nm]["perr"] if v is not None]
+        rows[nm] = dict(
+            perr_mean=(float(np.mean(pe)) if pe else None),
+            perr_std=(float(np.std(pe)) if pe else None),
+            rmse=float(np.nanmean(acc[nm]["rmse"])),
+            lat=float(np.nanmean(acc[nm]["lat"])),
+            gp=acc[nm]["gp"])
+    return dict(rows=rows, overlay=overlay)
+
+
 # --------------------------------------------------------------------------- #
 # robustness sweeps: Gaussian noise, outliers, dropout
 # --------------------------------------------------------------------------- #
@@ -285,11 +331,19 @@ def sweep_perr(plant, kind, levels, seeds):
     return out
 
 
+def sweep_perr_all(kind, levels, seeds, *, plants=None):
+    """Run :func:`sweep_perr` for **every** plant (default all of :data:`PLANTS`),
+    so the outlier / noise robustness claim is validated across shapes, not on the
+    damped oscillator alone. Returns ``{plant_key: {method: [errs per level]}}``."""
+    plants = plants if plants is not None else PLANTS
+    return {p["key"]: sweep_perr(p, kind, levels, seeds) for p in plants}
+
+
 def dropout_perr(plant, drops, seeds):
     """Mean parameter error vs dropout fraction for LSI / EAC / EKF. Returns a
     list of ``(method_label, [errs per drop])`` rows."""
     rows = []
-    for m_cls, mname in [(LegAd, "dtfit Legendre"), (EAAd, "dtfit EqualAreas"),
+    for m_cls, mname in [(LegAd, "dtfit LSIFilter"), (EAAd, "dtfit EACFilter"),
                          (EKFAd, "EKF")]:
         cells = []
         for d in drops:
@@ -303,6 +357,84 @@ def dropout_perr(plant, drops, seeds):
                 errs.append(perr(ad.params(), plant["true"]))
             cells.append(float(np.nanmean(errs)))
         rows.append((mname, cells))
+    return rows
+
+
+# --------------------------------------------------------------------------- #
+# model mismatch (negative control): the wrong physical model on-device
+# --------------------------------------------------------------------------- #
+# (true plant that generates the stream, wrong plant whose model is fitted to it)
+_MISMATCH_PAIRS = [
+    ("damped_osc", "first_order"),  # a decaying sinusoid fitted as a saturating rise
+    ("first_order", "ac_sine"),     # a monotone RC rise fitted as a pure sinusoid
+    ("ca_traj", "first_order"),     # an accelerating trajectory fitted as a plateau
+]
+
+
+def _plant_by_key(key):
+    return next(p for p in PLANTS if p["key"] == key)
+
+
+# RMSE ceiling: a wrong-model EKF can diverge to numerical overflow (covariance
+# windup / exp blow-up). Clip to a finite ceiling and flag it rather than let an
+# ~1e88 value swamp the table -- "diverged" is the honest reading.
+_MM_CEIL = 1e4
+
+
+def _mismatch_scores(adapter, t, y, clean, warm):
+    """Drive one adapter over a stream and return ``(rmse_vs_clean,
+    insample_residual_rmse, diverged)``. The residual (track vs the noisy
+    observations) is the on-device self-diagnosis signal: a wrong model cannot fit
+    even the data it sees, so its residual stays structured and large. ``diverged``
+    is set when the estimate blew up (non-finite or past :data:`_MM_CEIL`)."""
+    with np.errstate(over="ignore", invalid="ignore", divide="ignore"):
+        _, _, track = drive(adapter, t, y, clean, warm)
+    valid = np.isfinite(track)
+    valid[:warm] = False
+    if not valid.any():
+        return float("nan"), float("nan"), True
+    rmse_clean = float(np.sqrt(np.mean((track[valid] - clean[valid]) ** 2)))
+    resid = float(np.sqrt(np.mean((track[valid] - y[valid]) ** 2)))
+    diverged = not np.isfinite(rmse_clean) or rmse_clean > _MM_CEIL
+    return min(rmse_clean, _MM_CEIL), min(resid, _MM_CEIL), diverged
+
+
+def exp_model_mismatch(seeds=5):
+    """Negative control: drive an online estimator **configured for the wrong
+    plant model** over another plant's stream. Shows (a) no online estimator
+    rescues a mis-specified physical model -- the error is a property of the
+    *model* not the filter, and while the integral ``LSIFilter`` degrades
+    *gracefully* (stays bounded), the pointwise EKF can **diverge** outright; and
+    (b) the wrong model leaves a large **in-sample residual** (the streaming
+    analogue of an in-sample R^2 collapse, and exactly the innovation the fused
+    chi-square detector already watches), so a mismatch is self-diagnosing
+    on-device without ground truth. Returns one row per (true plant, wrong model,
+    estimator)."""
+    rows = []
+    for true_key, wrong_key in _MISMATCH_PAIRS:
+        tp, wp = _plant_by_key(true_key), _plant_by_key(wrong_key)
+        warm = max(tp["window"], wp["window"]) + 15
+        for cls, est in [(LegAd, "dtfit LSIFilter"), (EKFAd, "EKF")]:
+            cc, cw, rc, rw, dv = [], [], [], [], []
+            for s in range(seeds):
+                rng = np.random.default_rng(100 + s)
+                t, y, clean = gen_plant(tp, rng, noise=0.05)
+                c_clean, c_resid, _ = _mismatch_scores(cls(tp), t, y, clean, warm)
+                w_clean, w_resid, w_div = _mismatch_scores(cls(wp), t, y, clean,
+                                                           warm)
+                cc.append(c_clean); cw.append(w_clean)
+                rc.append(c_resid); rw.append(w_resid); dv.append(w_div)
+            correct = float(np.nanmean(cc))
+            wrong = float(np.nanmean(cw))
+            rows.append(dict(
+                true=true_key, wrong_model=wrong_key, estimator=est,
+                rmse_correct=correct, rmse_wrong=wrong,
+                blowup=(wrong / correct if correct and correct > 0
+                        else float("nan")),
+                resid_correct=float(np.nanmean(rc)),
+                resid_wrong=float(np.nanmean(rw)),
+                diverged=bool(np.any(dv)))
+            )
     return rows
 
 
@@ -458,10 +590,10 @@ def fx_track(t, y):
                    q_diag=[1e-4, 1e-4], r=0.5, adapt_r=True)
     ekf = EKFParam("a*exp(b*t)", "t", [1.0, 0.5], q=1e-5, r=0.1)
     rls = RLSPredictor(order=2, lam=1.0, delta=1e3)
-    preds = {"dtfit EqualAreas": [], "EKF": [], "RLS": [], "random walk": []}
+    preds = {"dtfit EACFilter": [], "EKF": [], "RLS": [], "random walk": []}
     actual = []
     for i in range(1, y.size):
-        preds["dtfit EqualAreas"].append(
+        preds["dtfit EACFilter"].append(
             float(ea.predict(np.array([t[i]]))[0]) if len(ea._t) >= ea.W else y[i - 1])
         preds["EKF"].append(float(ekf.predict(t[i])))
         preds["RLS"].append(rls.predict_next())

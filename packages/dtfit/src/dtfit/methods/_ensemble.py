@@ -109,12 +109,14 @@ def ensemble_fit(
 
     members: list[np.ndarray] = []
     names: tuple[str, ...] = ()
+    last_res: FittingResult | None = None
     start = 0
     while start + win <= n and len(members) < n_windows * 3:
         sl = slice(start, start + win)
         try:
             res = fitter(x[sl], y[sl], expr, var, p0=p0, **kwargs)
             members.append(np.asarray(res.coeffs, dtype=float))
+            last_res = res
             names = res.names or names
         except Exception:  # noqa: BLE001 - a corrupted window is simply skipped
             pass
@@ -125,9 +127,22 @@ def ensemble_fit(
     if not members:  # every subwindow failed -> one whole-record fit
         res = fitter(x, y, expr, var, p0=p0, **kwargs)
         members.append(np.asarray(res.coeffs, dtype=float))
+        last_res = res
         names = res.names or names
 
     M = np.vstack(members)
     coeffs = np.median(M, axis=0) if aggregate == "median" else np.mean(M, axis=0)
-    spread = np.std(M, axis=0)
+    if M.shape[0] < 2:
+        # A single surviving window gives no inter-window spread -- np.std would
+        # be exactly 0, which masquerades as *zero* uncertainty (a dangerously
+        # overconfident stderr / predict(return_std=True) precisely when the
+        # ensemble has degraded to one fit). Fall back to that fit's own analytic
+        # covariance; if even that is unavailable, report NaN rather than lie.
+        cov = last_res.cov if last_res is not None else None
+        if cov is not None:
+            spread = np.sqrt(np.clip(np.diag(cov), 0.0, None))
+        else:
+            spread = np.full(M.shape[1], np.nan)
+    else:
+        spread = np.std(M, axis=0)
     return EnsembleResult(coeffs, spread, M, expr=expr, var=var, names=names)

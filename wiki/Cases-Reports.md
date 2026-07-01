@@ -29,12 +29,12 @@ Each novel EAC/LSI adaptation, scored across the experiments that exercised it (
 | #3 overlapping-window ensemble (ensemble_fit) | noise/outliers: partial, gps: n/a | Keep experimental -- helps EAC at low outlier rates but unstable once many windows are corrupted; LSI's built-in smoothing is the more reliable robustness route. |
 | #4 joint multi-channel fit (fit_joint) | control: loss, gps: n/a | Keep experimental -- on cleanly-identifiable channels the dedicated solver already wins; value is parameter parsimony / consistency, not accuracy. |
 | #5 stage-wise boosting (boosted_fit) | forecasting: win, ltsf: n/a | Keep experimental -- a clear win on CO2 (trend+season) but only one domain demonstrated; promote if a second domain confirms. |
-| #6 adaptive-window EAC (fit_eac_adaptive) | transient fit: win | Keep experimental -- recovers localized-transient parameters well; needs broader evaluation before promotion. |
+| #6 adaptive-window EAC (fit_eac(window_mode="curvature")) | transient fit: win | Promoted into dtfit as fit_eac(window_mode="curvature") -- domain-validated on localized transients/peaks. |
 
 ## Promotion outcome
 
-- **Promoted to the stable API:** the map-reduce estimators (`PartitionedLSI` / `PartitionedEAC`, adaptation #1) -- re-exported from `dtfit` and documented; they cleared the gate (big-data + parallel).
+- **Promoted to the stable API:** the map-reduce estimators (`PartitionedLSI` / `PartitionedEAC`, adaptation #1) -- re-exported from `dtfit` and documented; they cleared the gate (big-data + parallel). Curvature-adaptive-window EAC (adaptation #6) was also promoted, as the `fit_eac(window_mode="curvature")` path of the stable `fit_eac` (domain-validated on transients/peaks).
 
-- **Kept experimental in `dtfit_experimental`:** #2-#6, with the honest per-experiment findings above. They remain available and documented but did not (yet) clear the >=2-domain promotion gate.
+- **Kept experimental in `dtfit_experimental`:** #2-#5, with the honest per-experiment findings above. They remain available and documented but did not (yet) clear the >=2-domain promotion gate.
 
 

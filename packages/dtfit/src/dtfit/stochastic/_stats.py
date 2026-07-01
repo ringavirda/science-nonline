@@ -10,7 +10,15 @@ import numpy as np
 
 
 def _ols_line(t: np.ndarray, y: np.ndarray) -> tuple[float, float, float]:
-    """OLS line ``y ~ a + b*t``; returns ``(slope, intercept, |t-stat of slope|)``."""
+    """OLS line ``y ~ a + b*t``; returns ``(slope, intercept, |t-stat of slope|)``.
+
+    The slope t-stat uses a **Newey-West (HAC)** standard error, not the classical
+    OLS one. The classical SE is badly anti-conservative when the residuals are
+    autocorrelated -- the norm for these series -- so a persistent-but-stationary
+    AR(1) shows a spuriously significant OLS slope, which is exactly the spurious
+    trend the router must not chase. A Bartlett-kernel HAC SE corrects the slope
+    variance for the residual autocorrelation, so the reported t-stat is honest.
+    """
     n = t.size
     tm, ym = t.mean(), y.mean()
     st = t - tm
@@ -20,8 +28,24 @@ def _ols_line(t: np.ndarray, y: np.ndarray) -> tuple[float, float, float]:
     slope = float(st @ (y - ym)) / denom
     intercept = float(ym - slope * tm)
     resid = y - (intercept + slope * t)
-    s2 = float(resid @ resid) / max(1, n - 2)
-    se = np.sqrt(s2 / denom) if s2 > 0 else 0.0
+    # Newey-West HAC covariance of (intercept, slope): (X'X)^-1 S (X'X)^-1 with
+    # S the Bartlett-weighted autocovariance of the score x_i * u_i. Reduces to
+    # White's HC0 at lag 0; adds autocorrelation robustness at higher lags.
+    X = np.column_stack([np.ones(n), t.astype(float)])
+    try:
+        xtx_inv = np.linalg.inv(X.T @ X)
+    except np.linalg.LinAlgError:
+        return slope, intercept, 0.0
+    xu = X * resid[:, None]                       # (n, 2)
+    S = xu.T @ xu                                 # lag 0
+    bw = int(np.floor(4.0 * (n / 100.0) ** (2.0 / 9.0)))  # Newey-West rule
+    bw = max(0, min(bw, n - 1))
+    for lag in range(1, bw + 1):
+        w = 1.0 - lag / (bw + 1.0)                # Bartlett kernel
+        g = xu[lag:].T @ xu[:-lag]               # (2, 2)
+        S = S + w * (g + g.T)
+    cov = xtx_inv @ S @ xtx_inv
+    se = float(np.sqrt(cov[1, 1])) if cov[1, 1] > 0 else 0.0
     tstat = abs(slope) / se if se > 0 else (np.inf if slope != 0 else 0.0)
     return slope, intercept, float(tstat)
 

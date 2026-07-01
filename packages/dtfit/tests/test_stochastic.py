@@ -13,8 +13,9 @@ import pytest
 
 from dtfit import fit_stochastic, StochasticModel, StochasticFilter, Stochastic
 from dtfit.stochastic import (
-    sample_acf, hurst_spectral, ar1_reversion, garch_persistence,
+    sample_acf, hurst_spectral, hurst_aggvar, ar1_reversion, garch_persistence,
     cycle_period, decompose_trend_cycle, FORECASTERS,
+    ar_order, fit_ar, fractional_difference,
 )
 
 
@@ -80,6 +81,88 @@ def test_hurst_spectral_recovers_long_memory():
     err = np.mean([abs(hurst_spectral(gen_arfima(4096, 0.3,
                   np.random.default_rng(10 + s)))["H"] - H) for s in range(3)])
     assert err < 0.15
+
+
+def _gen_ar2(n, p1, p2, seed):
+    rng = np.random.default_rng(seed)
+    x = np.zeros(n)
+    for t in range(2, n):
+        x[t] = p1 * x[t - 1] + p2 * x[t - 2] + rng.standard_normal()
+    return x
+
+
+def test_fit_ar_recovers_ar2_order_and_coeffs():
+    orders = [ar_order(_gen_ar2(2000, 0.5, 0.3, s)) for s in range(7)]
+    assert max(set(orders), key=orders.count) == 2      # AR(2) selected
+    fit = fit_ar(_gen_ar2(4000, 0.5, 0.3, 1))
+    assert fit["order"] == 2
+    assert np.allclose(np.asarray(fit["phi"], dtype=float), [0.5, 0.3], atol=0.08)
+
+
+def test_ar_order_white_noise_is_zero():
+    assert ar_order(np.random.default_rng(0).standard_normal(2000)) == 0
+
+
+def test_ar_p_not_mislabeled_long_memory():
+    """The router classifies a genuine finite-order AR as mean-reverting, not
+    long memory (the AR(p) veto), at any order including a near-unit-root AR(1)."""
+    for series in (_gen_ar2(3000, 0.5, 0.3, 0),        # AR(2)
+                   gen_ar1(3000, 0.95, np.random.default_rng(0))):  # near-unit AR(1)
+        m = fit_stochastic(series)
+        assert not m.has_long_memory
+        assert m.has_mean_reversion
+
+
+def test_strong_long_memory_still_detected():
+    """A strong ARFIMA (d=0.4, H~0.9) is detected as long memory -- reading the
+    raw-residual Hurst no longer under-detects it (the AR(1)-whitened innovations
+    used to)."""
+    got = sum(fit_stochastic(gen_arfima(4096, 0.4, np.random.default_rng(s)))
+              .has_long_memory for s in range(5))
+    assert got >= 4
+
+
+def test_fractional_difference_special_cases():
+    x = np.cumsum(np.random.default_rng(0).standard_normal(64))
+    assert np.allclose(fractional_difference(x, 0.0), x)          # identity
+    assert np.allclose(fractional_difference(x, 1.0)[1:], np.diff(x))  # first diff
+
+
+def test_fractional_difference_whitens_long_memory():
+    # differencing an ARFIMA(0,d,0) by its own d whitens it (Hurst -> ~0.5)
+    y = gen_arfima(4096, 0.3, np.random.default_rng(2))
+    d = hurst_spectral(y)["d"]
+    w = fractional_difference(y, d)
+    assert abs(hurst_spectral(w)["H"] - 0.5) < abs(hurst_spectral(y)["H"] - 0.5)
+
+
+def test_simulate_student_t_has_fat_tails_and_unit_scale():
+    from scipy.stats import kurtosis
+    x = gen_ar1(3000, 0.7, np.random.default_rng(1))
+    m = fit_stochastic(x)
+    sn = m.simulate(5000, seed=0, dist="normal")
+    st = m.simulate(5000, seed=0, dist="t", df=4)
+    assert float(kurtosis(st)) > float(kurtosis(sn)) + 1.5     # fatter tails
+    assert abs(np.std(st) - np.std(sn)) < 0.25 * np.std(sn)    # same scale
+
+
+def test_long_memory_simulate_variance_matches_sigma():
+    from dtfit.stochastic._simulate import _sim_long_memory
+    for H in (0.7, 0.9):
+        stds = [np.std(_sim_long_memory(2000, H, 1.0, np.random.default_rng(s)))
+                for s in range(6)]
+        assert abs(float(np.mean(stds)) - 1.0) < 0.1          # realized std ~ sigma
+
+
+def test_hurst_aggvar_recovers_long_memory():
+    # aggregated-variance Hurst is a stable-package public export; cover it here
+    # (previously only exercised via the experimental suite). Noisier than the
+    # spectral estimator, so a looser band + more seeds.
+    H = 0.8
+    ests = [hurst_aggvar(gen_arfima(4096, 0.3,
+            np.random.default_rng(60 + s)))["H"] for s in range(5)]
+    assert abs(float(np.mean(ests)) - H) < 0.2
+    assert all(0.0 <= e <= 1.0 for e in ests)
 
 
 @pytest.mark.parametrize("phi", [0.6, 0.9])

@@ -37,7 +37,8 @@ from dtfit_experimental.experiments.domains.common import embedded_footprint
 __all__ = [
     "DURATION", "MANEUVERS", "ONSETS", "GPS_SIGMA", "GYRO_SIGMA", "IMU_GYRO_SIGMA",
     "IMU_ACC_SIGMA", "IMU_WASH_TAU", "GRAVITY", "WARMUP", "MODELS",
-    "trajectory", "random_plan", "rmse3", "build_rig", "build_imu",
+    "MAG_SIGMA", "MAG_GAIN", "GYRO_BIAS",
+    "trajectory", "random_plan", "rmse3", "build_rig", "build_imu", "build_mag",
     "dtfit_track", "kalman_track", "ekf_track",
     "strapdown_basis", "imu_lsi_track", "FusedCUSUM", "roll_rmse", "match_onsets",
     "embedded_footprint",
@@ -73,6 +74,16 @@ IMU_WASH_TAU = 100.0     # accel washout time-constant (steps/dt): a longer (gen
 # handing it to the drift polynomial. Loosening 60 -> 100 (the maneuvers live on a
 # 6-8 s scale, so tau=60 steps = 6 s was cutting into the maneuver band) keeps more of
 # that arc, lowering RMSE while staying numerically bounded on random plans.
+# Magnetometer (the NEO-M8N puck + the Nano's BMM150 both carry one): an *absolute*
+# heading reference that, unlike the gyro, does not drift. It is modelled at the
+# heading level (like the GPS at the fix level) -- the honest output of a calibrated,
+# tilt-compensated compass: true course + residual hard-iron/declination bias + noise.
+MAG_SIGMA = 0.05     # compass heading noise, rad (~2.9 deg, tilt-compensated)
+MAG_GAIN = 0.05      # complementary mag->yaw correction per step (tau ~ dt/gain ~ 2 s)
+# A realistic MEMS yaw-rate bias: small while GPS anchors the track, but it integrates
+# into a large heading error across a multi-second GPS dropout -- exactly the error the
+# absolute compass bounds. Default off so the canonical E1-E7 results are unchanged.
+GYRO_BIAS = np.array([0.0, 0.0, 0.01])   # body yaw-rate bias, rad/s (~0.57 deg/s)
 GRAVITY = np.array([0.0, 0.0, -9.81])    # world-frame gravity (ENU, z up)
 WARMUP = 35         # skip the fill-window transient when scoring
 
@@ -219,10 +230,18 @@ class FusedCUSUM:
 
 
 def dtfit_track(t, fixes, horizons=(10,), *, kind="lsi", model="poly", robust=False,
-                fused=False, gyro=None):
+                fused=False, gyro=None, coast=False, coast_order=1):
     """Online per-axis tracking + rolling h-step forecasts. Missing fixes (NaN rows)
     are coasted (no update; the local model extrapolates). Returns
-    ``(smoothed, pred, drift_times)``."""
+    ``(smoothed, pred, drift_times)``.
+
+    ``coast`` selects how the local model is extrapolated off its window support
+    (during a GPS gap, and for the h-step forecast): ``False`` evaluates the
+    fitted model directly (``predict`` -- a cubic *diverges* past the window),
+    ``True`` dead-reckons from the last in-window sample via
+    :meth:`LSIFilter.coast` (order-1 constant-velocity by default, order-2 CA).
+    Only the off-support branch changes -- in-window smoothing is identical -- so
+    it is a clean matched control for the dropout/forecast regime."""
     n = t.size
     sm = np.zeros((n, 3))
     pred = {h: np.full((n, 3), np.nan) for h in horizons}
@@ -231,6 +250,13 @@ def dtfit_track(t, fixes, horizons=(10,), *, kind="lsi", model="poly", robust=Fa
     flts = _axis_filters(fixes, kind, model, robust, off)
     det = FusedCUSUM(3 + (gyro is not None)) if fused else None
     g_prev = None
+
+    def _extrap(ax, tt):  # off-support extrapolation: coast vs raw model eval
+        q = np.array([tt])
+        if coast:
+            return float(flts[ax].coast(q, order=coast_order)[0])
+        return float(flts[ax].predict(q)[0])
+
     for i in range(n):
         miss = np.any(np.isnan(fixes[i]))
         for ax in range(3):
@@ -238,7 +264,7 @@ def dtfit_track(t, fixes, horizons=(10,), *, kind="lsi", model="poly", robust=Fa
                 flts[ax].partial_fit(t[i], fixes[i, ax])
                 if not fused and flts[ax].drift_flag_:
                     drift.add(round(float(t[i]), 2))
-            sm[i, ax] = float(flts[ax].predict(np.array([t[i]]))[0])
+            sm[i, ax] = _extrap(ax, t[i])
         if det is not None and not miss:
             res = [flts[ax].last_residual_ for ax in range(3)]
             if gyro is not None:                 # add the gyro-rate change channel
@@ -251,7 +277,7 @@ def dtfit_track(t, fixes, horizons=(10,), *, kind="lsi", model="poly", robust=Fa
         for h in horizons:
             if i + h < n:
                 for ax in range(3):
-                    pred[h][i + h, ax] = float(flts[ax].predict(np.array([t[i + h]]))[0])
+                    pred[h][i + h, ax] = _extrap(ax, t[i + h])
     return sm, pred, sorted(drift)
 
 
@@ -351,16 +377,36 @@ def _log_so3(dR, dt):
     return a / (2.0 * np.sin(a)) * v / dt
 
 
-def build_imu(t, truth, *, gyro_sigma=IMU_GYRO_SIGMA, acc_sigma=IMU_ACC_SIGMA, seed=0):
-    """Simulate a full 9-DOF IMU consistent with the truth trajectory: a 3-axis
-    gyro (body angular rate) and a 3-axis accelerometer (specific force in body).
+def build_mag(t, truth, *, mag_sigma=MAG_SIGMA, bias=0.0, seed=0):
+    """Simulate a tilt-compensated compass: the *absolute* world heading (yaw) the
+    module reports = true course ``atan2(v_y, v_x)`` + residual hard-iron/declination
+    ``bias`` + ``N(0, mag_sigma)`` noise. Modelled at the heading level (like the GPS
+    at the fix level) — the honest output of a calibrated magnetometer, and the one
+    channel the gyro-only strapdown lacks: an attitude reference that does not drift.
+    Returns ``mag_heading`` of shape ``(n,)`` in radians."""
+    rng = np.random.default_rng(seed); dt = float(t[1] - t[0])
+    vel = np.gradient(truth, dt, axis=0)
+    psi = np.arctan2(vel[:, 1], vel[:, 0])
+    return psi + bias + rng.normal(0, mag_sigma, psi.shape)
+
+
+def build_imu(t, truth, *, gyro_sigma=IMU_GYRO_SIGMA, acc_sigma=IMU_ACC_SIGMA,
+              gyro_bias=None, mag_sigma=MAG_SIGMA, mag_bias=0.0, seed=0):
+    """Simulate the rig's full **9-DOF** IMU consistent with the truth trajectory: a
+    3-axis gyro (body angular rate), a 3-axis accelerometer (specific force in body)
+    and a 3-axis magnetometer (returned as the absolute compass heading it resolves
+    to — see :func:`build_mag`). The rig always carries the magnetometer, so it is
+    part of the IMU, not an optional add-on.
 
     Attitude = flight kinematics: heading from the velocity, pitch from the climb
     angle, roll from the coordinated-turn bank ``atan2(v·ψ̇, g)``. The gyro rate is
     the *exact* relative rotation (matrix log), so integrating it reproduces the
     attitude; the accelerometer is ``R^T (a_world − g)`` — what a strapped-down
-    sensor reads. Returns ``(R0, gyro, accel)`` with ``R0`` the initial attitude
-    (the alignment a real rig gets at start-up)."""
+    sensor reads. ``gyro_bias`` (rad/s, body frame; e.g. :data:`GYRO_BIAS`) adds a
+    constant rate offset — the realistic MEMS error that integrates into heading
+    drift through a GPS dropout, which the compass bounds. Returns
+    ``(R0, gyro, accel, mag_heading)`` with ``R0`` the initial attitude (the
+    alignment a real rig gets at start-up)."""
     rng = np.random.default_rng(seed); dt = float(t[1] - t[0]); m = t.size
     vel = np.gradient(truth, dt, axis=0)
     acc = np.gradient(vel, dt, axis=0)
@@ -375,11 +421,25 @@ def build_imu(t, truth, *, gyro_sigma=IMU_GYRO_SIGMA, acc_sigma=IMU_ACC_SIGMA, s
     omega[-1] = omega[-2]
     f_body = np.einsum("nij,nj->ni", np.transpose(R, (0, 2, 1)), acc - GRAVITY)
     gyro = omega + rng.normal(0, gyro_sigma, omega.shape)
+    if gyro_bias is not None:
+        gyro = gyro + np.asarray(gyro_bias, float)
     accel = f_body + rng.normal(0, acc_sigma, f_body.shape)
-    return R[0], gyro, accel
+    mag = build_mag(t, truth, mag_sigma=mag_sigma, bias=mag_bias, seed=seed + 1)
+    return R[0], gyro, accel, mag
 
 
-def strapdown_basis(t, gyro, accel, R0, *, tau=IMU_WASH_TAU):
+def _wrap(a):
+    """Wrap an angle (or array) to (-pi, pi]."""
+    return (np.asarray(a) + np.pi) % (2.0 * np.pi) - np.pi
+
+
+def _yaw_of(R):
+    """World-frame yaw (heading) of a body->world rotation ``R``."""
+    return float(np.arctan2(R[1, 0], R[0, 0]))
+
+
+def strapdown_basis(t, gyro, accel, R0, *, tau=IMU_WASH_TAU,
+                    mag_heading=None, mag_gain=0.0):
     """Strapdown integration of the IMU into a per-axis position basis ``S``.
 
     Integrate the gyro into attitude, rotate the accelerometer into the world,
@@ -390,12 +450,24 @@ def strapdown_basis(t, gyro, accel, R0, *, tau=IMU_WASH_TAU):
     the basis stays bounded and drift-free while keeping the maneuver content the
     accelerometer senses. The residual smooth drift is mopped up by the model's
     polynomial-drift terms — the rich model the LSI filter now carries. Returns
-    ``S`` of shape ``(n, 3)``."""
+    ``S`` of shape ``(n, 3)``.
+
+    If ``mag_heading`` is given, a **complementary yaw correction** of strength
+    ``mag_gain`` nudges the integrated attitude toward the absolute compass heading
+    each step (``R <- Rz(mag_gain·Δyaw) R``). The gyro still supplies the smooth,
+    high-rate attitude; the magnetometer only bounds its slow yaw drift. This runs
+    independently of the GPS, so it keeps the dead-reckoned heading honest *through
+    a GPS dropout* — where a gyro bias would otherwise curve the coast off-course."""
     dt = float(t[1] - t[0]); R = R0.copy(); m = t.size
     S = np.zeros((m, 3)); v = np.zeros(3); s = np.zeros(3); a = dt / tau
+    use_mag = mag_heading is not None and mag_gain > 0.0
     for i in range(m):
         aw = R @ accel[i] + GRAVITY
         R = R @ _exp_so3(gyro[i], dt)
+        if use_mag:
+            e = _wrap(float(mag_heading[i]) - _yaw_of(R)) * mag_gain
+            c, sn = np.cos(e), np.sin(e)
+            R = np.array([[c, -sn, 0.0], [sn, c, 0.0], [0.0, 0.0, 1.0]]) @ R
         v = (1.0 - a) * v + aw * dt
         s = (1.0 - a) * s + v * dt
         S[i] = s
@@ -403,7 +475,7 @@ def strapdown_basis(t, gyro, accel, R0, *, tau=IMU_WASH_TAU):
 
 
 def imu_lsi_track(t, fixes, gyro, accel, R0, horizons=(10,), *, window=28,
-                  drift="c2*tt**2"):
+                  drift="c2*tt**2", mag_heading=None, mag_gain=MAG_GAIN, S=None):
     """Full-IMU GPS fusion run **entirely through dtfit's LSI filter**, per axis.
 
     The strapdown basis ``S`` (gyro attitude + accelerometer, washed out) is fed
@@ -414,6 +486,12 @@ def imu_lsi_track(t, fixes, gyro, accel, R0, horizons=(10,), *, window=28,
     measurement. Missing fixes (NaN rows) coast on the IMU basis. Returns
     ``(smoothed, pred)``.
 
+    Passing ``mag_heading`` (+ ``mag_gain``, e.g. :data:`MAG_GAIN`) folds an
+    absolute compass into the strapdown attitude (see :func:`strapdown_basis`):
+    the gyro-integrated heading is anchored to magnetic north so the IMU coast does
+    not yaw away during GPS dropouts. Adds nothing when GPS is healthy (the fix
+    already pins heading) — its gain is concentrated in the gaps.
+
     The drift compensator is a **quadratic** (``c2·tt²``), not a cubic: with the
     accelerometer already supplying the motion shape, a cubic drift term overfits
     the GPS noise on clean fixes and — having no data to anchor it — extrapolates
@@ -422,7 +500,10 @@ def imu_lsi_track(t, fixes, gyro, accel, R0, horizons=(10,), *, window=28,
     slightly wider ``window`` (28; the order-6 projection wants room) the per-axis
     LSI now leads the coordinated-turn EKF on smoothing, coasting and robustness."""
     n = t.size; sm = np.zeros((n, 3)); ax = ["Sx", "Sy", "Sz"]
-    S = strapdown_basis(t, gyro, accel, R0)
+    # ``S`` may be supplied precomputed (e.g. a rest-aided real-IMU strapdown that
+    # estimates bias online); otherwise build the clean-IMU basis as in the sim.
+    if S is None:
+        S = strapdown_basis(t, gyro, accel, R0, mag_heading=mag_heading, mag_gain=mag_gain)
     nq = 2 + (drift.count("c") if drift else 0)
 
     def expr(a):
@@ -475,16 +556,27 @@ def match_onsets(flags):
 
 def _batch_one(arg):
     """One random-trajectory trial for the E6 batch (module-level so it is picklable
-    for a process pool). Returns ``(j, {method: smoothing RMSE}, sample-or-None)``."""
+    for a process pool). Returns ``(j, {method: smoothing RMSE}, sample-or-None)``.
+
+    The plan / GPS-noise / IMU-noise seeds are drawn as three INDEPENDENT children
+    of a per-trial :class:`numpy.random.SeedSequence` (``spawn``), so they are
+    decorrelated streams -- not the correlated integer offsets (1000+j / 2000+j /
+    3000+j) that can alias structure across the plan, fixes and IMU of one trial.
+    Each child is realized as a concrete integer seed (``generate_state``) so it
+    still satisfies ``build_imu``'s integer-seed contract (it derives the mag seed
+    as ``seed + 1``)."""
     j, n = arg
-    plan = random_plan(seed=1000 + j)
-    t, truth, fixes, gyro, _ = build_rig(n, seed=2000 + j, plan=plan)
-    R0, gy3, ac3 = build_imu(t, truth, seed=3000 + j)
+    children = np.random.SeedSequence(j).spawn(3)
+    s_plan, s_rig, s_imu = (int(c.generate_state(1)[0]) % (2 ** 31) for c in children)
+    plan = random_plan(seed=s_plan)
+    t, truth, fixes, gyro, _ = build_rig(n, seed=s_rig, plan=plan)
+    R0, gy3, ac3, mg3 = build_imu(t, truth, seed=s_imu)
     msk = np.ones(n, bool); msk[:WARMUP] = False
     out = {
         "raw": rmse3(fixes[msk], truth[msk]),
         "lsi": rmse3(dtfit_track(t, fixes, (1,), kind="lsi")[0][msk], truth[msk]),
-        "imu": rmse3(imu_lsi_track(t, fixes, gy3, ac3, R0, (1,))[0][msk], truth[msk]),
+        "imu": rmse3(imu_lsi_track(t, fixes, gy3, ac3, R0, (1,),
+                                   mag_heading=mg3)[0][msk], truth[msk]),
         "ekf": rmse3(ekf_track(t, fixes, gyro, (1,))[0][msk], truth[msk]),
         "kal": rmse3(kalman_track(t, fixes, (1,))[0][msk], truth[msk]),
     }

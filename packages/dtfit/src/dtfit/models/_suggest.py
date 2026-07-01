@@ -49,15 +49,22 @@ def _detect_categories(x: np.ndarray, y: np.ndarray) -> set[str]:
     # test is noise-dominated where the true slope is small -- a noisy sigmoid's
     # flat tails fail it, dropping the sigmoid/saturating families for exactly
     # the S-curves they describe. Spearman tolerates that (a logistic scores
-    # ~0.98; a sine ~0). A strongly monotone series is *never* oscillatory,
-    # however many times a line-detrended S-curve jitters across zero under
-    # noise -- so monotonicity vetoes the (crossing-based) oscillatory tag.
-    # scipy's typed stub returns a private result class whose ``statistic``
-    # attribute it does not expose; the access is valid at runtime.
+    # ~0.98; a sine ~0). scipy's typed stub returns a private result class whose
+    # ``statistic`` attribute it does not expose; the access is valid at runtime.
     rho = (spearmanr(x, y).statistic  # pyright: ignore[reportAttributeAccessIssue]
            if n > 2 and float(np.std(y)) > 0 else 0.0)
     monotone = abs(float(np.nan_to_num(rho))) > 0.85
-    oscillatory = (not monotone) and strength > 0.12 and crossings >= 4
+    # The oscillatory tag is ADDITIVE, not vetoed by monotonicity. The old
+    # ``(not monotone)`` veto dropped the whole oscillatory family for
+    # trend+seasonal data (a sinusoid riding a trend has high Spearman rho against
+    # x), which is exactly the trend-plus-cycle case the recommender must handle.
+    # The veto is also unnecessary: ``crossings`` is measured on the LINE-DETRENDED
+    # residual, so a monotone S-curve (a single hump once detrended) crosses zero
+    # ~2 times, not >= 4, and broadband noise is rejected by the spectral-strength
+    # gate. So a strong spectral peak with several detrended crossings tags
+    # oscillatory even under a trend; the monotone tag (below) is added too, and
+    # the AIC ranking decides which structure actually fits.
+    oscillatory = strength > 0.12 and crossings >= 4
     if oscillatory:
         cats |= _SHAPE_CATEGORIES["oscillatory"]
     # an interior extremum that the series rises to and falls from -> a peak.

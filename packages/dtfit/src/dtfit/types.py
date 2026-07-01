@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import warnings
 from collections.abc import Sequence
 from typing import Any, Callable, Literal, overload
@@ -11,6 +12,25 @@ import numpy as np
 # Array-like initial parameter guess accepted by the fitters; coerced with
 # ``np.asarray`` internally, so a plain list of floats is fine.
 InitialGuess = Sequence[float] | np.ndarray | None
+
+
+@functools.lru_cache(maxsize=256)
+def _parse_model(expr: str, var: str):
+    """Parse ``(expr, var)`` to ``(sympy, t, f, params)`` -- cached.
+
+    ``sympify`` + free-symbol sorting is pure overhead when the same expression
+    is re-parsed (every ``.model`` / ``predict(return_std=True)`` access, and
+    across the many :class:`FittingResult` objects a batch fit produces that all
+    share one model). SymPy expressions are immutable, so the parse is safely
+    memoized on ``(expr, var)``. ``params`` is returned as a tuple for hashing;
+    callers that need a list copy it.
+    """
+    import sympy as sp
+
+    t = sp.Symbol(var)
+    f = sp.sympify(expr)
+    params = tuple(sorted((s for s in f.free_symbols if s != t), key=str))
+    return sp, t, f, params
 
 
 class FittingResult:
@@ -106,17 +126,13 @@ class FittingResult:
         return self._model
 
     def _sympy(self):
-        import sympy as sp
-
         if self.expr is None or self.var is None:
             raise ValueError(
                 "this FittingResult has no expr/var; the operation needs the "
                 "model expression (only the precomputed callable is available)."
             )
-        t = sp.Symbol(self.var)
-        f = sp.sympify(self.expr)
-        params = sorted((s for s in f.free_symbols if s != t), key=str)
-        return sp, t, f, params
+        sp, t, f, params = _parse_model(self.expr, self.var)
+        return sp, t, f, list(params)
 
     def _lambdify(self, coeffs: np.ndarray) -> Callable[..., Any]:
         sp, t, f, params = self._sympy()
@@ -190,13 +206,17 @@ class FittingResult:
             raise ValueError("prediction std needs a covariance (cov is None).")
         sp, t, f, params = self._sympy()
         base = self.coeffs.astype(float)
+        # Lambdify the model ONCE over ``(t, *params)`` and finite-difference each
+        # parameter against it, rather than re-lambdifying ``f.subs(...)`` inside
+        # the loop -- that was ``len(params)`` separate SymPy compiles on every
+        # uncertainty-band call. Numerics are unchanged (same step, same formula).
+        f_lam = sp.lambdify((t, *params), f, "numpy")
         jac = np.empty((x.size, len(params)))
         for k in range(len(params)):
             step = 1e-6 * max(1.0, abs(base[k]))
             cp = base.copy()
             cp[k] += step
-            fk = sp.lambdify(t, f.subs(dict(zip(params, cp))), "numpy")
-            vk = np.asarray(fk(x), dtype=float)
+            vk = np.asarray(f_lam(x, *cp), dtype=float)
             if np.ndim(vk) == 0:
                 vk = np.full_like(x, float(vk))
             jac[:, k] = (vk - y) / step
