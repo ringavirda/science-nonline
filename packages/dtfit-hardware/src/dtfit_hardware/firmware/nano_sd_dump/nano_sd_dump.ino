@@ -25,6 +25,15 @@ static bool isCsv(const char* n) {
          (n[L - 1] == 'v' || n[L - 1] == 'V');
 }
 
+// Leading YYYY of a session name "YYYYMMDD_HHMMSS.CSV", or 0 if not that pattern (SESSnnnn,
+// riglog.csv). A GPS date spoof can name a file 2028 while its FAT mtime reads a valid 2026 --
+// so we reject the spoofed NAME too, not just the FAT year.
+static int nameYear(const char* n) {
+  for (int i = 0; i < 8; i++) if (n[i] < '0' || n[i] > '9') return 0;
+  if (n[8] != '_') return 0;
+  return (n[0] - '0') * 1000 + (n[1] - '0') * 100 + (n[2] - '0') * 10 + (n[3] - '0');
+}
+
 void setup() {
   Serial.begin(115200);
   unsigned long t0 = millis();
@@ -52,8 +61,10 @@ void setup() {
       // (observed: a fake 2028 date), which would otherwise out-rank a real drive. FAT year =
       // 1980 + (date >> 9); a genuine run is within [2024, MAX_YEAR].
       int yr = 1980 + (d >> 9);
+      int ny = nameYear(name);                 // 0 for SESS/riglog (fall back to FAT date)
       uint32_t key = ((uint32_t)d << 16) | tm;
-      if (isCsv(name) && yr >= 2024 && yr <= MAX_YEAR && key >= newestKey) {
+      if (isCsv(name) && yr >= 2024 && yr <= MAX_YEAR && ny <= MAX_YEAR &&
+          key >= newestKey) {
         newestKey = key;
         strncpy(newest, name, sizeof(newest) - 1);
       }

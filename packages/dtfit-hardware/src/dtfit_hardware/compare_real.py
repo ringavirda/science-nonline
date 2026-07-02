@@ -44,11 +44,24 @@ G_MS2 = 9.81
 # --------------------------------------------------------------------------- #
 def load_log(path: str) -> dict:
     """Parse a rig CSV (raw GPS+IMU, optionally the nano_lsi_log columns). Keeps
-    only fix==1 rows; returns named float arrays + the column set present."""
+    only fix==1 rows; returns named float arrays + the column set present.
+
+    v4 logs emit faster than GPS (``EMIT_HZ``), so most rows repeat the last fix with
+    only fresh IMU/heading. When the ``newfix`` column is present we keep just the
+    genuine-GPS-update rows (newfix==1), so the trajectory stays at the real GPS rate and
+    every existing metric is unchanged; the between-fix high-rate samples remain in the raw
+    CSV for finer analysis. The on-MCU heading columns (hdg_deg/dhdg_deg) are carried through."""
     rows = list(csv.reader(open(path)))
     head = rows[0]
     ix = {name: i for i, name in enumerate(head)}
-    data = [r for r in rows[1:] if len(r) == len(head) and r[ix.get("fix", 2)] == "1"]
+    has_newfix = "newfix" in ix
+
+    def keep(r):
+        if len(r) != len(head) or r[ix.get("fix", 2)] != "1":
+            return False
+        return (not has_newfix) or r[ix["newfix"]] == "1"
+
+    data = [r for r in rows[1:] if keep(r)]
     if not data:
         raise ValueError(f"no fix==1 rows in {path}")
 
@@ -61,7 +74,8 @@ def load_log(path: str) -> dict:
     t = t - t[0]
     out = {"t": t, "n": len(data), "cols": set(ix)}
     for k in ("lat", "lon", "alt_m", "ax", "ay", "az", "gx", "gy", "gz",
-              "mx", "my", "mz", "est_lat", "est_lon", "sats", "hdop", "spd_kmph"):
+              "mx", "my", "mz", "est_lat", "est_lon", "sats", "hdop", "spd_kmph",
+              "hdg_deg", "dhdg_deg"):
         out[k] = col(k)
     # accept the v1 column names for the on-MCU estimate (lsi_lat/lsi_lon)
     if out["est_lat"] is None and "lsi_lat" in ix:
@@ -119,8 +133,27 @@ def _imu(log):
     R0 = _align_to_z(g0)
     abias0 = g0 - R0.T @ np.array([0.0, 0.0, np.linalg.norm(g0)])
     rest = _rest_mask(gyro, accel, gbias0, log["spd_kmph"])
+    # Yaw rate about the *gravity* (world-vertical) axis, not the raw body z. With the
+    # board tilted (even ~11 deg), roll/pitch rates from road bumps/braking -- gyro_x/y,
+    # often larger than gyro_z -- leak into gyro_z and integrate into a bogus heading
+    # (measured 98 deg RMS vs GPS course on the car drive; the gravity-aligned component
+    # is 36 deg). R0 is the same body->world alignment the strapdown path already uses;
+    # (R0 @ w)[2] is the component of body rate w about world up. Feeds gyro_gated_basis
+    # and ekf_track (both previously used the raw-z yaw).
+    yaw = (R0 @ (gyro - gbias0).T).T[:, 2]
+    # Prefer the on-MCU high-rate heading when the v4 firmware logs it: hdg_deg is integrated
+    # at ~100 Hz on-chip (gravity-aligned), so it does not alias the way one 1 Hz gyro sample
+    # per second does. Consume it as an equivalent yaw *rate* (d(heading)/dt) so gyro_gated_basis
+    # and ekf_track are unchanged. Falls back to the gravity-aligned gyro_z above when absent.
+    hdg = log.get("hdg_deg")
+    if hdg is not None and len(hdg) == len(gyro) and np.isfinite(hdg).all():
+        t = log["t"]
+        u = np.unwrap(np.radians(hdg))
+        dt = np.diff(t, prepend=t[0] - 1.0)
+        dt[dt <= 0] = 1.0
+        yaw = np.diff(u, prepend=u[0]) / dt
     return dict(gyro=gyro, accel=accel, R0=R0, gbias0=gbias0, abias0=abias0,
-                rest=rest, yaw=gyro[:, 2] - gbias0[2])
+                rest=rest, yaw=yaw)
 
 
 def _mag_heading_enu(log, fixes, *, win=10, disp=8.0):
@@ -383,8 +416,12 @@ def report(path: str, h: int = 10, gap: int = 15) -> str:
     def _fwd(pred_h):
         return _fc_rmse(pred_h, fixes), _fc_rmse(pred_h, fixes, motion=rest)
 
-    rows.append(("dtfit LSI-cubic (GPS-only)",
-                 *_fwd(G.dtfit_track(t, fixes, (h,), kind="lsi")[1][h])))
+    # coast=True: off its window the cubic is dead-reckoned constant-velocity, not
+    # evaluated directly -- a raw cubic *diverges* past the window (h-step forecast and
+    # gap coasting both blow up: measured 143 m at a 25-step gap vs 104 m coasted). This
+    # is the matched control for the dropout/forecast regime (see dtfit_track's docstring).
+    rows.append(("dtfit LSI-cubic (GPS-only, CV-coast)",
+                 *_fwd(G.dtfit_track(t, fixes, (h,), kind="lsi", coast=True)[1][h])))
     rows.append(("Kalman-CA (GPS-only)", *_fwd(G.kalman_track(t, fixes, (h,))[1][h])))
     ctrl_a = ctrl_m = gg_a = gg_m = float("nan")
     if have_imu:
@@ -417,7 +454,8 @@ def report(path: str, h: int = 10, gap: int = 15) -> str:
     fg = fixes.copy()
     fg[gm] = np.nan
     sc = []
-    sc.append(("dtfit LSI-cubic (GPS-only)", G.dtfit_track(t, fg, (1,), kind="lsi")[0]))
+    sc.append(("dtfit LSI-cubic (GPS-only, CV-coast)",
+               G.dtfit_track(t, fg, (1,), kind="lsi", coast=True)[0]))
     sc.append(("Kalman-CA (GPS-only)", G.kalman_track(t, fg, (1,))[0]))
     if have_imu:
         sc.append(("dtfit IMU-LSI S=0 control (matched)",
@@ -557,6 +595,264 @@ def sweep(path: str, horizons=(2, 3, 5, 10), gaps=(5, 10, 15)) -> str:
         eks = G.rmse3(ek[gm], fixes[gm]) if gm.any() else float("nan")
         L.append(f"  {gap:3d}  {ctrl:7.2f}  {gg:9.2f}  {cm:11.2f}  {eks:7.2f}")
     return "\n".join(L)
+
+
+# --------------------------------------------------------------------------- #
+# real 5 Hz car-drive analyses (E1/E2 on the fast-motion run)
+# --------------------------------------------------------------------------- #
+def est_err_by_speed(log, buckets=((0, 1), (1, 10), (10, 30), (30, 60), (60, 200))):
+    """On-MCU LSI estimate vs the raw GPS fix (the phone's EST ERR chip), binned by speed (m).
+    At 5 Hz the fixed 15-sample window spans 3 s (not 15 s), so the on-chip degree-1 fit stops
+    cutting corners at speed. Returns rows ``(lo, hi, n, mean_err, max_err)`` or None if no est."""
+    if log.get("est_lat") is None:
+        return None
+    cl = math.cos(math.radians(float(log["lat"][0]))); md = 111320.0
+    err = np.hypot((log["est_lon"] - log["lon"]) * cl * md, (log["est_lat"] - log["lat"]) * md)
+    ok = np.isfinite(err) & ~((log["est_lat"] == 0) & (log["est_lon"] == 0))
+    spd = log["spd_kmph"]
+    rows = []
+    for lo, hi in buckets:
+        m = ok & (spd >= lo) & (spd < hi)
+        if m.any():
+            rows.append((lo, hi, int(m.sum()), float(err[m].mean()), float(err[m].max())))
+    return rows
+
+
+def imu_noise_floor(log):
+    """IMU noise at the longest stationary stretch (parked; true rate~0, |a|~1 g) vs fast driving.
+    Isotropic gyro/accel std far above the parked floor is mechanical vibration through a loose
+    mount, not vehicle dynamics (which is anisotropic). Returns per-regime stats + stop duration."""
+    g = np.stack([log["gx"], log["gy"], log["gz"]], axis=1)
+    a = np.stack([log["ax"], log["ay"], log["az"]], axis=1)
+    spd = log["spd_kmph"]; amag = np.linalg.norm(a, axis=1)
+    still = spd < 1
+    best = end = cur = 0
+    for i in range(len(spd)):
+        cur = cur + 1 if still[i] else 0
+        if cur > best:
+            best, end = cur, i
+    stop = np.zeros(len(spd), bool); stop[end - best + 1:end + 1] = True
+    fast = spd > 60
+
+    def st(m):
+        return dict(n=int(m.sum()), gyro_std=g[m].std(axis=0).round(2).tolist(),
+                    amag_mean=float(amag[m].mean()), amag_std=float(amag[m].std()))
+    return dict(stop=st(stop), fast=st(fast),
+                stop_s=float(log["t"][end] - log["t"][end - best + 1]))
+
+
+def _course(fixes, *, win=15, disp=8.0):
+    """GPS course-over-ground (ENU angle from east) where there's real displacement, else NaN."""
+    n = len(fixes); c = np.full(n, np.nan)
+    for i in range(n):
+        j = min(i + win, n - 1); k = max(i - win, 0)
+        de, dn = fixes[j, 0] - fixes[k, 0], fixes[j, 1] - fixes[k, 1]
+        if math.hypot(de, dn) > disp:
+            c[i] = math.atan2(dn, de)
+    return c
+
+
+def complementary_heading(log, fixes, *, K=0.03):
+    """Clean the wobbly on-MCU gyro heading with a complementary filter: propagate on the real
+    per-emit yaw increment (``dhdg_deg``, integrated ~35 Hz on-chip), slow-correct toward GPS
+    course when moving (removes the drift + vibration-rectification bias the loose mount injects),
+    and coast on gyro alone through GPS gaps (NaN fix). Returns ``(psi_cleaned, course)``. Needs
+    the v4+ ``dhdg_deg`` column."""
+    n = len(fixes); dhdg = np.radians(np.asarray(log["dhdg_deg"]))
+    course = _course(fixes); psi = np.zeros(n); p = 0.0
+    for i in range(n):
+        p += dhdg[i]
+        if np.isfinite(course[i]) and not np.any(np.isnan(fixes[i])):
+            p += K * math.atan2(math.sin(course[i] - p), math.cos(course[i] - p))
+        psi[i] = p
+    return psi, course
+
+
+def onchip_heading_causal(log, fixes, *, win=15, disp=8.0, K=0.04):
+    """Host mirror of the on-MCU v7 CLEANED heading (firmware ``anchorHeading`` in nano_lsi_log):
+    integrate the RAW per-emit gyro increment (``dhdg_deg``) and slow-correct toward a CAUSAL
+    backward-difference GPS course -- the direction from the fix ``win`` samples ago to now, only
+    where displacement>``disp`` m and moving. This is complementary_heading() with a backward
+    (MCU-realisable) course instead of the centred one it uses, so it reproduces exactly what the
+    chip now emits live in ``hdg_deg`` (v7). On the drive it lands 82 -> ~15 deg vs GPS course (the
+    causal-lag cost over the 9 deg of the non-causal host filter). Lets a NEW log verify the chip.
+    Constants mirror the firmware #defines (CRS_WIN / CRS_DISP / CRS_K). Returns cleaned psi (rad)."""
+    n = len(fixes); dhdg = np.radians(np.asarray(log["dhdg_deg"]))
+    spd = log.get("spd_kmph"); psi = np.zeros(n); p = 0.0
+    for i in range(n):
+        p += dhdg[i]                                     # gyro propagation (raw increment)
+        moving = spd is None or spd[i] >= 2.0
+        if i >= win and moving:
+            de = fixes[i, 0] - fixes[i - win, 0]; dn = fixes[i, 1] - fixes[i - win, 1]
+            if math.hypot(de, dn) > disp:                # real displacement over the causal window
+                course = math.atan2(dn, de)
+                p += K * math.atan2(math.sin(course - p), math.cos(course - p))
+        psi[i] = p
+    return psi
+
+
+def heading_rms(psi, course):
+    """RMS of a heading (rad) vs GPS course after one best constant offset (deg)."""
+    m = np.isfinite(course)
+    d = course[m] - psi[m]
+    off = math.atan2(float(np.sin(d).mean()), float(np.cos(d).mean()))
+    r = np.arctan2(np.sin(d - off), np.cos(d - off))
+    return math.degrees(math.sqrt(np.mean(r ** 2)))
+
+
+def deadreckon_basis(t, fixes, psi, *, tau=4.0):
+    """Position basis from a heading + GPS finite-difference speed (speed held through gaps),
+    washed out over ``tau`` -- the gyro-yaw dead-reckoning fed to imu_lsi_track as regressor ``S``.
+    No accelerometer: its double integration is hopeless on a vibrating mount."""
+    n = len(fixes); S = np.zeros((n, 3)); s = np.zeros(2); last = 0.0
+    for i in range(n):
+        dt = min(max(float(t[i] - t[i - 1]) if i > 0 else 0.2, 1e-3), 5.0); a = dt / tau
+        if i > 0 and not np.any(np.isnan(fixes[i])) and not np.any(np.isnan(fixes[i - 1])):
+            last = float(np.linalg.norm(fixes[i, :2] - fixes[i - 1, :2])) / dt
+        s = (1 - a) * s + last * np.array([math.cos(psi[i]), math.sin(psi[i])]) * dt
+        S[i, :2] = s
+    return S
+
+
+def maneuver_dropouts(log, fixes, *, gap=75, turn_deg=15):
+    """Place periodic ``gap``-sample GPS dropouts, coast GPS-only vs cleaned-gyro fusion through
+    each, and split gaps into straight vs turn by net heading change. The IMU pays off exactly on
+    turn-dropouts -- GPS-only extrapolates straight off the turn while the gyro carries the
+    heading. Averaged over random placement the two cancel (why periodic dropouts show ~nothing),
+    so the split is the honest view. Returns per-bin means + the best-improvement turn gap and the
+    two coasted tracks (for plotting)."""
+    n = len(fixes); t = log["t"]; z3 = np.zeros((n, 3))
+    psi_full = np.unwrap(complementary_heading(log, fixes)[0])
+    gm = _gap_mask(n, gap=gap); fg = fixes.copy(); fg[gm] = np.nan
+    ctrl = G.imu_lsi_track(t, fg, z3, z3, np.eye(3), (1,), S=z3)[0]
+    fus = G.imu_lsi_track(t, fg, z3, z3, np.eye(3), (1,),
+                          S=deadreckon_basis(t, fg, complementary_heading(log, fg)[0]))[0]
+    runs = []; i = 0
+    while i < n:
+        if gm[i]:
+            a = i
+            while i < n and gm[i]:
+                i += 1
+            runs.append((a, i))
+        else:
+            i += 1
+    rows = [dict(a=a, b=b, man=math.degrees(abs(psi_full[b - 1] - psi_full[a])),
+                 ctrl=float(G.rmse3(ctrl[a:b], fixes[a:b])),
+                 fus=float(G.rmse3(fus[a:b], fixes[a:b]))) for a, b in runs]
+    straight = [r for r in rows if r["man"] < turn_deg]
+    turns = [r for r in rows if r["man"] >= turn_deg]
+
+    def mean(g, k):
+        return float(np.mean([r[k] for r in g])) if g else float("nan")
+    best = max(turns, key=lambda r: r["ctrl"] - r["fus"]) if turns else None
+    return dict(n_straight=len(straight), n_turn=len(turns),
+                straight=(mean(straight, "ctrl"), mean(straight, "fus")),
+                turn=(mean(turns, "ctrl"), mean(turns, "fus")),
+                best=best, ctrl=ctrl, fus=fus)
+
+
+def load_comma_enu(path):
+    """Load the compact comma2k19 demo ENU CSV (``data/comma2k19_demo_enu.csv``; see its provenance
+    header). Public CA-280 highway: raw ublox live GNSS (~5 Hz) + comma's ``global_pose`` dm-truth,
+    both in per-segment local ENU metres with the constant ublox<->pose datum offset removed. This
+    is the ONE thing our no-RTK rig lacks -- absolute ground truth -- so it turns the rig's forecast/
+    coast *proxies* into real E1/E2 error. Returns a list of segments ``{seg, t, raw(Nx3, z=0),
+    truth(Nx3, z=0), n}`` (the trailing z lets the backend trackers, which expect ENU, run as-is)."""
+    rows = [r for r in csv.reader(open(path)) if r and not r[0].startswith("#")]
+    ix = {k: i for i, k in enumerate(rows[0])}
+    by_seg = {}
+    for r in rows[1:]:
+        by_seg.setdefault(int(r[ix["seg"]]), []).append(r)
+    segs = []
+    for s in sorted(by_seg):
+        rs = by_seg[s]
+        t = np.array([float(r[ix["t"]]) for r in rs])
+        raw = np.array([[float(r[ix["raw_e"]]), float(r[ix["raw_n"]]), 0.0] for r in rs])
+        tru = np.array([[float(r[ix["truth_e"]]), float(r[ix["truth_n"]]), 0.0] for r in rs])
+        segs.append(dict(seg=s, t=t, raw=raw, truth=tru, n=len(t)))
+    return segs
+
+
+def comma_bench(segs, *, horizons=(5, 10), gaps=(15, 25), glitch_thr=8.0):
+    """dtfit LSI-cubic (CV-coast) vs Kalman-CA on the comma2k19 segments, scored against ABSOLUTE
+    dm-truth -- the real E1 (forecast) and E2 (coast) the rig can only proxy without RTK. Metrics are
+    fix-weighted over segments. Also scans for ORGANIC multipath (raw-vs-truth deviations, no
+    injection). Returns dataset stats + ``forecast[H]=(dtfit,kalman)``, ``coast[gap]=(dtfit,kalman)``
+    and the glitch count above ``glitch_thr`` m."""
+    def rms2(a, b):
+        m = ~np.isnan(a[:, 0]); m[:WARM] = False
+        return float(np.sqrt(np.mean(np.sum((a[m, :2] - b[m, :2]) ** 2, axis=1)))) if m.any() else float("nan")
+    w = np.array([s["n"] for s in segs], float)
+    wm = lambda x: float(np.average(x, weights=w))
+    res = np.concatenate([np.linalg.norm(s["raw"][:, :2] - s["truth"][:, :2], axis=1) for s in segs])
+    path = sum(float(np.sum(np.linalg.norm(np.diff(s["truth"][:, :2], axis=0), axis=1))) for s in segs)
+    dur = sum(float(s["t"][-1]) for s in segs)
+    fc = {}
+    for H in horizons:
+        d = [rms2(G.dtfit_track(s["t"], s["raw"], (H,), kind="lsi", coast=True)[1][H], s["truth"]) for s in segs]
+        k = [rms2(G.kalman_track(s["t"], s["raw"], (H,))[1][H], s["truth"]) for s in segs]
+        fc[H] = (wm(d), wm(k))
+    co = {}
+    for gap in gaps:
+        d, k = [], []
+        for s in segs:
+            gm = _gap_mask(s["n"], gap=gap); fg = s["raw"].copy(); fg[gm] = np.nan
+            if not gm.any():
+                continue
+            d.append(rms2(G.dtfit_track(s["t"], fg, (1,), kind="lsi", coast=True)[0][gm], s["truth"][gm]))
+            k.append(rms2(G.kalman_track(s["t"], fg, (1,))[0][gm], s["truth"][gm]))
+        co[gap] = (float(np.mean(d)), float(np.mean(k)))
+    return dict(n_seg=len(segs), n_fix=int(w.sum()), path_km=path / 1000.0,
+                avg_kmph=path / dur * 3.6, raw_med=float(np.median(res)),
+                raw_p95=float(np.percentile(res, 95)), raw_max=float(res.max()),
+                forecast=fc, coast=co, n_glitch=int((res > glitch_thr).sum()), glitch_thr=glitch_thr)
+
+
+def load_urbannav_enu(path):
+    """Load the UrbanNav Medium-Urban (TST) organic-multipath CSV (``data/urbannav_tst_enu.csv``; see
+    its provenance header). Deep-ish HK urban canyon: three receivers' raw NMEA GGA fixes (a clean
+    dual-freq ublox F9P, a phone, and a severe single-freq M8T ~ our rig's NEO-M8N class) vs the
+    SPAN-CPT dm-truth, in local ENU + the receiver-reported HDOP. This is *organic* multipath -- no
+    injection. Returns ``{recv: {t, raw(Nx3, z=0), truth(Nx3, z=0), hdop, n}}``."""
+    rows = [r for r in csv.reader(open(path)) if r and not r[0].startswith("#")]
+    ix = {k: i for i, k in enumerate(rows[0])}
+    by = {}
+    for r in rows[1:]:
+        by.setdefault(r[ix["recv"]], []).append(r)
+    out = {}
+    for recv, rs in by.items():
+        t = np.array([float(r[ix["t"]]) for r in rs])
+        raw = np.array([[float(r[ix["raw_e"]]), float(r[ix["raw_n"]]), 0.0] for r in rs])
+        tru = np.array([[float(r[ix["truth_e"]]), float(r[ix["truth_n"]]), 0.0] for r in rs])
+        hd = np.array([float(r[ix["hdop"]]) for r in rs])
+        out[recv] = dict(t=t - t[0], raw=raw, truth=tru, hdop=hd, n=len(t))
+    return out
+
+
+def urbannav_e3(data, *, spike_thr=15.0):
+    """Organic E3 on UrbanNav, and the honest bound on the robustness claim. For each receiver:
+    (1) the quality gradient -- horizontal error vs SPAN truth (median / p95 / max); (2) whether a
+    robust POINTWISE filter rescues the multipath -- raw vs dtfit-robust (winsorized integral) vs
+    Kalman-CA at the organic spike epochs (raw error > ``spike_thr`` m); and (3) ``n_iso``, spikes
+    that are *isolated* (both neighbours < 8 m). Real urban NLOS is SUSTAINED (n_iso ~ 0), so no
+    per-axis filter helps -- the robust win is scoped to isolated outliers (the rig's injected E3),
+    and the urban regime is a tight-coupling / 3D-map problem. Returns per-receiver stats."""
+    def rms(a, b, m):
+        ok = ~np.isnan(a[:, 0]) & m
+        return float(np.sqrt(np.mean(np.sum((a[ok, :2] - b[ok, :2]) ** 2, axis=1)))) if ok.any() else float("nan")
+    out = {}
+    for recv, d in data.items():
+        t, raw, tru = d["t"], d["raw"], d["truth"]
+        err = np.hypot(raw[:, 0] - tru[:, 0], raw[:, 1] - tru[:, 1])
+        sp = err > spike_thr
+        iso = int(sum(1 for k in np.where(sp)[0]
+                      if 0 < k < len(err) - 1 and err[k - 1] < 8 and err[k + 1] < 8))
+        rob = G.dtfit_track(t, raw, (1,), kind="lsi", robust=True)[0]
+        kal = G.kalman_track(t, raw, (1,))[0]
+        out[recv] = dict(n=d["n"], med=float(np.median(err)), p95=float(np.percentile(err, 95)),
+                         mx=float(err.max()), n_spike=int(sp.sum()), n_iso=iso,
+                         raw_sp=rms(raw, tru, sp), rob_sp=rms(rob, tru, sp), kal_sp=rms(kal, tru, sp))
+    return out
 
 
 if __name__ == "__main__":

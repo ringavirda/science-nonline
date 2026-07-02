@@ -189,4 +189,4 @@ papers/
 scripts/paperkit.py
 scripts/build_paper_*.py
 packages/dtfit-experimental/src/dtfit_experimental/experiments/domains/realtime_gps/data
-packages/dtfit-experimental/src/dtfit_experimental/experiments/domains/realtime_gps_hw/data
+packages/dtfit-hardware/src/dtfit_hardware/data

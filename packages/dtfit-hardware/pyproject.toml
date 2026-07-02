@@ -1,0 +1,84 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dtfit-hardware"
+version = "0.1.0"
+description = "Real-silicon rig for the dtfit streaming filters: Arduino firmware, host telemetry link, and a phone-side BLE monitor (depends on dtfit-experimental)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Oleksandr Tuhanskykh", email = "ringanaro@gmail.com" }]
+keywords = ["embedded", "gps", "imu", "bluetooth", "arduino", "differential-transformations"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Mathematics",
+]
+# The rig reproduces the simulated ``realtime_gps`` study on real hardware, so it
+# scores captured logs against that domain's backend (hence the dependency on
+# dtfit-experimental, which transitively pulls dtfit). pyserial/bleak are the
+# USB + BLE links to the board and are core here (unlike in dtfit-experimental,
+# where they were an optional ``rig`` extra). The Arduino CLI/toolchain is
+# provided by the Arduino IDE install, not pip; the phone app is built with yarn.
+dependencies = [
+    "dtfit-experimental",
+    "pyserial>=3.5",
+    "bleak>=0.21",
+    "numpy>=1.24",
+]
+
+[project.optional-dependencies]
+# Plotting for the report notebook (report figures + the log comparison harness).
+bench = ["matplotlib>=3.7", "pandas>=2.0"]
+dev = ["pytest>=7", "pytest-cov>=4", "ruff>=0.4", "mypy>=1.8"]
+
+[project.urls]
+Homepage = "https://github.com/ringavirda/science-pylab"
+Repository = "https://github.com/ringavirda/science-pylab"
+Issues = "https://github.com/ringavirda/science-pylab/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+# Ship the Arduino sketches, host tools and captured datasets with the package.
+dtfit_hardware = [
+    "firmware/**/*",
+    "tools/**/*",
+    "data/**/*.csv",
+]
+
+[tool.ruff]
+line-length = 79
+target-version = "py310"
+# The phone app is a JS/TS project with its own tooling; never lint it as Python.
+extend-exclude = ["mobile"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401", "F403"]  # star re-exports are intentional
+# Host-glue / rig scripts: allow compact one-line setup (`a(); b()`), a script
+# convention only -- mirrors dtfit-experimental's experiments tree.
+"src/dtfit_hardware/**" = ["E702"]
+# The report notebook imports after a markdown/setup cell (E402) and uses short
+# throwaway names / compact control flow in plotting (E701/E741/E731).
+"src/dtfit_hardware/**/*.ipynb" = ["E402", "E701", "E741", "E731"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.mypy]
+# This package is host-glue driving real silicon (serial/BLE I/O, no library
+# API surface) plus a research notebook -- like dtfit-experimental's experiments
+# tree, it is ruff-linted but not type-gated. Only the package shell is checked.
+files = ["src/dtfit_hardware/__init__.py"]
+ignore_missing_imports = true
+
+[tool.coverage.run]
+source = ["dtfit_hardware"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true

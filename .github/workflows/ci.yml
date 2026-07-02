@@ -35,10 +35,11 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
 
-      - name: Install both packages (with viz + dev extras)
+      - name: Install all three packages (with viz + dev extras)
         run: |
           pip install -e "packages/dtfit[viz,dev]"
           pip install -e "packages/dtfit-experimental[dev]"
+          pip install -e "packages/dtfit-hardware[dev]"
 
       # The optional C kernels need clang; only the Linux runner builds them.
       # Windows/macOS deliberately run on the NumPy/SciPy fallback, so CI also
@@ -78,6 +79,15 @@ jobs:
           mypy --python-version ${{ matrix.python-version }}
           pytest
         working-directory: packages/dtfit-experimental
+
+      # Host-glue driving real silicon: no board in CI, so this only checks the
+      # package imports, ships its firmware, and the shell type-checks (mypy is
+      # scoped to __init__.py -- the serial/BLE modules are not type-gated).
+      - name: Type check + test — dtfit-hardware
+        run: |
+          mypy --python-version ${{ matrix.python-version }}
+          pytest
+        working-directory: packages/dtfit-hardware
 
       # Publish the coverage report once (one OS/interpreter) as a build
       # artifact, so the number is visible/trendable without an external service.

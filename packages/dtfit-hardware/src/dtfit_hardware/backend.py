@@ -44,14 +44,21 @@ BLE_TELE_UUID = "9a1e0001-1b2c-4f3a-8d5e-6f7a8b9c0d10"
 BLE_CSV_HEADER = (
     "t_ms,sats,fix,lat,lon,alt_m,hdop,spd_kmph,ax,ay,az,gx,gy,gz"
 )
-# nano_lsi_log emits a wider record: raw fix + IMU, then the on-MCU float32 LSI
+# nano_lsi_log (v4) emits a wider record: raw fix + IMU, then the on-MCU float32 LSI
 # estimate + 1 s forecast (est_lat/est_lon/fc_*, computed in local-ENU metres so
 # float32 stays well-conditioned), the IMU-adaptive ``mode`` (0 = still/ZUPT degree-0,
-# 1 = moving/degree-1), and the per-update cost (us). The PC scores the float32 est_*
-# columns against a float64 LSI replayed on the raw lat/lon.
+# 1 = moving/degree-1), the per-update cost (us), the high-rate on-MCU heading block
+# (``hdg_deg`` on-MCU COMPLEMENTARY-cleaned heading -- gyro integrated at high rate but
+# slow-anchored to the GPS course so it is drift-free live (v7; was the raw integrator
+# pre-v7); ``dhdg_deg`` the RAW gravity-aligned yaw increment since the last emit (the
+# alias-free increment the host dead-reckons on; cumsum recovers the raw heading),
+# ``imu_hz`` samples integrated this interval,
+# ``newfix`` 1 on a fresh GPS fix / 0 on a between-fix high-rate sample), and ``sd``
+# (0/1 -- write+sync health, so the untethered phone can show REC / NO SD). The PC scores
+# the float32 est_* columns against a float64 LSI replayed on the raw lat/lon.
 BLE_CSV_HEADER_LSI = (
     "t_ms,sats,fix,lat,lon,alt_m,hdop,spd_kmph,ax,ay,az,gx,gy,gz,mx,my,mz,"
-    "est_lat,est_lon,fc_lat,fc_lon,mode,cost_us"
+    "est_lat,est_lon,fc_lat,fc_lon,mode,cost_us,hdg_deg,dhdg_deg,imu_hz,newfix,sd"
 )
 
 HERE = Path(__file__).resolve().parent

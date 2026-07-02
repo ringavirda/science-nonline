@@ -37,10 +37,9 @@ bench = ["matplotlib>=3.7", "torch>=2.2", "statsmodels>=0.14", "pandas>=2.0"]
 # (e.g. a Blackwell / RTX 50-series box), cupy-cuda12x for CUDA 12. Install
 # explicitly, e.g. `pip install cupy-cuda13x`; not pinned here.
 gpu = ["cupy-cuda13x>=14.0"]
-# Hardware rig (experiments .../domains/realtime_gps_hw): the USB-serial link to
-# the Arduino Nano 33 BLE. The Arduino CLI/toolchain is provided by the Arduino
-# IDE install, not pip. See that domain's README for the firmware side.
-rig = ["pyserial>=3.5", "bleak>=0.21"]
+# The hardware rig (Arduino firmware, USB/BLE host link, phone app) now lives in
+# the separate ``dtfit-hardware`` package -- see packages/dtfit-hardware. Its
+# pyserial/bleak links are core deps there, not an extra here.
 dev = ["pytest>=7", "pytest-cov>=4", "ruff>=0.4", "mypy>=1.8"]
 
 [project.urls]
