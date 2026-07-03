@@ -155,7 +155,16 @@ def cross_check() -> float:
 
 # --- C header emission ----------------------------------------------------- #
 def _fc(v: float) -> str:
-    """Format a float as a valid C float literal (always decimal or exponent)."""
+    """Format a float as a valid C float literal (always decimal or exponent).
+
+    Values with ``|v| < 1e-12`` -- projection entries that are analytically zero
+    but carry platform-dependent ~1e-17 floating-point roundoff (they differ
+    across BLAS / NumPy builds) -- are snapped to ``0.0`` so the emitted tables
+    are byte-deterministic across machines. Without this the checked-in-tables
+    sync test is flaky (and the firmware ships meaningless 1e-17 noise).
+    """
+    if abs(v) < 1e-12:
+        v = 0.0
     s = f"{v:.9g}"
     if not any(c in s for c in ".eE"):
         s += ".0"          # "1" -> "1.0" so the 'f' suffix is valid C++
