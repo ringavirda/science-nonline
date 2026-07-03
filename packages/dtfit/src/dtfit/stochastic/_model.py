@@ -158,7 +158,14 @@ class StochasticModel:
             var = (self.sigma ** 2) * (1.0 - self.ar1_phi ** (2 * steps)) \
                 / (1.0 - self.ar1_phi ** 2)
         elif name.startswith(("random walk", "drift")):
-            var = (self.sigma_walk ** 2) * steps
+            if self.has_long_memory and 0.5 < self.hurst < 1.0:
+                # Long memory forecasts as a random walk, but its h-step
+                # forecast-error variance grows as h^(2H) (2H > 1), which the
+                # plain sigma^2 * h random-walk band under-covers. Widen it to
+                # h^(2H) so the band matches the documented long-memory growth.
+                var = (self.sigma_walk ** 2) * steps ** (2.0 * self.hurst)
+            else:
+                var = (self.sigma_walk ** 2) * steps
         else:
             # Deterministic-mean forecasters (trend / seasonal / trend+seasonal,
             # incl. the "(anchored)" variants): the residual around the fitted

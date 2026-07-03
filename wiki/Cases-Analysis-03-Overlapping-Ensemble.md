@@ -1,11 +1,14 @@
 # #3 -- Overlapping-window ensemble + robust aggregation
 
-**Verdict: EXPERIMENTAL -- partial.** Helps EAC at *low* outlier rates, but its
-aggregation breaks down once many windows are corrupted, and plain **LSI is both
-simpler and more robust**. Does not clear the promotion gate.
+**Verdict: PROMOTED as `dtfit.ensemble_fit` -- a specialized tool.** It ships in
+stable `dtfit` as the whole-window-rejection complement to `fit_eac`'s in-fit
+robust loss: the route that stays stable where the robust loss diverges. Read it as
+a specialist, not a default -- it helps EAC at *low* outlier rates, but its
+aggregation breaks down once *many* overlapping windows are corrupted, and plain
+**LSI is both simpler and more robust** at high contamination.
 
-Source: `../../src/dtfit/adaptations/ensemble.py`.
-Tested in: [Noise & robustness (3)](Case-03-Noise-Robustness).
+Source: [`methods/_ensemble.py`](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit/src/dtfit/methods/_ensemble.py).
+Tested in: [Noise & robustness (3)](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit-experimental/src/dtfit_experimental/experiments/cases/03_noise_robustness/03_noise_robustness.ipynb).
 
 ## What it is
 
@@ -38,7 +41,7 @@ The soft-L1 robust-loss variant tracked stock EAC (little benefit).
 - **LSI alone holds R^2 ~= 0.92 at 20%** -- better than the ensemble at every
   contaminated row, with none of the extra machinery.
 
-## Why it's only partial (the mechanism)
+## Why it is a specialist, not a general default (the mechanism)
 
 The ensemble's robustness is governed by a **breakdown point**, and the geometry
 of overlapping windows pushes that breakdown point *lower*, not higher:
@@ -80,4 +83,4 @@ outliers), which is the worst case for any voting/median scheme.
 ## Related
 
 - The reliable robustness route is LSI's built-in prefilter -- see the
-  [noise report](Case-03-Noise-Robustness) "Reading it".
+  [noise report](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit-experimental/src/dtfit_experimental/experiments/cases/03_noise_robustness/03_noise_robustness.ipynb) "Reading it".

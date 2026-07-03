@@ -4,10 +4,10 @@
 power.** It lets dtfit *express* periodic/decay models cleanly, but on the tested
 data it did not improve accuracy, and on the LTSF benchmark it was a net **loss**.
 
-Source: `../../src/dtfit/adaptations/basis_lsi.py`,
-`_spectral.py`.
-Tested in: [Forecasting (4)](Case-04-Realworld-Forecasting),
-[LTSF (6)](Case-06-Benchmark-LTSF).
+Source: [`basis_lsi.py`](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit-experimental/src/dtfit_experimental/basis_lsi.py) (experimental),
+[`_core/_spectral.py`](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit/src/dtfit/_core/_spectral.py).
+Tested in: [Forecasting (4)](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit-experimental/src/dtfit_experimental/experiments/cases/04_realworld_forecasting/04_realworld_forecasting.ipynb),
+[LTSF (6)](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit-experimental/src/dtfit_experimental/experiments/cases/06_benchmark_ltsf/06_benchmark_ltsf.ipynb).
 
 ## What it is
 
@@ -87,7 +87,7 @@ regime where learned models (LSTM/ARIMA) that pool the whole history win.
 ## Related
 
 - The LTSF reframe that quantified the failure is in
-  [the LTSF report](Case-06-Benchmark-LTSF); the gap to deep models there
+  [the LTSF report](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit-experimental/src/dtfit_experimental/experiments/cases/06_benchmark_ltsf/06_benchmark_ltsf.ipynb); the gap to deep models there
   is global structure, not noise.
 - Contrast with [#5 boosting](Cases-Analysis-05-Stagewise-Boosting), which *did* win on a
   trend+season series -- because it matched the **additive generative structure**,

@@ -1,11 +1,12 @@
 # #6 -- Adaptive / multi-resolution EAC windows
 
-**Verdict: EXPERIMENTAL -- works on its niche, under-tested.** Recovers
-localized-transient parameters that equal-span windows smear, but only one signal
-class has been demonstrated, so the evidence base is too narrow to promote.
+**Verdict: PROMOTED as `dtfit.fit_eac(window_mode="curvature")`.** Recovers
+localized-transient parameters that equal-span windows smear; folded into the
+stable `fit_eac` as its `window_mode="curvature"` path (there is **no** separate
+`fit_eac_adaptive` symbol), domain-validated on transients/peaks.
 
-Source: `../../src/dtfit/adaptations/multiresolution.py`.
-Tested in: [Noise & robustness (3)](Case-03-Noise-Robustness) (transient class).
+Source: [`methods/_eac.py`](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit/src/dtfit/methods/_eac.py) (the `window_mode="curvature"` path of `fit_eac`).
+Tested in: [Noise & robustness (3)](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit-experimental/src/dtfit_experimental/experiments/cases/03_noise_robustness/03_noise_robustness.ipynb) (transient class).
 
 ## What it is
 
@@ -47,14 +48,14 @@ rate is concentrated in the **high-curvature region** -- the fast initial bend o
 In effect it aligns the **measurement grid with the Fisher information** of the
 problem -- the windows that most constrain the parameters get the most resolution.
 
-## Why it isn't promoted
+## What promotion rests on (and what remains)
 
-Only one transient class has been tested. The mechanism is sound and the result is
-clean, but "works on one saturating exponential" is not enough evidence that
-adaptive placement generalises -- it could equally be tuned to this case. A proper
-evaluation would sweep several transient/multi-scale families (step+settle,
-multi-rate decay, a localized bump on a slow background) and compare adaptive vs
-equal-span EAC *and* vs LSI across them.
+It is now the `window_mode="curvature"` path of the stable `fit_eac`, domain-validated
+on localized transients/peaks -- the mechanism is sound and the result is clean. The
+honest remaining gap: most of the demonstrated evidence is the saturating-exponential
+class, so the case would be hardened further by sweeping several transient/multi-scale
+families (step+settle, multi-rate decay, a localized bump on a slow background) and
+comparing adaptive vs equal-span EAC *and* vs LSI across them.
 
 ## When it would help / when it wouldn't
 

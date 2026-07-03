@@ -8,6 +8,7 @@ from __future__ import annotations
 from typing import Callable
 
 import numpy as np
+from scipy.signal import lfilter
 
 # A standardized (unit-variance) innovation draw: ``noise(rng, size) -> ndarray``.
 Noise = Callable[[np.random.Generator, int], np.ndarray]
@@ -38,10 +39,13 @@ def _sim_ar1(n: int, phi: float, sigma: float, rng: np.random.Generator,
         noise = make_innovations()
     phi = float(np.clip(phi, -0.999, 0.999))
     e = noise(rng, n + burn) * float(sigma)
-    x = np.empty(n + burn)
-    x[0] = e[0] / np.sqrt(max(1e-9, 1.0 - phi ** 2))
-    for tt in range(1, n + burn):
-        x[tt] = phi * x[tt - 1] + e[tt]
+    # AR(1) is a linear recurrence x_t = phi x_{t-1} + e_t, so a single IIR pass
+    # (scipy.signal.lfilter) replaces the Python loop. The initial filter state is
+    # chosen so x_0 = e_0 / sqrt(1 - phi^2) -- the stationary start (no transient)
+    # the loop used -- making the vectorized path bit-identical to it.
+    denom = np.sqrt(max(1e-9, 1.0 - phi ** 2))
+    zi = [float(e[0]) * (1.0 / denom - 1.0)]
+    x, _ = lfilter([1.0], [1.0, -phi], e, zi=zi)
     return x[burn:]
 
 

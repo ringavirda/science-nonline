@@ -199,7 +199,11 @@ class StochasticFilter:
         if abs(c) >= 1.0:
             return float("nan")
         per = float(2.0 * np.pi / np.arccos(c))
-        return per if 2.0 <= per <= 2.0 * self.nlags else float("nan")
+        # Same resolvable-cycle window as snapshot()'s "cyclical" label: at least
+        # ~4 samples per period, and at least one full period inside the lag
+        # window. Outside it the period is unresolved -> NaN (so params_ and the
+        # regime label never disagree).
+        return per if 4.0 <= per <= self.nlags else float("nan")
 
     # -- detector ----------------------------------------------------------- #
     def _rho1(self) -> float:
@@ -258,7 +262,7 @@ class StochasticFilter:
         per = p["cycle_period"]
         if p["sigma"] < 1e-9:
             regime = "white noise"
-        elif np.isfinite(per) and 4 <= per <= self.nlags:
+        elif np.isfinite(per):  # _cycle_period already restricts to 4..nlags
             regime = "cyclical"
         elif p["ar1_phi"] > 0.2:
             regime = "mean-reverting"

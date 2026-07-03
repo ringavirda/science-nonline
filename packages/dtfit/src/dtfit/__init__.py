@@ -29,15 +29,19 @@ Streaming (online, partial_fit):
     EACFilter / LSIFilter: real-time parameter trackers (streaming twins of
         fit_eac / fit_lsi); start from the ``.tracking()`` / ``.robust()``
         presets. FilterBank / FusedChiSquareDetector drive many streams at once.
-        InformationFilter: the inverse-covariance (information-form) linear
-        primitive -- additive, associative fusion (add information) and an
-        n_params-sized readout, for embedded / sensor-fusion use.
 
 Scale (same methods, run big):
     PartitionedLSI / PartitionedEAC / PartitionedBatchLSI (one-pass / distributed
         map-reduce), fit_lsi_batched (GEMM-batched multi-channel), fit_many
         (process/thread fan-out). The low-level project_spectra primitive lives
         under ``dtfit.scale``.
+
+Stochastic series (genuinely random data -- economic / financial series):
+    fit_stochastic / StochasticModel / Stochastic: fit the deterministic
+        *functionals* of a random process (autocovariance, spectrum, trend/cycle)
+        to characterize, forecast and generate it (pick structure via the
+        ``Stochastic`` model, or call ``fit_stochastic`` directly).
+        StochasticFilter tracks that structure online. See ``dtfit.stochastic``.
 
 Result type:
     FittingResult: the self-describing fitted-model result -- named parameters,
@@ -73,7 +77,6 @@ from dtfit.streaming import (
     LSIFilter,
     FilterBank,
     FusedChiSquareDetector,
-    InformationFilter,
 )
 from dtfit.scale._parallel import fit_many, FittingProblem
 # Promoted after the experiment suite validated them across the big-data and
@@ -114,7 +117,6 @@ __all__ = [
     "LSIFilter",
     "FilterBank",
     "FusedChiSquareDetector",
-    "InformationFilter",
     "PartitionedLSI",
     "PartitionedEAC",
     "PartitionedBatchLSI",

@@ -141,17 +141,20 @@ def _imu(log):
     # (R0 @ w)[2] is the component of body rate w about world up. Feeds gyro_gated_basis
     # and ekf_track (both previously used the raw-z yaw).
     yaw = (R0 @ (gyro - gbias0).T).T[:, 2]
-    # Prefer the on-MCU high-rate heading when the v4 firmware logs it: hdg_deg is integrated
-    # at ~100 Hz on-chip (gravity-aligned), so it does not alias the way one 1 Hz gyro sample
-    # per second does. Consume it as an equivalent yaw *rate* (d(heading)/dt) so gyro_gated_basis
-    # and ekf_track are unchanged. Falls back to the gravity-aligned gyro_z above when absent.
-    hdg = log.get("hdg_deg")
-    if hdg is not None and len(hdg) == len(gyro) and np.isfinite(hdg).all():
+    # Prefer the on-MCU RAW yaw increment (``dhdg_deg``, v4+): it is the alias-free,
+    # gravity-aligned per-emit heading delta the host dead-reckons on, integrated at high
+    # rate on-chip so it does not alias the way one gyro sample per second does. Crucially it
+    # is *not* the GPS-course-anchored ``hdg_deg`` -- feeding that cleaned heading into the
+    # "gyro" fusion would leak the GPS course (incl. metric [B]'s held-out fixes, which the
+    # on-chip anchor still saw) into the dead-reckoning. ``hdg_deg`` is reserved for
+    # reporting/plots. Consumed as a yaw *rate* (increment / dt) so gyro_gated_basis and
+    # ekf_track are unchanged; falls back to the gravity-aligned gyro_z above when absent.
+    dhdg = log.get("dhdg_deg")
+    if dhdg is not None and len(dhdg) == len(gyro) and np.isfinite(dhdg).all():
         t = log["t"]
-        u = np.unwrap(np.radians(hdg))
         dt = np.diff(t, prepend=t[0] - 1.0)
         dt[dt <= 0] = 1.0
-        yaw = np.diff(u, prepend=u[0]) / dt
+        yaw = np.radians(np.asarray(dhdg, float)) / dt
     return dict(gyro=gyro, accel=accel, R0=R0, gbias0=gbias0, abias0=abias0,
                 rest=rest, yaw=yaw)
 
@@ -257,7 +260,8 @@ def gyro_gated_basis(t, fixes, imu, *, tau=4.0, gbias_relax=0.01,
     psi = 0.0; gb = 0.0; s = np.zeros(2); last_speed = 0.0
     for i in range(m):
         dt = (t[i] - t[i - 1]) if i > 0 else (t[1] - t[0] if m > 1 else 1.0)
-        dt = min(max(float(dt), 1e-3), 5.0); a = dt / tau
+        dt = min(max(float(dt), 1e-3), 5.0)
+        a = min(dt / tau, 1.0)                        # clamp: a>1 on a >tau gap would sign-flip the washout
         if rest[i]:                                   # ZUPT on the yaw-rate bias
             gb = (1 - gbias_relax) * gb + gbias_relax * yaw_rate[i]
         psi += (yaw_rate[i] - gb) * dt
@@ -316,12 +320,14 @@ def _gap_mask(n, gap=15, period=80):
 
 def _cv_replay(t, fixes_en, rest=None):
     """Float64 replay of the *on-MCU* model for the precision diff: per-axis **degree-1**
-    LSI (``c0 + c1*t``), window 15, ZUPT-adaptive -- i.e. exactly what ``nano_lsi_log``
-    computes on-chip (NOT the cubic GPS-only tracker). Matching the model is what makes
-    ``[C]`` isolate float32-vs-float64; a cubic replay instead measures the model gap and
-    grossly overstates the 'precision drop'. The rigorous bit-faithful E5 is the
-    golden-vector test in ``tools/embed_lsi.py`` (<=3e-5 deg); this is the on-run sanity
-    number on the same fixes the rig actually saw. ``rest`` (the on-MCU rest mask) applies
+    LSI (``c0 + c1*t``), window 15, ZUPT-adaptive -- i.e. **approximately** what
+    ``nano_lsi_log`` computes on-chip (NOT the cubic GPS-only tracker). It matches the
+    on-chip window and degree, but the Legendre spectral ``order`` here (4) differs from the
+    firmware's (5) and it cannot reproduce the exact on-chip warmup / glitch / ENU-origin
+    state, so ``[C]`` is a *coarse* float32-vs-float64 sanity number (a cubic replay instead
+    would measure the model gap and grossly overstate the 'precision drop'). The rigorous
+    bit-faithful E5 is the golden-vector test in ``tools/embed_lsi.py`` (<=3e-5 deg); this is
+    the on-run sanity number on the same fixes the rig actually saw. ``rest`` (the on-MCU rest mask) applies
     the same zero-velocity update: while still, hold the estimate (degree-0), as the chip
     does, so the diff is not polluted by the PC model tracking GPS jitter the chip froze."""
     m = len(t)
@@ -706,7 +712,8 @@ def deadreckon_basis(t, fixes, psi, *, tau=4.0):
     No accelerometer: its double integration is hopeless on a vibrating mount."""
     n = len(fixes); S = np.zeros((n, 3)); s = np.zeros(2); last = 0.0
     for i in range(n):
-        dt = min(max(float(t[i] - t[i - 1]) if i > 0 else 0.2, 1e-3), 5.0); a = dt / tau
+        dt = min(max(float(t[i] - t[i - 1]) if i > 0 else 0.2, 1e-3), 5.0)
+        a = min(dt / tau, 1.0)                        # clamp: a>1 on a >tau gap would sign-flip the washout
         if i > 0 and not np.any(np.isnan(fixes[i])) and not np.any(np.isnan(fixes[i - 1])):
             last = float(np.linalg.norm(fixes[i, :2] - fixes[i - 1, :2])) / dt
         s = (1 - a) * s + last * np.array([math.cos(psi[i]), math.sin(psi[i])]) * dt
@@ -783,7 +790,9 @@ def comma_bench(segs, *, horizons=(5, 10), gaps=(15, 25), glitch_thr=8.0):
         m = ~np.isnan(a[:, 0]); m[:WARM] = False
         return float(np.sqrt(np.mean(np.sum((a[m, :2] - b[m, :2]) ** 2, axis=1)))) if m.any() else float("nan")
     w = np.array([s["n"] for s in segs], float)
-    wm = lambda x: float(np.average(x, weights=w))
+
+    def wm(x):
+        return float(np.average(x, weights=w))
     res = np.concatenate([np.linalg.norm(s["raw"][:, :2] - s["truth"][:, :2], axis=1) for s in segs])
     path = sum(float(np.sum(np.linalg.norm(np.diff(s["truth"][:, :2], axis=0), axis=1))) for s in segs)
     dur = sum(float(s["t"][-1]) for s in segs)

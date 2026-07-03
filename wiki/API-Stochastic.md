@@ -195,7 +195,10 @@ low false-alarm rate. Flat memory, bounded per-sample cost.
 
 **Methods & attributes**
 
-- `update(x) -> self` -- ingest one sample. `partial_fit(xs)` ingests a batch.
+- `update(x) -> self` -- ingest one sample. `partial_fit(xs)` ingests a **batch**
+  (an array of samples, looped through `update`) -- note this differs from
+  [`EACFilter` / `LSIFilter`](API-Streaming), whose `partial_fit` takes a **single**
+  sample.
 - `params_ -> dict` -- current `{level, sigma, ar1_phi, cycle_period, vol_persistence, n}`.
 - `snapshot() -> dict` -- `params_` plus a coarse online `regime` label.
 - `predict(h) -> ndarray` -- forecast `h` steps by AR(1) mean reversion at the snapshot.

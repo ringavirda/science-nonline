@@ -97,6 +97,14 @@ def resolve_backend(name: str = "auto", *, dtype: Any = "float64") -> Backend:
         name = "cupy" if "cupy" in avail else ("torch" if "torch" in avail else "numpy")
     if name == "numpy":
         return _numpy_backend(dtype)
+    if name in ("cupy", "torch") and name not in avail:
+        # Known GPU backend, just not installed/available here: give the same
+        # actionable message as an unknown name rather than a raw ImportError
+        # from deep inside the backend factory.
+        raise ValueError(
+            f"backend {name!r} is not available (install it / a working GPU); "
+            f"available: {avail}"
+        )
     if name == "cupy":
         return _cupy_backend(dtype)  # pragma: no cover - requires a GPU
     if name == "torch":

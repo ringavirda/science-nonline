@@ -67,11 +67,13 @@ production fitter (see [methods-explained.md#dsb](Guides-Methods-Explained#dsb))
   loss on spiky data. It's a specialised tool: on clean data prefer a single fit.
   (For a *single* fit, the self-scaling `fit_eac(..., robust=True)` is the simpler
   outlier defence -- no `f_scale` to tune.)
-- **Streaming with dropouts or multiple sensors?** Use `filter.coast(...)` /
-  `coast_cov` to dead-reckon through measurement gaps (the uncertainty band grows
-  with the gap) instead of freezing or diverging, and `InformationFilter`
-  (additive updates, exact `fuse()`) when you need to combine several estimators
-  or sensors into one state.
+- **Streaming with dropouts?** Use `filter.coast(...)` / `coast_cov` to
+  dead-reckon through measurement gaps (the uncertainty band grows with the gap)
+  instead of freezing or diverging. (For combining several estimators/sensors into
+  one state there is an experimental inverse-covariance `InformationFilter` in
+  `dtfit-experimental` -- additive updates, exact `fuse()` -- but it is not part of
+  the stable streaming surface; see
+  [../experimental/adaptations-api.md](Experimental-Adaptations-API).)
 
 ---
 

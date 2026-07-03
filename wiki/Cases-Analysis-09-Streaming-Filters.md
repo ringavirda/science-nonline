@@ -10,12 +10,12 @@ that does not translate into beating the Kalman. The streaming filter's value is
 real-time/streaming operation, change detection, and a tiny fixed footprint that
 fits a microcontroller (Exp 9) -- not raw accuracy superiority.
 
-Source: `../../src/dtfit/streaming/`
+Source: [`streaming/`](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit/src/dtfit/streaming)
 (`EACFilter`, `LSIFilter`, `FilterBank`).
-Tested in: [Control (1)](Case-01-Control-Systems),
-[Big-data (2)](Case-02-Big-Data-Streaming),
-[GPS (5)](Case-05-GPS-Trajectory),
-[Embedded footprint (9)](Case-09-Embedded-Footprint).
+Tested in: [Control (1)](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit-experimental/src/dtfit_experimental/experiments/cases/01_control_systems/01_control_systems.ipynb),
+[Big-data (2)](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit-experimental/src/dtfit_experimental/experiments/cases/02_big_data_streaming/02_big_data_streaming.ipynb),
+[GPS (5)](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit-experimental/src/dtfit_experimental/experiments/cases/05_gps_trajectory/05_gps_trajectory.ipynb),
+[Embedded footprint (9)](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit-experimental/src/dtfit_experimental/experiments/cases/09_embedded_footprint/09_embedded_footprint.ipynb).
 
 ## What it is
 
@@ -113,9 +113,11 @@ filter's own convergence transient and stays hard -- an honest startup/SNR limit
 
 This is built on two small, reusable library primitives added to both filters:
 `last_residual_` (the exposed one-step innovation) and a public `inflate()`
-(covariance re-arming hook for an external detector). The fused detector itself
-lives in the experiment as a prototype -- demonstrated on one domain, so it has
-**not** cleared the >=2-domain promotion gate.
+(covariance re-arming hook for an external detector). The fused detector itself is
+now a **stable library primitive** -- `dtfit.FusedChiSquareDetector` (in
+`streaming/_bank.py`), constructed via `FilterBank.fused_detector(...)` -- a general
+multi-stream chi^2 change-detector promoted into `dtfit`, even though the *tracking*
+payoff of acting on it was demonstrated on one domain here.
 
 **Does acting on detection help tracking?** Only in a narrow regime -- the most
 important honest finding. A *gentle* covariance nudge (x3) on a flag turns the
@@ -141,7 +143,7 @@ thousand FLOPs per epoch against a 1-10 Hz GPS rate, **compute is never the
 bottleneck** -- memory and float discipline are. Honest caveat: NumPy does not run
 on an MCU, so the per-sample latency (~34 us desktop) is a reference for the
 algorithm shape while the deployable artifact is a hand-coded C recurrence (the
-integration kernels are already C in `dtfit._native`); the memory verdict, which
+integration kernels are already C in `dtfit._core._native`); the memory verdict, which
 usually decides feasibility, is exact.
 
 ### A library robustness bug found along the way (the durable fix)

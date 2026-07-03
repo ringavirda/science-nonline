@@ -135,6 +135,11 @@ class Model:
         p0 = sp0 if p0 is None else p0
         bounds = sb if bounds is None else bounds
         if method == "auto":
+            # A composite (e.g. trend + sine) fits as 'bulk' LSI but still carries
+            # its freq_param: the cycle is resolved by the tight FFT seed the
+            # composed seeder computes on the detrended residual, which is
+            # empirically more robust here than forcing the full oscillatory
+            # recipe (whose raised order can over-fit a trend+cycle spectrum).
             shape = self.shape if self.shape != "composite" else "bulk"
             return auto_estimate(x, y, self.expr, self.var, shape=shape,
                                  freq_param=self.freq_param, p0=p0, bounds=bounds)

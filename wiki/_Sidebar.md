@@ -21,6 +21,7 @@
 - [05 Streaming](Example-05-Streaming)
 - [06 Scaling](Example-06-Scaling)
 - [07 Diagnostics](Example-07-Diagnostics)
+- [08 Stochastic](Example-08-Stochastic)
 
 **API reference**
 

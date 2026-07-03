@@ -285,12 +285,13 @@ def ble_log_csv(
     name: str = BLE_NAME,
     char_uuid: str = BLE_TELE_UUID,
     scan_timeout: float = 15.0,
-    header: str = BLE_CSV_HEADER,
+    header: str = BLE_CSV_HEADER_LSI,
 ) -> Path:
     """Stream BLE telemetry to a CSV (with the firmware's column header).
 
-    Pass ``header=BLE_CSV_HEADER_LSI`` when logging the ``nano_lsi_log`` firmware,
-    whose record adds the on-MCU LSI estimate/forecast/cost columns.
+    Defaults to the ``nano_lsi_log`` (rig) column header, the firmware the rig
+    actually runs. Pass ``header=BLE_CSV_HEADER`` for the plain 14-column
+    ``nano_ble_telemetry`` sketch instead.
     """
     out = Path(path)
     out.parent.mkdir(parents=True, exist_ok=True)

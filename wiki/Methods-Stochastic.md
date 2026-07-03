@@ -81,6 +81,12 @@ seasonal forecast extrapolates the *fitted* trend + seasonal (not the noisy last
 value, which would carry that residual forward as a bias) for a noisy series, while
 a clean strong-trend series keeps the anchored variant -- the backtest decides which.
 
+The confidence band is keyed off the **selected** forecaster rather than the
+detected flags, so its growth matches the point forecast: **bounded** for mean
+reversion, `~sqrt(h)` for a random walk, and the long-memory **`h^(2H)`** band
+(`2H > 1`) when the long-memory forecaster is chosen -- a wider envelope than the
+plain `sigma^2 * h` random-walk band, which would under-cover a long-memory path.
+
 ---
 
 ## The generative model
@@ -118,3 +124,8 @@ once per change, at a low false-alarm rate -- the streaming counterpart of the
 [`FusedChiSquareDetector`](API-Streaming#fused). Memory and per-sample cost are flat
 (independent of the stream length), matching the characteristics of
 [`EACFilter` / `LSIFilter`](Methods-Equal-Areas-Filter).
+
+One API note: `StochasticFilter.partial_fit(xs)` ingests a **batch** of samples (a
+house-style alias for a loop over `update`), unlike the single-sample
+`partial_fit(t, y)` of [`EACFilter` / `LSIFilter`](Methods-Equal-Areas-Filter). Use
+`update(x)` for the true one-at-a-time path.

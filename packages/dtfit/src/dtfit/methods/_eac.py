@@ -352,6 +352,10 @@ def fit_eac(
     echo("EAC fitted coefficients:", coeffs)
 
     cov = _covariance(sol.jac, sol.fun, n)
+    # On the robust path stamp a stable 'robust IRLS' label (matching fit_lsi)
+    # rather than surfacing whichever inner IRLS solver's raw message ran last.
+    converged = True if robust else bool(sol.success)
+    message = "robust IRLS" if robust else str(sol.message)
 
     # Do not lambdify the fitted model here: FittingResult rebuilds it lazily
     # from expr+coeffs on first .model/.predict access (and drops it on pickling
@@ -359,6 +363,6 @@ def fit_eac(
     # read coeffs/cov -- one SymPy lambdify saved per fit.
     return FittingResult(coeffs=coeffs, cov=cov,
                          expr=expr, var=var, names=tuple(str(p) for p in params),
-                         converged=bool(sol.success), message=str(sol.message),
+                         converged=converged, message=message,
                          x_range=(float(np.min(x)), float(np.max(x))))
 

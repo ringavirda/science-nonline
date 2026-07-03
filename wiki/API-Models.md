@@ -49,13 +49,14 @@ seeder unless you override them.
 | `"auto"` (default) | routes by `shape` through [`auto_estimate`](API-Auto#auto_estimate) | yes |
 | `"lsi"` | [`fit_lsi`](API-Fitting#fit_lsi) (passing `freq_param`) | yes |
 | `"eac"` | [`fit_eac`](API-Fitting#fit_eac) | yes (as `(lower, upper)` tuples) |
-| `"adaptive"` | [`fit_eac`](API-Fitting#fit_eac) with `window_mode="curvature"` | **no -- bounds are dropped** |
+| `"adaptive"` | [`fit_eac`](API-Fitting#fit_eac) with `window_mode="curvature"` | yes (as `(lower, upper)` tuples) |
 
-> **Bounds on the `"adaptive"` path.** Unlike `"eac"` (and every other method),
-> `method="adaptive"` forwards only `p0` to [`fit_eac`](API-Fitting#fit_eac) -- the
-> seeded (or explicitly passed) `bounds` are **silently ignored**, so the
-> curvature-window fit is unconstrained. If you need the fit constrained, use
-> `method="eac"` (uniform windows, honours bounds) or apply the bounds another way.
+> **Bounds on the `"adaptive"` path.** Both EAC paths now forward the seeded (or
+> explicitly passed) `bounds` to [`fit_eac`](API-Fitting#fit_eac): `"eac"` (uniform
+> windows) and `"adaptive"` (curvature windows) alike. The curvature path
+> previously dropped them -- a seeded model fit ran unconstrained there -- but the
+> code now honours them, so a self-seeded model's positivity/width guards hold on
+> both paths.
 
 ### `seed(x, y) -> dict`
 The data-driven `{name: (p0, lo, hi)}` seed map (empty if the family has no
@@ -146,6 +147,13 @@ Each constructor accepts no required arguments and reads its parameter ranges of
 the data at `fit` time, so the typical use is a one-liner:
 `models.<family>().fit(x, y)`.
 
+> **Domain requirement (anchored-at-zero families).** Three trend families use an
+> `x`-anchored basis and require the data to start near 0: `sqrt_law`
+> (`a + b*sqrt(x)`, requires `x >= 0`), `logarithmic` (`a + b*log(x + 1)`, requires
+> `x > -1`), and `power_law` (`a*(x + 1)**b`, requires `x > -1`). Their seeders
+> raise `ValueError` if `x` violates the domain -- shift `x` to start at (or above)
+> 0 before fitting these families.
+
 ---
 
 <a name="stochastic"></a>
@@ -204,13 +212,19 @@ the parameters themselves.
 
 ### Cycles need the oscillatory recipe
 
-Recovering a frequency requires the **oscillatory recipe** (smoothing off, order
-raised to resolve the cycle, FFT-seeded frequency). The self-seeding path applies
-it automatically -- `models.sine().fit(x, y)`, `(linear() + sine()).fit(...)`, or
-[`auto_estimate`](API-Auto#auto_estimate) all route oscillatory families through
-it. The **bare** [`NonlineRegressor("...sin...", method="lsi")`](API-Estimator) does
-*not* (its default smoothing + low order erase the cycle); pass `freq_param=` or
-use the model/`auto_estimate` path instead. See the
+Recovering a frequency requires the FFT-seeded frequency. A **pure** oscillatory
+family (`models.sine().fit(x, y)`, `models.damped_oscillation()`, or
+[`auto_estimate`](API-Auto#auto_estimate) with an oscillatory shape) routes through
+the full **oscillatory recipe** (smoothing off, order raised to resolve the cycle,
+FFT-seeded frequency). A **composite** such as `(linear() + sine()).fit(...)` does
+*not* -- it fits as **bulk LSI** and relies on the **tight FFT frequency seed** the
+composed seeder computes on the detrended residual (empirically more robust here
+than forcing the raised-order recipe, which can over-fit a trend+cycle spectrum);
+the cycle is still recovered, just via the seed rather than the recipe. Either way
+the self-seeding path handles the frequency for you. The **bare**
+[`NonlineRegressor("...sin...", method="lsi")`](API-Estimator) does *not* (its
+default smoothing + low order erase the cycle); pass `freq_param=` or use the
+model/`auto_estimate` path instead. See the
 [LSI oscillatory recipe](Methods-LSI#the-oscillatory-recipe).
 
 ### `suggest_models` coverage

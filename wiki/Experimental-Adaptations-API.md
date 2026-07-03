@@ -16,6 +16,7 @@ from dtfit_experimental import (
     fit_lsi_basis,                 # #2 pluggable orthogonal basis
     fit_joint, JointResult,        # #4 joint shared-parameter multi-channel fit
     boosted_fit, BoostedModel,     # #5 stage-wise residual boosting
+    InformationFilter,             # inverse-covariance (info-form) fusion primitive
     available_backends, resolve_backend, Backend,   # array backends
 )
 ```
@@ -23,6 +24,7 @@ from dtfit_experimental import (
 - [`fit_lsi_basis`](#fit_lsi_basis) -- #2 pluggable basis
 - [`fit_joint`](#fit_joint) / [`JointResult`](#jointresult) -- #4 joint fit
 - [`boosted_fit`](#boosted_fit) / [`BoostedModel`](#boostedmodel) -- #5 boosting
+- [`InformationFilter`](#informationfilter) -- inverse-covariance fusion primitive
 - [array backends](#backends) -- `available_backends`, `resolve_backend`, `Backend`
 
 ---
@@ -39,7 +41,7 @@ signal -- fewer coefficients, better conditioning.
 
 ```python
 fit_lsi_basis(data_x, data_y, expr, var, *,
-              basis="fourier", order=5, filter_data=True,
+              basis="fourier", order=5, filter_data=None,
               period=None, bounds=None, p0=None) -> FittingResult
 ```
 
@@ -49,9 +51,9 @@ fit_lsi_basis(data_x, data_y, expr, var, *,
 | `expr`, `var` | -- | model expression and main variable |
 | `basis` | `"fourier"` | `"legendre"` \| `"chebyshev"` \| `"fourier"` \| `"laguerre"` |
 | `order` | `5` | spectral order (number of harmonics `K` for Fourier) |
-| `filter_data` | `True` | Savitzky-Golay pre-smoothing before projection |
+| `filter_data` | `None` | Savitzky-Golay pre-smoothing before projection. `None` (the default) picks per basis: **off** for `"fourier"` (smoothing would erase the very cycle a Fourier basis targets -- the same reason `fit_lsi`'s oscillatory recipe disables it) and **on** for every other basis. Pass an explicit bool to override. |
 | `period` | `None` | fundamental period for Fourier (defaults to the domain length) |
-| `bounds` | `None` | per-parameter `(min, max)` bounds |
+| `bounds` | `None` | per-parameter `(min, max)` bounds; **supplying them switches on `solve_spectral`'s global (differential-evolution) search before the local refine** -- needed for a multimodal fit such as a free frequency |
 | `p0` | `None` | initial guess |
 
 Returns a [`FittingResult`](API-Types) (coefficients, callable model,
@@ -147,6 +149,61 @@ bm = boosted_fit(x, y, [
     {"expr": "A*sin(w*x + p)", "var": "x", "method": "eac"}, # cycle on the residual
 ])
 y_hat = bm.predict(x)
+```
+
+---
+
+<a name="informationfilter"></a>
+## `InformationFilter` -- inverse-covariance fusion primitive
+
+**What it is.** The covariance-form Kalman update the stable `EACFilter` /
+`LSIFilter` run maintains `P` and inverts an `m x m` innovation covariance each
+step. The **information form** maintains the inverse `Y = P^-1` (the *information
+matrix*) and `yv = P^-1 p` (the *information vector*) instead, which flips two
+properties that matter for sensor fusion: the measurement update is **purely
+additive** (`Y += Hᵀ R⁻¹ H`, `yv += Hᵀ R⁻¹ z` -- no inverse to absorb a
+measurement), so independent estimators **fuse by adding information** (exact,
+associative, order-independent); and the readout inverts only the small `n x n`
+state matrix.
+
+This is a **standalone experimental primitive**, a recursive *linear*-Gaussian
+estimator (RLS in information form, with an optional forgetting factor). It is
+**not** a linearization of the nonlinear EAC/LSI filters and **shares no code**
+with them -- they run the covariance form directly. It is exercised by no domain
+study and has **not cleared the >=2-domain promotion gate**, so it stays in
+`dtfit-experimental` until a sensor-fusion / embedded domain uses it.
+
+```python
+InformationFilter(n_params, *, prior_precision=1e-6, forgetting=1.0)
+```
+
+| arg | default | meaning |
+|---|---|---|
+| `n_params` | -- | state dimension `n` |
+| `prior_precision` | `1e-6` | diagonal of the initial information matrix `Y0 = prior_precision * I` (a weak prior; `0` is uninformative but leaves `Y` singular until enough measurements arrive) |
+| `forgetting` | `1.0` | exponential forgetting in `(0, 1]` (`1` = none); each step down-weights the accumulated information before adding the new measurement, so it tracks slowly-varying parameters |
+
+| method / attribute | meaning |
+|---|---|
+| `partial_fit(h, z, r=1.0)` | absorb one measurement `z = h . theta + noise` (variance `r`); `h` is a length-`n` row for scalar `z`, or an `(m, n)` matrix for a vector `z` of length `m` (then `r` may be scalar or length-`m`). Additive, no inverse. Returns `self` |
+| `fuse(other)` | add another estimator's information into this one **in place** (exact, associative, commutative); the shared prior is subtracted once so it is not double-counted. Assumes both used `forgetting == 1`. Returns `self` |
+| `theta_` | current estimate, from the single small solve `Y theta = yv` (alias `p`) |
+| `cov_` | parameter covariance `P = Y^-1` (alias `P`) |
+| `n_updates` | measurements absorbed so far |
+
+```python
+import numpy as np
+from dtfit_experimental import InformationFilter
+
+# A line z = a0 + a1*x, streamed as rows h = [1, x], split across two "sensors"
+# that are then fused into the exact state one estimator seeing all data reaches.
+x = np.linspace(0, 1, 200)
+z = 0.5 + 2.0 * x + np.random.default_rng(0).normal(0, 0.05, x.size)
+fa, fb = InformationFilter(2), InformationFilter(2)
+for i in range(x.size):
+    (fa if i % 2 == 0 else fb).partial_fit([1.0, x[i]], z[i], r=0.04)
+fused = fa.fuse(fb)
+print(np.round(fused.theta_, 3))          # ~ [0.5, 2.0]
 ```
 
 ---

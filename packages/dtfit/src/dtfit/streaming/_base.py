@@ -65,6 +65,43 @@ class _RecursiveFilter:
         se = np.sqrt(np.clip(np.diag(self.P), 0.0, None))
         return {str(s): float(v) for s, v in zip(self.params, se)}
 
+    def _compile_model(self, model, t_sym, reg_syms) -> None:
+        """Lambdify the model, its per-parameter Jacobian, its time derivatives
+        (for :meth:`coast`) and the mixed derivatives (for :meth:`coast_cov`) once,
+        off the hot path -- then split it for regressor coasting. Regressor symbols
+        are passed positionally before the parameters. Shared by both filters'
+        ``__init__`` (the block was previously duplicated verbatim in each)."""
+        import sympy as sp
+
+        self._f = sp.lambdify([t_sym, *reg_syms, *self.params], model, "numpy")
+        self._jac = [
+            sp.lambdify([t_sym, *reg_syms, *self.params], sp.diff(model, p), "numpy")
+            for p in self.params
+        ]
+        # Time derivatives, for coast() dead-reckoning through gaps. Only
+        # meaningful without external regressors (a measured regressor has no
+        # closed-form time derivative); coast() guards on that.
+        self._dfdt = sp.lambdify(
+            [t_sym, *reg_syms, *self.params], sp.diff(model, t_sym), "numpy"
+        )
+        self._d2fdt2 = sp.lambdify(
+            [t_sym, *reg_syms, *self.params], sp.diff(model, t_sym, 2), "numpy"
+        )
+        # Mixed derivatives d/dp_k(df/dt) and d/dp_k(d2f/dt2), for coast_cov()'s
+        # gap-growing uncertainty band (no-regressor models only).
+        self._dfdt_jac = [
+            sp.lambdify([t_sym, *reg_syms, *self.params],
+                        sp.diff(sp.diff(model, t_sym), p), "numpy")
+            for p in self.params
+        ]
+        self._d2fdt2_jac = [
+            sp.lambdify([t_sym, *reg_syms, *self.params],
+                        sp.diff(sp.diff(model, t_sym, 2), p), "numpy")
+            for p in self.params
+        ]
+        # Extrapolable/nuisance split for coast() on regressor models.
+        self._compile_regressor_coast(model, t_sym, reg_syms)
+
     def _compile_regressor_coast(self, model, t_sym, reg_syms) -> None:
         """Split the model into extrapolable (regressor-dependent) and nuisance
         (time-only drift) parts so :meth:`coast` can roll a regressor model
@@ -138,7 +175,10 @@ class _RecursiveFilter:
         ``(len(x), n_reg)`` array)."""
         xa = np.asarray(x, dtype=float)
         if not self._has_reg:
-            return self._f(xa, *self.p)
+            # Broadcast to x's shape so a t-independent model (e.g. "c0") still
+            # returns an (len(x),) array rather than a bare scalar, matching the
+            # documented contract and the regressor/predict_cov branches.
+            return np.broadcast_to(np.asarray(self._f(xa, *self.p), float), xa.shape)
         cols = self._predict_cols(xa, regressors)
         return self._f(xa, *cols, *self.p)
 

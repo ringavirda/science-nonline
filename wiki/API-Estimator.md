@@ -6,16 +6,16 @@ It exposes the standard `fit` / `predict` / `score` API (plus
 `sklearn.pipeline.Pipeline`, `GridSearchCV`, and `cross_val_score`.
 
 ```python
-NonlineRegressor(expr, var="x", method="lsi", k_star=5, alpha=0.2,
+NonlineRegressor(expr="a0 + a1*x", var="x", method="lsi", k_star=5, alpha=0.2,
                  filter_data=True, bounds=None, active_ratio=0.8,
-                 poly_degree=None, p0=None)
+                 poly_degree=None, p0=None, random_state=0)
 ```
 
 ## Constructor arguments
 
 | name | applies to | default | meaning |
 |---|---|---|---|
-| `expr` | all | -- | model expression, e.g. `"a0 + a1*x + a2*exp(a3*x)"` |
+| `expr` | all | `"a0 + a1*x"` | model expression, e.g. `"a0 + a1*x + a2*exp(a3*x)"`. Effectively required -- the affine default exists only so `NonlineRegressor()` is constructible with no arguments (the sklearn `clone` / meta-estimator contract); supply your own model |
 | `var` | all | `"x"` | main variable name (the single input feature) |
 | `method` | -- | `"lsi"` | `"lsi"`, `"eac"`, or `"dsb"` |
 | `k_star` | LSI | `5` | number of spectral discretes to match |
@@ -25,6 +25,7 @@ NonlineRegressor(expr, var="x", method="lsi", k_star=5, alpha=0.2,
 | `active_ratio` | EAC | `0.8` | leading fraction of data used for window placement |
 | `poly_degree` | DSB | `None` | polynomial degree for the required pre-fit; `None` selects it by BIC |
 | `p0` | all | `None` | initial guess for the parameters |
+| `random_state` | LSI | `0` | seed for the deterministic global / differential-evolution search used when `bounds` are given, so a bounded fit is reproducible under `GridSearchCV` / `clone`; `None` uses the global RNG |
 
 For DSB, the estimator runs the polynomial pre-fit for you (BIC degree, floored at
 `n_params - 1`) -- you don't supply `coeffs_poly` as you would to bare

@@ -5,11 +5,11 @@
 deepest result in the suite -- it is not a heuristic but the linearity of
 integration turned into an architecture.
 
-Source: `../../src/dtfit/adaptations/partitioned.py`.
-Tested in: [Big-data (2)](Case-02-Big-Data-Streaming),
-[Parallel (7)](Case-07-Parallel-Scaling),
-[GPU (8)](Case-08-GPU-Batched-Projection),
-[Fused multi-channel (10)](Case-10-Fused-Partitioned-Batched).
+Source: [`scale/_partitioned.py`](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit/src/dtfit/scale/_partitioned.py).
+Tested in: [Big-data (2)](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit-experimental/src/dtfit_experimental/experiments/cases/02_big_data_streaming/02_big_data_streaming.ipynb),
+[Parallel (7)](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit-experimental/src/dtfit_experimental/experiments/cases/07_parallel_scaling/07_parallel_scaling.ipynb),
+[GPU (8)](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit-experimental/src/dtfit_experimental/experiments/cases/08_gpu_batched_projection/08_gpu_batched_projection.ipynb),
+[Fused multi-channel (10)](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit-experimental/src/dtfit_experimental/experiments/cases/10_fused_partitioned_batched/10_fused_partitioned_batched.ipynb).
 
 ## The fused multi-channel extension (`PartitionedBatchLSI`, Exp 10)
 

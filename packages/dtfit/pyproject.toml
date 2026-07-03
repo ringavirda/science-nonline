@@ -1,9 +1,10 @@
 [build-system]
 # numpy is a *build* requirement too: the optional C extension declared in
 # setup.py compiles against the NumPy C-API headers (numpy.get_include()).
-# Building against NumPy 2.x yields kernels backward-compatible with the
-# runtime floor (numpy>=1.24). If the build can't run (no compiler/headers),
-# the extension is optional=True and the install falls back to pure NumPy.
+# The runtime floor is numpy>=2.0 as well: the library calls the NumPy-2.0
+# ``np.trapezoid`` API (scale/_partitioned.py, stochastic/_filter.py). If the
+# build can't run (no compiler/headers), the extension is optional=True and the
+# install falls back to pure NumPy.
 requires = ["setuptools>=61", "numpy>=2.0"]
 build-backend = "setuptools.build_meta"
 
@@ -30,7 +31,7 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "numpy>=1.24",
+    "numpy>=2.0",
     "scipy>=1.10",
     "sympy>=1.12",
     "scikit-learn>=1.6",  # validate_data / __sklearn_tags__ (estimator API)

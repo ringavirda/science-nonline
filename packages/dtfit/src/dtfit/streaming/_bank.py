@@ -336,6 +336,11 @@ class FusedChiSquareDetector:
         self.threshold_ = float(chi2.ppf(1.0 - alpha, df=self.k))
         self.inflate_factor = float(inflate)
         self.ewma = float(ewma)
+        # W is the filter's window *cap*; for an adaptive-window filter the
+        # effective window starts at min_window and grows, so the default
+        # ``3*W`` warmup is deliberately conservative (it delays first detection
+        # but never causes a false positive). Pass an explicit ``warmup`` sized to
+        # ``min_window`` if you need the detector to arm sooner on adaptive banks.
         w = int(getattr(bank.filters[0], "W", 1))
         self._warmup = 3 * w if warmup is None else int(warmup)
         self._cooldown_len = w if cooldown is None else int(cooldown)

@@ -325,11 +325,15 @@ are detailed in [../methods/equal_areas_filter.md](Methods-Equal-Areas-Filter).
   measurements drop out, roll the current parameter model forward
   (dead-reckoning) and grow the uncertainty band with the length of the gap,
   instead of freezing the last estimate or letting a raw extrapolation diverge.
-- **Sensor fusion / distributed streaming** (`InformationFilter`) -- the
-  inverse-covariance ("information") form of the recursive fit. Its updates are
-  purely **additive**, so independent estimators `fuse()` **exactly** and in any
-  order -- the natural state object for multi-sensor combination and streaming
-  map-reduce. -> [api/streaming.md](API-Streaming)
+- **Sensor fusion / distributed streaming** (`InformationFilter`, *experimental*) --
+  an inverse-covariance ("information") form recursive **linear** estimator whose
+  updates are purely **additive**, so independent estimators `fuse()` **exactly**
+  and in any order -- a natural state object for multi-sensor combination and
+  streaming map-reduce. It is a **standalone experimental primitive** in
+  `dtfit-experimental` (`from dtfit_experimental import InformationFilter`): it
+  shares **no code** with the nonlinear `EACFilter` / `LSIFilter` above (which run
+  the covariance form directly), and it has not yet cleared the >=2-domain
+  promotion gate. -> [../experimental/adaptations-api.md](Experimental-Adaptations-API)
 
 ---
 

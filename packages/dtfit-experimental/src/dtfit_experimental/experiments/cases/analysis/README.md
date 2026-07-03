@@ -1,7 +1,7 @@
 # dtfit feature analysis
 
 Per-feature deep-dives into every optimization and structural adaptation tested
-across the experiment suite (`experiments/01_…` through `10_…`). Each file
+across the experiment suite (`experiments/cases/01_…` through `10_…`). Each file
 answers the same four questions — **what it is, where it was tested (with the
 measured numbers), why it works or doesn't, and the verdict** — and pushes on the
 *mechanistic* "why" rather than just tabulating outcomes.
@@ -16,10 +16,10 @@ each one across all the experiments that exercised it.
 |---|---|---|
 | [01_map_reduce_partitioned.md](01_map_reduce_partitioned.md) | #1 map-reduce / partitioned LSI·EAC | **Promoted** |
 | [02_pluggable_basis.md](02_pluggable_basis.md) | #2 pluggable orthogonal basis | Experimental — vocabulary, not power |
-| [03_overlapping_ensemble.md](03_overlapping_ensemble.md) | #3 overlapping-window ensemble | Experimental — partial |
+| [03_overlapping_ensemble.md](03_overlapping_ensemble.md) | #3 overlapping-window ensemble | **Promoted** (`dtfit.ensemble_fit`) — the whole-window-rejection complement to `fit_eac`'s robust loss |
 | [04_joint_multichannel.md](04_joint_multichannel.md) | #4 joint shared-parameter fit | Experimental — loss where tested |
 | [05_stagewise_boosting.md](05_stagewise_boosting.md) | #5 stage-wise boosting | Experimental — win, 1 domain |
-| [06_adaptive_window_eac.md](06_adaptive_window_eac.md) | #6 adaptive-window EAC | **Promoted** (`dtfit.fit_eac_adaptive`) — domain-validated on transients/peaks |
+| [06_adaptive_window_eac.md](06_adaptive_window_eac.md) | #6 adaptive-window EAC | **Promoted** (`dtfit.fit_eac(window_mode="curvature")`) — domain-validated on transients/peaks |
 
 ## Performance & parallelization optimizations
 

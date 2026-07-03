@@ -172,7 +172,6 @@ the complete list across the stable API.
 | **EACFilter** | `EACFilter(...)` | streaming EAC (area measurement) |
 | **LSIFilter** | `LSIFilter(...)` | streaming LSI (spectrum measurement) -- for oscillatory plants |
 | **Gap coasting** | `filter.coast(...)`, `coast_cov(...)` | dead-reckon a streaming fit through measurement dropouts (uncertainty grows with the gap) |
-| **Information filter** | `InformationFilter(...)` | inverse-covariance streaming form; additive, exact `fuse()` for sensor fusion / streaming map-reduce |
 | **Filter bank** | `FilterBank.from_model(...)` | many streams in lockstep |
 | **Fused detector** | `bank.fused_detector(...)` | pool stream innovations for a shared-fault test |
 | **Stochastic fit** | `fit_stochastic(...)` -> `StochasticModel` | detect the regime of a *random* series (long-memory / mean-reversion / GARCH / cycle), forecast it, and `.simulate` it -- by fitting its functionals |
@@ -216,6 +215,7 @@ kept experimental until it proves itself. Here is the complete list with status.
 | **#2** | pluggable basis LSI | `fit_lsi_basis` | keep LSI's criterion but choose the basis -- **Fourier** for periodic signals (a wiggle is 2-3 harmonics, not many polynomial orders), **Laguerre** for decays, Chebyshev/Legendre otherwise |
 | **#4** | joint shared-parameter fit | `fit_joint` | stack several channels' area equations into one system with **shared** parameters (a common frequency/rate) plus per-channel **private** ones -- more equations per shared unknown |
 | **#5** | stage-wise residual boosting | `boosted_fit` | fit stage 1 (e.g. an LSI trend), subtract it, fit stage 2 (e.g. an EAC cycle) on the residual; the sum is more expressive than either alone (the fingerprint is linear, so component fits add up) |
+| **--** | inverse-covariance fusion primitive | `InformationFilter` | information-form (inverse-covariance) recursive linear estimator: additive updates, exact/associative `fuse()` for sensor fusion and streaming map-reduce. Shares **no code** with the nonlinear EAC/LSI filters (they run the covariance form directly); exercised by no domain study, so it has **not cleared the >=2-domain promotion gate** and was moved out of stable `dtfit` |
 
 Full signatures and usage for the experimental four:
 [../experimental/adaptations-api.md](Experimental-Adaptations-API). The
@@ -245,7 +245,7 @@ dtfit (stable, public)
 +-- one-call entry points  auto_estimate . auto_forecast
 +-- model framework        models.<family> . Model . suggest_models
 +-- streaming / online     EACFilter . LSIFilter . FilterBank . FusedChiSquareDetector
-|                          InformationFilter   (coast/coast_cov dead-reckon through gaps)
+|                          (coast/coast_cov dead-reckon through gaps)
 +-- stochastic (random)    fit_stochastic . StochasticModel . StochasticFilter . Stochastic
 |                          estimators: hurst_aggvar/spectral . ar1_reversion . garch_persistence
 |                          cycle_period . decompose_trend_cycle . ar_order . fit_ar . fractional_difference
@@ -255,6 +255,7 @@ dtfit (stable, public)
 
 dtfit-experimental (separate; promotes into dtfit when validated)
 +-- adaptations in trial   fit_lsi_basis(#2) . fit_joint(#4) . boosted_fit(#5)
++-- fusion primitive       InformationFilter   (info-form; not yet through the gate)
 +-- backend helpers        available_backends . resolve_backend . Backend
 +-- experiments            cases/ (each lever) . domains/ (vs the real toolkit)
 ```

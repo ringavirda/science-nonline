@@ -10,7 +10,7 @@ lean.
 This page explains, accessibly:
 
 - [the promotion model](#promotion) -- how an idea graduates from experimental to stable;
-- [the adaptations](#adaptations) -- the four structural extensions still in trial,
+- [the adaptations](#adaptations) -- the structural extensions still in trial,
   each with intuition + the math it rests on;
 - [the experiment suite](#suite) -- the *cases* and *domains* studies that decide
   promotion;
@@ -48,8 +48,12 @@ went):
 | fused multi-axis fault detection | `FusedChiSquareDetector` |
 | #3 overlapping-window ensemble | `ensemble_fit`, `EnsembleResult` |
 
-**Still experimental** (the three below): `fit_lsi_basis`, `fit_joint`,
-`boosted_fit`.
+**Still experimental** (the three adaptations below): `fit_lsi_basis`,
+`fit_joint`, `boosted_fit`. The inverse-covariance **`InformationFilter`** (an
+information-form fusion primitive) also lives in this tier -- it was **moved out of
+stable `dtfit`** because it is exercised by no domain study and shares no code with
+the covariance-form `EACFilter` / `LSIFilter`, so it has not cleared the
+>=2-domain promotion gate (`from dtfit_experimental import InformationFilter`).
 
 ---
 
@@ -138,10 +142,10 @@ Jupyter notebook (the report); open/run the notebook directly (index:
 
 ### `domains/` -- the levers together, against the real toolkit
 
-Four **application-domain** studies, each testing *every applicable dtfit method*
+Six **application-domain** studies, each testing *every applicable dtfit method*
 against the **established methods a practitioner in that domain actually uses**,
 on synthetic *and real* data. This is the suite that decides whether an
-adaptation earns promotion. The four domains and their honest headline results:
+adaptation earns promotion. The six domains and their honest headline results:
 
 | domain | what it tests | headline result |
 |---|---|---|
@@ -149,6 +153,8 @@ adaptation earns promotion. The four domains and their honest headline results:
 | **Parameter estimation** | LSI, EAC, adaptive-EAC, ensemble, joint, the merged selector -- across 15+ nonlinear model families, noise/outlier/sparse/short/multi-channel regimes, real recovery -- vs NLLS, robust NLLS, MLP, Gaussian process | with the **shape-matched variant**, dtfit's integral estimators **tie the NLLS gold standard** across the families; pointwise NLLS keeps a slight edge only on the heavy-tailed Lorentzian |
 | **Big-data processing** | GEMM batch, fused streaming, distributed merge, streaming filter -- multi-channel panels + a real 321-channel set -- exactness, memory/throughput scaling, numerical stability, mergeability, online cost -- vs per-channel NLLS, vectorized poly lstsq, SGD `partial_fit`, RLS | the additive projection is exact across batch/streaming/distributed routes and scales with bounded memory; trades peak throughput for that bounded memory |
 | **Embedded control** | EACFilter, LSIFilter, FilterBank + fused chi^2 detector -- 4 plant shapes, robustness profile, multi-axis fault detection, sub-KiB footprint, real streaming -- vs EKF, RLS, constant-accel Kalman, sliding-window refit | the *integral* measurement wins under outliers/dropouts at fixed O(1)/sample cost; online fault detection is SNR-limited (and reported as such) |
+| **Real-time GPS/inertial** | streaming LSI/EAC with external regressors + a full-IMU strapdown fused *inside* the LSI filter + fused NIS/CUSUM maneuver detector -- 9-DOF maneuvering-target rig, dropouts/multipath, plus well-known-trajectory benchmarks and a hardware rig (`dtfit-hardware`) -- vs constant-accel Kalman and the gyro-aided coordinated-turn EKF | the integral trackers match/beat the constant-accel Kalman and hold up in benign (static/pedestrian) regimes, but structurally **trail the CT-EKF on aggressive maneuvers**; the coast/glitch/on-MCU results de-risk the embedded paper |
+| **Stochastic series** | the stochastic tier (`fit_stochastic` / `StochasticModel` / `StochasticFilter`) recovering long-memory Hurst, AR(1) reversion, GARCH persistence, stochastic-cycle period and trend+cycle from a process's *functionals* -- vs the standard estimator for each (aggregated-variance/GPH, ACF-exp, GARCH-QMLE, ...) | dtfit recovers the **regime and its parameters** with a single coherent estimator->forecast->generator API; it cannot out-forecast a martingale and a dedicated MLE (GARCH-QMLE) stays a touch sharper on the raw parameter (reported per possibility as VIABLE / MARGINAL / NOT VIABLE) |
 
 Each domain is a self-contained folder with a `backend.py` (the compute) and a
 Jupyter notebook (the report); open/run the notebook directly (index:

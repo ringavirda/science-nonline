@@ -10,10 +10,10 @@ criterion (diagonal-weighted spectral match) but lets the caller pick the basis.
 from __future__ import annotations
 
 import numpy as np
-from scipy.signal import savgol_filter
 
 from dtfit.types import FittingResult, InitialGuess
 from dtfit._core._spectral import make_basis, solve_spectral
+from dtfit.methods._common import _savgol_prefilter
 
 
 def fit_lsi_basis(
@@ -24,7 +24,7 @@ def fit_lsi_basis(
     *,
     basis: str = "fourier",
     order: int = 5,
-    filter_data: bool = True,
+    filter_data: bool | None = None,
     period: float | None = None,
     bounds: list[tuple[float, float]] | None = None,
     p0: InitialGuess = None,
@@ -36,9 +36,16 @@ def fit_lsi_basis(
         expr, var: Model expression and main variable.
         basis: ``"legendre"`` | ``"chebyshev"`` | ``"fourier"`` | ``"laguerre"``.
         order: Spectral order (number of harmonics K for ``"fourier"``).
-        filter_data: Savitzky-Golay pre-smoothing before projection.
+        filter_data: Savitzky-Golay pre-smoothing before projection. ``None``
+            (default) picks the right thing per basis: **off** for ``"fourier"``
+            (smoothing erases the very cycle a Fourier basis targets -- the same
+            reason :func:`dtfit.fit_lsi`'s oscillatory recipe disables it) and
+            **on** otherwise. Pass an explicit bool to override.
         period: Fundamental period for ``"fourier"`` (defaults to the domain
             length).
+        bounds: Optional per-parameter ``(min, max)`` bounds; supplying them
+            enables ``solve_spectral``'s global (differential-evolution) search,
+            needed for multimodal fits such as a free frequency.
         p0: Optional initial guess.
 
     Returns:
@@ -47,10 +54,10 @@ def fit_lsi_basis(
     x = np.asarray(data_x, dtype=float)
     y = np.asarray(data_y, dtype=float)
 
-    if filter_data and y.size >= 5:
-        window = min(11, y.size if y.size % 2 == 1 else y.size - 1)
-        if window > 3:
-            y = np.asarray(savgol_filter(y, window, polyorder=3), dtype=float)
+    if filter_data is None:
+        filter_data = basis != "fourier"
+    if filter_data:
+        y = _savgol_prefilter(y)
 
     domain = (float(x[0]), float(x[-1]))
     kwargs = {"period": period} if basis == "fourier" else {}

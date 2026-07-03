@@ -21,7 +21,7 @@ classifiers = [
 # transitively via dtfit but are listed for clarity.
 dependencies = [
     "dtfit",
-    "numpy>=1.24",
+    "numpy>=2.0",
     "scipy>=1.10",
     "sympy>=1.12",
 ]

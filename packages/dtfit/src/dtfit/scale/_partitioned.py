@@ -9,8 +9,15 @@ processed in fixed memory (O(order) state), and a partitioned dataset is fitted
 by reducing per-partition partial statistics with no re-pass over the data.
 
 * :class:`PartitionedLSI` accumulates the basis-projection integrals per chunk
-  (and merges across workers), then solves the usual LSI spectral match once.
-* :class:`PartitionedEAC` accumulates per-window areas the same way.
+  (and merges across workers), then solves the usual LSI spectral match once. The
+  reduce is exact relative to its own trapezoid projection; parity with
+  :func:`dtfit.fit_lsi` (which adds Savitzky-Golay pre-filtering, auto/robust
+  order selection and a least-squares Legendre projection) is asymptotic on dense
+  uniform data, not bit-exact.
+* :class:`PartitionedEAC` accumulates per-window areas the same way. Its windows
+  are placed uniformly in the domain value (not by sample index as batch
+  ``fit_eac``), so it is a streaming/distributed *approximation* of the EAC
+  criterion -- consistent with batch EAC asymptotically, not identical.
 
 Both require the **global domain fixed up front** (so every chunk projects onto
 the same basis); pass it to the constructor.
@@ -30,11 +37,17 @@ fitting.
 
 from __future__ import annotations
 
+from typing import cast
+
 import numpy as np
+import sympy as sp
+from scipy.integrate import simpson
+from scipy.optimize import least_squares
 
 from dtfit.types import FittingResult, InitialGuess
 from dtfit._core._backend import Backend, resolve_backend
 from dtfit._core._spectral import make_basis, solve_spectral
+from dtfit.methods._common import model_params, _covariance
 
 
 class PartitionedLSI:
@@ -111,11 +124,22 @@ class PartitionedLSI:
 class PartitionedEAC:
     """Streaming / distributed EAC via additive per-window area accumulation.
 
-    The domain is split into ``n_windows`` fixed area windows; each chunk adds
-    its contribution to whichever windows it overlaps. The model is then matched
-    to the reduced data areas with the same overdetermined least-squares solve
-    as batch EAC.
+    The domain is split into ``n_windows`` value-uniform windows; each chunk adds
+    the exact windowed integral of its piecewise-linear interpolant into the
+    windows it overlaps (an interval straddling a window edge is split at the edge
+    so no area is lost). The model is then matched to the reduced data areas with
+    the same overdetermined least-squares solve as batch EAC, using a Simpson
+    quadrature of the model over each window (converges to the true window
+    integral, unlike a single midpoint sample).
+
+    Because the windows are placed by domain value (not by sample index as batch
+    :func:`dtfit.fit_eac`), this is a streaming/distributed *approximation* of the
+    EAC criterion -- it recovers the same parameters as batch EAC asymptotically
+    on dense, roughly uniform data, not bit-for-bit.
     """
+
+    #: model-side quadrature nodes per window (odd -> Simpson exact for cubics)
+    _Q = 9
 
     def __init__(
         self,
@@ -134,19 +158,43 @@ class PartitionedEAC:
         self._first: tuple[float, float] | None = None  # accumulator's first sample
         self._last: tuple[float, float] | None = None    # ...and its last sample
         self.n_samples = 0
+        # (m, _Q) grid of model-evaluation nodes, one Simpson panel per window.
+        frac = np.linspace(0.0, 1.0, self._Q)
+        self._qnodes = self.edges[:-1, None] + frac[None, :] * np.diff(self.edges)[:, None]
+
+    def _accumulate(self, x: np.ndarray, y: np.ndarray) -> None:
+        """Add the exact windowed integral of the piecewise-linear interpolant of
+        ``(x, y)`` into ``self._areas`` (fully vectorized).
+
+        The interior window edges that fall inside the chunk are spliced into the
+        grid as extra, linearly-interpolated nodes, so every resulting segment
+        lies entirely within one window; each segment's trapezoid area is then
+        binned to its window in a single ``np.add.at``. Splitting at the edges is
+        what stops an interval straddling a window boundary from being dropped, so
+        the per-window areas sum to the exact trapezoid integral partitioned at
+        the true edges.
+        """
+        edges = self.edges
+        ie = edges[1:-1]
+        ie = ie[(ie > x[0]) & (ie < x[-1])]  # interior edges inside this chunk
+        if ie.size:
+            ye = np.interp(ie, x, y)
+            xa = np.concatenate([x, ie])
+            ya = np.concatenate([y, ye])
+            order = np.argsort(xa, kind="mergesort")  # stable; keeps edge-at-sample ties
+            xa, ya = xa[order], ya[order]
+        else:
+            xa, ya = x, y
+        seg = 0.5 * (ya[:-1] + ya[1:]) * np.diff(xa)  # trapezoid area per segment
+        mid = 0.5 * (xa[:-1] + xa[1:])
+        wk = np.clip(np.searchsorted(edges, mid, side="right") - 1, 0, self.m - 1)
+        np.add.at(self._areas, wk, seg)
 
     def _add_interval(self, xa: float, ya: float, xb: float, yb: float) -> None:
-        """Add the single trapezoid interval ``[xa, xb]`` into the window(s) that
-        contain it, matching the per-window masking of :meth:`update`."""
-        if xb <= xa:
-            return
-        cx = np.array([xa, xb])
-        cy = np.array([ya, yb])
-        for k in range(self.m):
-            lo, hi = self.edges[k], self.edges[k + 1]
-            if (cx >= lo).all() and (cx <= hi).all():
-                self._areas[k] += float(np.trapezoid(cy, cx))
-                return
+        """Add the single connecting trapezoid interval ``[xa, xb]`` (the merge
+        twin of :meth:`update`'s boundary carry)."""
+        if xb > xa:
+            self._accumulate(np.array([xa, xb]), np.array([ya, yb]))
 
     def update(self, x_chunk: np.ndarray, y_chunk: np.ndarray) -> "PartitionedEAC":
         x = np.asarray(x_chunk, dtype=float)
@@ -159,14 +207,8 @@ class PartitionedEAC:
             y = np.concatenate([[self._last[1]], y])
         if x.size:
             self._last = (float(x[-1]), float(y[-1]))
-        if x.size < 2:
-            return self
-        # bin each window's area by trapezoid over the samples falling in it
-        for k in range(self.m):
-            lo, hi = self.edges[k], self.edges[k + 1]
-            mask = (x >= lo) & (x <= hi)
-            if mask.sum() >= 2:
-                self._areas[k] += float(np.trapezoid(y[mask], x[mask]))
+        if x.size >= 2:
+            self._accumulate(x, y)
         self.n_samples += n_orig
         return self
 
@@ -197,27 +239,21 @@ class PartitionedEAC:
 
     def fit(self, *, p0: InitialGuess = None) -> FittingResult:
         """Match the model's window areas to the reduced data areas."""
-        import sympy as sp
-        from scipy.optimize import least_squares
-        from typing import cast
-
-        from dtfit.methods._common import model_params
-        from dtfit.methods._common import _covariance
-
         t = sp.Symbol(self.var)
         f_sym = cast(sp.Expr, sp.sympify(self.expr))
         params = model_params(f_sym, t)
         n = len(params)
         f_func = sp.lambdify((t, *params), f_sym, "numpy")
-        centers = 0.5 * (self.edges[:-1] + self.edges[1:])
-        widths = np.diff(self.edges)
+        nodes = self._qnodes  # (m, _Q)
 
         def model_areas(c: np.ndarray) -> np.ndarray:
-            # midpoint-rule model area per window (cheap, consistent across calls)
-            fv = np.asarray(f_func(centers, *c), dtype=float)
-            if fv.ndim == 0:
-                fv = np.full_like(centers, float(fv))
-            return fv * widths
+            # Simpson quadrature of the model over each window: converges to the
+            # true window integral (the midpoint rule this replaced biased on
+            # curved windows), consistent with the trapezoid-integrated data area.
+            fv = np.asarray(f_func(nodes, *c), dtype=float)
+            if fv.shape != nodes.shape:
+                fv = np.broadcast_to(fv, nodes.shape)
+            return simpson(fv, x=nodes, axis=1)
 
         def residual(c: np.ndarray) -> np.ndarray:
             return model_areas(c) - self._areas
@@ -227,7 +263,10 @@ class PartitionedEAC:
         coeffs = np.asarray(sol.x, dtype=np.float64)
         cov = _covariance(sol.jac, residual(coeffs), n)
         return FittingResult(coeffs=coeffs, cov=cov,
-                             expr=self.expr, var=self.var, names=tuple(str(p) for p in params))
+                             expr=self.expr, var=self.var,
+                             names=tuple(str(p) for p in params),
+                             converged=bool(sol.success), message=str(sol.message),
+                             x_range=(self.x0, self.xn))
 
 
 class PartitionedBatchLSI:

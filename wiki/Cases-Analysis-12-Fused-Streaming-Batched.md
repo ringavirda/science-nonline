@@ -9,11 +9,11 @@ per-channel partitioned loop at the same flat memory**, and **backend-pluggable*
 It trails the whole-array single GEMM (the price of bounded memory) and the GPU
 does *not* help its streaming path -- both honest, both expected.
 
-Source: `../../src/dtfit/adaptations/partitioned.py`
-(`PartitionedBatchLSI`), built on the new
-`_spectral.py` primitive
+Source: [`scale/_partitioned.py`](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit/src/dtfit/scale/_partitioned.py)
+(`PartitionedBatchLSI`), built on the
+[`_core/_spectral.py`](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit/src/dtfit/_core/_spectral.py) primitive
 `Basis.project_integral_batched` (raw additive integrals).
-Tested in: [Fused multi-channel big data (10)](Case-10-Fused-Partitioned-Batched).
+Tested in: [Fused multi-channel big data (10)](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit-experimental/src/dtfit_experimental/experiments/cases/10_fused_partitioned_batched/10_fused_partitioned_batched.ipynb).
 Extends [#1 map-reduce](Cases-Analysis-01-Map-Reduce-Partitioned) and the
 [GEMM-batched projection](Cases-Analysis-10-GEMM-Batched-Projection).
 
@@ -130,9 +130,10 @@ accuracy. So:
   independent fits.
 - A 109-element reduction may want a compensated (Kahan) accumulator; the bounded
   per-chunk GEMM is fine at fp32.
-- A **single-domain** result so far, so by the suite's >=2-domain promotion gate it
-  stays in `dtfit.adaptations` (experimental), **not yet promoted** to the
-  top-level API -- unlike its parent `PartitionedLSI`.
+- A **single-domain** result so far, but the estimator itself is re-exported from
+  stable `dtfit` as `dtfit.PartitionedBatchLSI` (implementation in
+  `scale/_partitioned.py`) -- a specialized streaming multi-channel tool alongside
+  its parent `PartitionedLSI`, not a general-purpose default.
 
 ## Related
 

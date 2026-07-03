@@ -16,7 +16,7 @@ each one across all the experiments that exercised it.
 |---|---|---|
 | [01_map_reduce_partitioned.md](Cases-Analysis-01-Map-Reduce-Partitioned) | #1 map-reduce / partitioned LSI*EAC | **Promoted** |
 | [02_pluggable_basis.md](Cases-Analysis-02-Pluggable-Basis) | #2 pluggable orthogonal basis | Experimental -- vocabulary, not power |
-| [03_overlapping_ensemble.md](Cases-Analysis-03-Overlapping-Ensemble) | #3 overlapping-window ensemble | Experimental -- partial |
+| [03_overlapping_ensemble.md](Cases-Analysis-03-Overlapping-Ensemble) | #3 overlapping-window ensemble | **Promoted** (`dtfit.ensemble_fit`) -- the whole-window-rejection complement to `fit_eac`'s robust loss |
 | [04_joint_multichannel.md](Cases-Analysis-04-Joint-Multichannel) | #4 joint shared-parameter fit | Experimental -- loss where tested |
 | [05_stagewise_boosting.md](Cases-Analysis-05-Stagewise-Boosting) | #5 stage-wise boosting | Experimental -- win, 1 domain |
 | [06_adaptive_window_eac.md](Cases-Analysis-06-Adaptive-Window-EAC) | #6 adaptive-window EAC | **Promoted** (`dtfit.fit_eac(window_mode="curvature")`) -- domain-validated on transients/peaks |
@@ -85,6 +85,6 @@ statistical power the data did not contain.**
   whole-array GEMM, and the GPU does not help its streaming path. See
   [12_fused_streaming_batched.md](Cases-Analysis-12-Fused-Streaming-Batched). It is a
   **single-domain** result, so experimental -- not promoted.
-- #5 and #6 are **single-domain wins** -- promising, not promotion-eligible under
+- #5 is a **single-domain win** -- promising, not promotion-eligible under
   the >=2-domain gate.
 - The `fit_many` negative is **platform-specific** (Windows process spawn).

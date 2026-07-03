@@ -4,9 +4,9 @@
 pure-C numeric loops lets a thread pool drive every physical core at near-linear
 efficiency.
 
-Source: `../../src/dtfit/_native.c`
+Source: [`_core/_native.c`](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit/src/dtfit/_core/_native.c)
 (`simpson_windows`, `simpson_windows_rows`, `legendre_project`).
-Tested in: [Parallel scaling (7)](Case-07-Parallel-Scaling).
+Tested in: [Parallel scaling (7)](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit-experimental/src/dtfit_experimental/experiments/cases/07_parallel_scaling/07_parallel_scaling.ipynb).
 
 ## What it is
 

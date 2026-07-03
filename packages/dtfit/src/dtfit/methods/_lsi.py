@@ -28,19 +28,20 @@ This works directly on raw ``(x, y)`` data and returns a parameter covariance
 estimate alongside the coefficients.
 """
 
-from typing import Any, cast
+from typing import cast
 
 import numpy as np
 import sympy as sp
 from numpy.polynomial import Legendre
-from scipy.optimize import least_squares, differential_evolution, minimize
-from scipy.signal import savgol_filter
+from scipy.optimize import least_squares
 
 from dtfit.log import echo
 from dtfit._core._kernels import legendre_project
+from dtfit._core._spectral import solve_weighted_nlls
 from dtfit.types import FittingResult, InitialGuess
 from ._common import (
-    model_params, _covariance, information_criteria, _validate_xy, _validate_p0
+    model_params, _covariance, information_criteria, _validate_xy, _validate_p0,
+    _savgol_prefilter,
 )
 
 
@@ -182,10 +183,8 @@ def fit_lsi(
         filter_data = False
 
     # 1. Optional smoothing to tame noise before the spectral projection.
-    if filter_data and y.size >= 5:
-        window = min(11, y.size if y.size % 2 == 1 else y.size - 1)
-        if window > 3:
-            y = np.asarray(savgol_filter(y, window, polyorder=3), dtype=float)
+    if filter_data:
+        y = _savgol_prefilter(y)
 
     if k_star is None:
         order = 5  # the conditioned default Legendre order
@@ -199,6 +198,16 @@ def fit_lsi(
     # at the default k_star (e.g. an 8-parameter Fourier series needs order>=7).
     order = max(order, len(params) - 1)
     order = max(1, min(order, y.size - 2))
+    if order + 1 < len(params):
+        # The sample count clamped the order below n_params-1, so the spectral
+        # residual (order+1 entries) carries fewer equations than parameters and
+        # LM would raise a cryptic 'm < n'. Fail clearly instead (mirrors EAC's
+        # 2*n_params guard).
+        raise ValueError(
+            f"fit_lsi needs at least {len(params) + 1} samples to fit "
+            f"{len(params)} parameters (got {y.size}); the spectral match "
+            "would be underdetermined."
+        )
     echo(f"LSI Legendre spectral order: {order}")
 
     x0, xn = float(x[0]), float(x[-1])
@@ -248,48 +257,16 @@ def fit_lsi(
             )
         guess[names.index(freq_param)] = fft_frequency_seed(x, y)
 
-    # 5. Solve. Without bounds: weighted NLLS from the seed. With bounds: a fast
-    #    bounded *local* solve from a supplied seed first -- the catalog seeders
-    #    and the auto/oscillatory paths give good, data-driven seeds (an FFT peak
-    #    for the frequency), so a trust-region solve from there lands on the same
-    #    optimum as the global search at ~10-50x less cost. The global
-    #    differential-evolution search is kept as the fallback for when no seed is
-    #    supplied or the local solve lands on a poor basin (large residual).
-    if bounds is not None:
-        lo = [b[0] for b in bounds]
-        hi = [b[1] for b in bounds]
-        local = None
-        if p0 is not None:
-            loc = least_squares(
-                residual, np.clip(guess, lo, hi), bounds=(lo, hi), method="trf"
-            )
-            denom = float(np.linalg.norm(sqrt_w * beta_data)) + 1e-30
-            rel = float(np.linalg.norm(loc.fun)) / denom
-            if loc.success and rel < 0.5:  # converged + explains the spectrum
-                local = loc
-        if local is not None:
-            coeffs = np.asarray(local.x, dtype=np.float64)
-            jac = local.jac
-            converged, message = bool(local.success), str(local.message)
-        else:
-            def cost(c: np.ndarray) -> float:
-                r = residual(c)
-                return float(r @ r)
-
-            # cast: `seed` is the portable arg across scipy versions (newer stubs
-            # only expose its `rng` successor).
-            res_g = cast(Any, differential_evolution)(
-                cost, bounds, strategy="best1bin", popsize=15, seed=random_state
-            )
-            res = minimize(cost, res_g.x, method="L-BFGS-B", bounds=bounds)
-            coeffs = np.asarray(res.x, dtype=np.float64)
-            jac = _numeric_jac(residual, coeffs)
-            converged, message = bool(res.success), str(res.message)
-    else:
-        sol = least_squares(residual, guess, method="lm")
-        coeffs = np.asarray(sol.x, dtype=np.float64)
-        jac = sol.jac
-        converged, message = bool(sol.success), str(sol.message)
+    # 5. Solve via the shared weighted-NLLS driver (the same bounded-local /
+    #    global-DE-fallback / unbounded-LM logic behind the promoted map-reduce
+    #    fitters -- one implementation, so the two cannot drift). Without bounds it
+    #    is a weighted LM from the seed; with bounds a fast bounded local solve
+    #    from a good seed (catalog/oscillatory paths give data-driven seeds, e.g.
+    #    an FFT peak for the frequency) at ~10-50x less cost than the global
+    #    differential-evolution fallback that guards the multimodal cases.
+    coeffs, jac, converged, message = solve_weighted_nlls(
+        residual, sqrt_w, beta_data, guess, p0=p0, bounds=bounds, seed=random_state
+    )
 
     if robust:
         # Robust integral via IRLS: winsorize each sample's residual to the
@@ -327,15 +304,3 @@ def fit_lsi(
                          expr=expr, var=var, names=tuple(str(p) for p in params),
                          converged=converged, message=message,
                          x_range=(float(np.min(x)), float(np.max(x))))
-
-
-def _numeric_jac(residual, c: np.ndarray, eps: float = 1e-6) -> np.ndarray:
-    """Forward-difference Jacobian of a residual vector at ``c``."""
-    r0 = residual(c)
-    jac = np.empty((r0.size, c.size))
-    for k in range(c.size):
-        step = eps * max(1.0, abs(c[k]))
-        cp = c.copy()
-        cp[k] += step
-        jac[:, k] = (residual(cp) - r0) / step
-    return jac

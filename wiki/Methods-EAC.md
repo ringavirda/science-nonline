@@ -66,8 +66,13 @@ current method makes $M$ default to **$2m$** (configurable via `n_windows`), an
   ([`FittingResult.cov`](API-Types)), which an exactly-determined system
   cannot provide.
 
-`n_windows` is clamped to keep at least 3 samples per window (Simpson's rule needs
-three points), and to be $\ge m$ for solvability.
+`n_windows` is clamped to be $\ge m$ for solvability and to target 3 samples per
+window (Simpson's rule wants three points). **This is a target, not a hard
+guarantee:** solvability wins, so in the small-$n$ / high-parameter corner where
+$m$ is forced up to the parameter count on a short record, a uniform window can
+fall to a **floor of 2 samples** -- there Simpson degrades to the trapezoid rule on
+that window (still a valid area, just lower-order). Give EAC more samples (or fewer
+parameters) if you want every window to keep the full three.
 
 ### Window placement -- equal vs. curvature-adaptive
 

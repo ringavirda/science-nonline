@@ -104,7 +104,12 @@ def auto_estimate(
         return fit_lsi(x, y, expr, var, p0=p0, bounds=bounds, oscillatory=True,
                        freq_param=freq_param)
     if shape in ("transient", "peak"):
-        return fit_eac(x, y, expr, var, window_mode="curvature", p0=p0)
+        # Forward the (self-seeded) bounds: the curvature path honours them, and
+        # peak/saturating families rely on them for their positivity / width
+        # guards (e.g. a Gaussian's sigma > 0), so dropping them here would let
+        # those families land on a degenerate negative-width fit.
+        return fit_eac(x, y, expr, var, window_mode="curvature", p0=p0,
+                       bounds=_eac_bounds(bounds))
     if shape == "robust":
         return fit_eac(x, y, expr, var, p0=p0, bounds=_eac_bounds(bounds),
                        loss="soft_l1")
@@ -148,7 +153,7 @@ def _auto_model(y: np.ndarray, seasonal: bool, season_strength: float) -> str:
     """Route the model class with no per-series tuning (the merged forecaster's
     router): saturating growth -> logistic; a detected cycle -> linear+seasonal;
     otherwise a quadratic level (caught by the divergence guard if it runs away)."""
-    if _looks_like_growth(y) and np.all(y > 0):
+    if _looks_like_growth(y):  # already guarantees strictly positive y
         return "logistic"
     _, strength = dominant_period(y)
     return "linear_seasonal" if (seasonal and strength > season_strength) else "poly"
@@ -253,6 +258,11 @@ def auto_forecast(
     Returns:
         The length-``horizon`` forecast (the values at the extrapolated x grid).
     """
+    allowed = {"auto", "logistic", "linear", "poly", "linear_seasonal", "random_walk"}
+    if model not in allowed:
+        raise ValueError(
+            f"unknown model {model!r}; expected one of {sorted(allowed)}"
+        )
     x = np.asarray(x, dtype=float)
     y = np.asarray(y, dtype=float)
     if horizon <= 0:

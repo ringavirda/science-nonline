@@ -68,6 +68,13 @@ class Basis:
 
     name = "base"
 
+    # Quadrature attributes set by the polynomial subclasses (Legendre /
+    # Chebyshev / Laguerre) and read by :meth:`_project_spectrum`; declared here
+    # for the type checker.
+    _w: np.ndarray
+    _V: np.ndarray
+    _norm: np.ndarray
+
     def __init__(self, order: int, domain: tuple[float, float]) -> None:
         self.order = int(order)
         self.x0, self.xn = float(domain[0]), float(domain[1])
@@ -81,6 +88,20 @@ class Basis:
     # node samples -> spectral coefficients (the model spectrum)
     def model_spectrum(self, fv: np.ndarray) -> np.ndarray:  # pragma: no cover
         raise NotImplementedError
+
+    def _project_spectrum(self, fv: np.ndarray) -> np.ndarray:
+        """``norm ⊙ ((w ⊙ fv) @ V)`` via the GIL-free native kernel (with an exact
+        NumPy fallback). The single projection shared by every quadrature basis
+        that carries ``(_w, _V, _norm)`` (Legendre / Chebyshev / Laguerre); the
+        kernel is basis-agnostic despite its ``legendre_project`` name."""
+        from dtfit._core._kernels import legendre_project
+
+        return legendre_project(
+            np.ascontiguousarray(fv, float),
+            np.ascontiguousarray(self._w, float),
+            np.ascontiguousarray(self._V, float),
+            np.ascontiguousarray(self._norm, float),
+        )
 
     # data (x, y) -> empirical spectrum by least squares (best conditioned)
     def empirical(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:  # pragma: no cover
@@ -160,14 +181,7 @@ class LegendreBasis(Basis):
         return self.x0 + self.h * (self._u + 1.0) / 2.0
 
     def model_spectrum(self, fv: np.ndarray) -> np.ndarray:
-        from dtfit._core._kernels import legendre_project
-
-        return legendre_project(
-            np.ascontiguousarray(fv, float),
-            np.ascontiguousarray(self._w, float),
-            np.ascontiguousarray(self._V, float),
-            np.ascontiguousarray(self._norm, float),
-        )
+        return self._project_spectrum(fv)
 
     def empirical(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
         return L.Legendre.fit(x, y, self.order, domain=[self.x0, self.xn]).coef
@@ -204,7 +218,7 @@ class ChebyshevBasis(Basis):
         return self.x0 + self.h * (self._u + 1.0) / 2.0
 
     def model_spectrum(self, fv: np.ndarray) -> np.ndarray:
-        return self._norm * ((self._w * fv) @ self._V)
+        return self._project_spectrum(fv)
 
     def empirical(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
         return C.Chebyshev.fit(x, y, self.order, domain=[self.x0, self.xn]).coef
@@ -295,7 +309,7 @@ class LaguerreBasis(Basis):
         return self.x0 + self.h * self._u / 5.0
 
     def model_spectrum(self, fv: np.ndarray) -> np.ndarray:
-        return self._norm * ((self._w * fv) @ self._V)
+        return self._project_spectrum(fv)
 
     def empirical(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
         return Lag.Laguerre.fit(self._to_u(x), y, self.order).coef
@@ -374,11 +388,44 @@ def solve_spectral(
         return sqrt_w * (beta_data - spec)
 
     guess = np.ones(len(params)) if p0 is None else np.asarray(p0, float)
+    coeffs, jac, converged, message = solve_weighted_nlls(
+        residual, sqrt_w, beta_data, guess, p0=p0, bounds=bounds
+    )
+    cov = _covariance(jac, residual(coeffs), len(params))
+    # FittingResult lambdifies the fitted model lazily from expr+coeffs.
+    # Thread the optimizer status and the fitted domain through so the promoted
+    # scale fitters (PartitionedLSI / PartitionedBatchLSI / fit_lsi_batched) get
+    # the same `converged` signal and `predict(warn_extrapolation)` guard that
+    # fit_lsi/fit_eac already provide.
+    return FittingResult(coeffs=coeffs, cov=cov,
+                         expr=expr, var=var, names=tuple(str(p) for p in params),
+                         converged=converged, message=message,
+                         x_range=(basis.x0, basis.xn))
+
+
+def solve_weighted_nlls(
+    residual,
+    sqrt_w: np.ndarray,
+    beta_data: np.ndarray,
+    guess: np.ndarray,
+    *,
+    p0=None,
+    bounds: list[tuple[float, float]] | None = None,
+    seed: int | None = 0,
+):
+    """The shared bounded/unbounded weighted-NLLS driver for the LSI spectral
+    match, used by both :func:`solve_spectral` and :func:`dtfit.fit_lsi`.
+
+    Without bounds it is a weighted Levenberg-Marquardt from ``guess``. With
+    bounds it tries a fast bounded local (trf) solve from a supplied seed first
+    -- accepting it only if it converged and explains the spectrum (relative
+    residual < 0.5) -- and otherwise falls back to a global differential-evolution
+    search refined by L-BFGS-B (the multimodal-safe path for e.g. a free
+    frequency). ``seed`` seeds the DE search for reproducibility.
+
+    Returns ``(coeffs, jac, converged, message)``.
+    """
     if bounds is not None:
-        # A supplied seed is usually good enough for a fast bounded local solve;
-        # fall back to the (10-50x slower) global differential-evolution search
-        # only when no seed is given or the local solve lands on a poor basin.
-        # (Mirrors fit_lsi; keeps the multimodal-safe DE as the safety net.)
         lo = [b[0] for b in bounds]
         hi = [b[1] for b in bounds]
         local = None
@@ -390,27 +437,25 @@ def solve_spectral(
             if loc.success and float(np.linalg.norm(loc.fun)) / denom < 0.5:
                 local = loc
         if local is not None:
-            coeffs = np.asarray(local.x, dtype=np.float64)
-            jac = local.jac
-        else:
-            def cost(c: np.ndarray) -> float:
-                r = residual(c)
-                return float(r @ r)
+            return (np.asarray(local.x, dtype=np.float64), local.jac,
+                    bool(local.success), str(local.message))
 
-            res_g = cast(Any, differential_evolution)(
-                cost, bounds, strategy="best1bin", popsize=15, seed=0
-            )
-            res = minimize(cost, res_g.x, method="L-BFGS-B", bounds=bounds)
-            coeffs = np.asarray(res.x, dtype=np.float64)
-            jac = _numeric_jac(residual, coeffs)
-    else:
-        sol = least_squares(residual, guess, method="lm")
-        coeffs = np.asarray(sol.x, dtype=np.float64)
-        jac = sol.jac
-    cov = _covariance(jac, residual(coeffs), len(params))
-    # FittingResult lambdifies the fitted model lazily from expr+coeffs.
-    return FittingResult(coeffs=coeffs, cov=cov,
-                         expr=expr, var=var, names=tuple(str(p) for p in params))
+        def cost(c: np.ndarray) -> float:
+            r = residual(c)
+            return float(r @ r)
+
+        # cast: ``seed`` is the portable arg across scipy versions (newer stubs
+        # only expose its ``rng`` successor).
+        res_g = cast(Any, differential_evolution)(
+            cost, bounds, strategy="best1bin", popsize=15, seed=seed
+        )
+        res = minimize(cost, res_g.x, method="L-BFGS-B", bounds=bounds)
+        coeffs = np.asarray(res.x, dtype=np.float64)
+        return coeffs, _numeric_jac(residual, coeffs), bool(res.success), str(res.message)
+
+    sol = least_squares(residual, guess, method="lm")
+    return (np.asarray(sol.x, dtype=np.float64), sol.jac,
+            bool(sol.success), str(sol.message))
 
 
 def _numeric_jac(residual, c: np.ndarray, eps: float = 1e-6) -> np.ndarray:

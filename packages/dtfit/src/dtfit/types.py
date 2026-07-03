@@ -211,6 +211,13 @@ class FittingResult:
         # the loop -- that was ``len(params)`` separate SymPy compiles on every
         # uncertainty-band call. Numerics are unchanged (same step, same formula).
         f_lam = sp.lambdify((t, *params), f, "numpy")
+        # Finite-difference against f_lam's OWN baseline (not self.model(x)); if a
+        # caller passed an explicit model= that isn't exactly f.subs(coeffs) the
+        # two would disagree and skew the band. For the normal case (model derived
+        # from expr) y0 == y to machine precision, so numerics are unchanged.
+        y0 = np.asarray(f_lam(x, *base), dtype=float)
+        if np.ndim(y0) == 0:
+            y0 = np.full_like(x, float(y0))
         jac = np.empty((x.size, len(params)))
         for k in range(len(params)):
             step = 1e-6 * max(1.0, abs(base[k]))
@@ -219,7 +226,7 @@ class FittingResult:
             vk = np.asarray(f_lam(x, *cp), dtype=float)
             if np.ndim(vk) == 0:
                 vk = np.full_like(x, float(vk))
-            jac[:, k] = (vk - y) / step
+            jac[:, k] = (vk - y0) / step
         var = np.einsum("ij,jk,ik->i", jac, np.asarray(self.cov, float), jac)
         return y, np.sqrt(np.clip(var, 0.0, None))
 

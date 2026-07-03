@@ -165,6 +165,16 @@ def test_hurst_aggvar_recovers_long_memory():
     assert all(0.0 <= e <= 1.0 for e in ests)
 
 
+def test_hurst_aggvar_eac_matches_loglog():
+    # the equal-areas (linear-space power-law) branch must recover the same
+    # long-memory slope as the log-log fit -- a regression guard for the p0/bounds
+    # ordering (it previously pinned H at 1.0 from swapped seed/bound order).
+    x = gen_arfima(4096, 0.3, np.random.default_rng(77))
+    h_eac = hurst_aggvar(x, method="eac")["H"]
+    h_lsi = hurst_aggvar(x, method="lsi")["H"]
+    assert 0.0 < h_eac < 1.0 and abs(h_eac - h_lsi) < 0.15
+
+
 @pytest.mark.parametrize("phi", [0.6, 0.9])
 def test_ar1_reversion_recovers_phi(phi):
     est = np.mean([ar1_reversion(gen_ar1(1500, phi,

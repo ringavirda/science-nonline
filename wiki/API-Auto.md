@@ -76,7 +76,7 @@ it honest.
 |---|---|---|---|
 | `x`, `y` | array | -- | observed series (`x` (near-)uniformly sampled) |
 | `horizon` | int | -- | number of future steps to forecast |
-| `model` | str | `"auto"` | `"auto"` (route by structure) or one of `"logistic"`, `"linear"`, `"poly"`, `"linear_seasonal"`, `"random_walk"` |
+| `model` | str | `"auto"` | `"auto"` (route by structure) or one of `"logistic"`, `"linear"`, `"poly"`, `"linear_seasonal"`, `"random_walk"`. Any other string **raises `ValueError`** (the closed set is validated up front -- an unrecognised name is no longer silently treated as a quadratic) |
 | `period` | float \| None | `None` | known seasonal period (in samples) for the seasonal fit |
 | `seasonal` | bool | `True` | consider a seasonal model under `"auto"` |
 | `season_strength` | float | `0.05` | minimum detected cycle strength to pick a seasonal model |

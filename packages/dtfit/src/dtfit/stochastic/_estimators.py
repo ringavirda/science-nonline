@@ -106,12 +106,18 @@ def hurst_aggvar(
         raise RuntimeError("too few usable scales for aggregated-variance Hurst")
 
     if method == "eac":
-        # nonlinear power law in linear space (no log transform)
-        b0 = float(np.polyfit(np.log(ms_a), np.log(vs_a), 1)[0])
+        # nonlinear power law c*m**b in linear space (no log transform).
+        # model_params sorts names -> [b, c], and fit_eac maps p0/bounds
+        # positionally onto that sorted order, so both must be given as [b, c]
+        # (the exponent first). The old [c, b] ordering forced the negative
+        # slope b into c's positive bracket and pinned H at 1.0.
+        # slope b lies in [-2, 0] (<=> H in [0, 1]); clip the log-log seed into
+        # the open bracket so it never starts on/outside the bound.
+        b0 = float(np.clip(np.polyfit(np.log(ms_a), np.log(vs_a), 1)[0], -1.999, -1e-9))
         r = fit_eac(ms_a, vs_a, "c*m**b", "m",
-                    p0=[float(vs_a[0]), b0],
-                    bounds=([1e-12, -2.0], [1e6, 0.0]))
-        slope = float(r.coeffs[0])  # sorted names [b, c] -> b first
+                    p0=[b0, float(vs_a[0])],
+                    bounds=([-2.0, 1e-12], [0.0, 1e6]))
+        slope = float(r.coeffs[0])  # sorted names [b, c] -> b (the exponent) first
     else:
         slope = _loglog_slope(np.log(ms_a), np.log(vs_a), method=method)
 
@@ -205,10 +211,11 @@ def ar1_reversion(
 def _phi_from_acf(acf: np.ndarray, n: int, *, method: str = "lsi") -> float:
     """AR(1) ``phi`` from a **decaying-exponential dtfit fit to the ACF**.
 
-    The shared core of the batch :func:`ar1_reversion` and the streaming
-    :class:`~dtfit.stochastic.StochasticFilter`: both feed
-    their (sample or EWMA) ACF here so the persistence is read off the same
-    ``fit_lsi`` / ``fit_eac`` exponential fit, not a single-lag shortcut.
+    The core of the batch :func:`ar1_reversion` (reads persistence off a full
+    ``fit_lsi`` / ``fit_eac`` exponential fit of the ACF, not a single-lag
+    shortcut). The streaming :class:`~dtfit.stochastic.StochasticFilter` applies
+    the *same principle* to its EWMA ACF but is a separate re-derivation and does
+    not call this function.
 
     Restrict the fit to lags where the ACF is still above the white-noise band
     (~``2/sqrt(n)``); beyond it the ACF is pure sampling noise and only drags the
@@ -365,8 +372,10 @@ def _persistence_from_acf(
     acf: np.ndarray, *, method: str = "lsi", n: int | None = None
 ) -> float:
     """Volatility persistence from a **decaying-exponential dtfit fit to the ACF
-    of |returns| / squared returns**. Shared by the batch :func:`garch_persistence`
-    and the streaming filter (which feeds the EWMA ACF of its |residual|).
+    of |returns| / squared returns**. The core of the batch
+    :func:`garch_persistence`; the streaming ``StochasticFilter`` uses the same
+    principle on its EWMA ACF but is a separate re-derivation (it does not call
+    this function).
 
     The amplitude ``A`` is kept free (unlike the AR(1) fit): the squared-return
     ACF of a GARCH process does *not* pass through 1 at lag 1 -- it has a level
@@ -417,36 +426,27 @@ def cycle_period(
 
 
 def _cycle_from_acf(acf: np.ndarray) -> dict[str, float]:
-    """Dominant cycle from a **damped-cosine dtfit fit to the ACF**. Shared by the
-    batch :func:`cycle_period` and the streaming filter; the angular frequency is
-    FFT-seeded from the ACF's own spectral peak (``dtfit.fit_lsi`` oscillatory
-    recipe), so only the damping and frequency are read back."""
+    """Dominant cycle from a **damped-cosine dtfit fit to the ACF**.
+
+    Used by the batch :func:`cycle_period`. The angular frequency ``w`` is
+    FFT-seeded internally by :func:`dtfit.fit_lsi`'s oscillatory recipe
+    (``freq_param="w"`` reads the ACF's own spectral peak), so only the damping
+    and frequency are read back. (The streaming ``StochasticFilter`` is a
+    *separate* re-derivation of the same AR(2) principle and does not call this.)
+    """
     nlags = acf.size - 1
     k = np.arange(nlags + 1, dtype=float)
-    w0 = _acf_peak_w(acf)
+    # sorted param order is [A, g, p, w]; fit_lsi(freq_param="w") supplies the
+    # frequency seed from the ACF's spectral peak, so p0's w entry is nominal
+    # (the earlier code misplaced the FFT seed into the phase slot).
     r = fit_lsi(k, acf, "A*exp(-g*k)*cos(w*k + p)", "k",
-                freq_param="w", p0=[1.0, 0.05, w0, 0.0])
-    # sorted names [A, g, p, w] -- only the damping g and frequency w are needed
+                freq_param="w", p0=[1.0, 0.05, 0.0, np.pi / 2.0])
     g, w = float(r.coeffs[1]), abs(float(r.coeffs[3]))
     # A near-zero recovered frequency means "no cycle found" -- report it as such
     # rather than an enormous spurious period.
     period = 2.0 * np.pi / w if w > (2.0 * np.pi / (2.0 * nlags)) else float("inf")
     return {"period": float(period), "w": float(w),
             "damping": float(np.exp(-abs(g)))}
-
-
-def _acf_peak_w(acf: np.ndarray) -> float:
-    """Angular frequency of the dominant peak in the FFT of the ACF (the seed
-    for the damped-cosine fit). Falls back to a quarter-Nyquist guess."""
-    a = np.asarray(acf, dtype=float)
-    a = a - a.mean()
-    spec = np.abs(np.fft.rfft(a))
-    if spec.size > 1:
-        spec[0] = 0.0
-    freqs = np.fft.rfftfreq(a.size, d=1.0)
-    kpk = int(np.argmax(spec)) if spec.size else 0
-    f = float(freqs[kpk]) if kpk > 0 else 0.0
-    return 2.0 * np.pi * f if f > 0 else (np.pi / 2.0)
 
 
 # --------------------------------------------------------------------------- #

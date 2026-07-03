@@ -26,7 +26,7 @@ dependencies = [
     "dtfit-experimental",
     "pyserial>=3.5",
     "bleak>=0.21",
-    "numpy>=1.24",
+    "numpy>=2.0",
 ]
 
 [project.optional-dependencies]

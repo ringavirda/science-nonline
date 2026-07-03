@@ -19,8 +19,13 @@ properties that matter for the embedded / sensor-fusion target:
 
 This module provides the linear-Gaussian primitive (recursive least squares in
 information form, with an optional forgetting factor) -- the "on-MCU info-form"
-building block. The nonlinear dtfit filters linearize to exactly this update each
-step; this class is the standalone, fusion-oriented core.
+building block. It is the *same update* dtfit's nonlinear filters would take if
+they were run in information form rather than covariance form; it is provided
+here as a **standalone, fusion-oriented experimental primitive**. It is not
+imported by the covariance-form ``EACFilter`` / ``LSIFilter`` (which run the
+covariance update directly), and it stays in ``dtfit-experimental`` until a
+domain study exercises it -- it has not yet cleared the >=2-domain promotion gate
+that the stable tier is defined by.
 """
 
 from __future__ import annotations
@@ -38,6 +43,7 @@ class InformationFilter:
 
     Usage::
 
+        from dtfit_experimental import InformationFilter
         f = InformationFilter(n_params=2)
         for h, z in stream:                 # h: (2,) row, z: scalar
             f.partial_fit(h, z, r=0.04)
@@ -140,6 +146,11 @@ class InformationFilter:
         associative, commutative reduce -- the property that makes the information
         form the natural sensor-fusion / map-reduce state. The shared prior is
         subtracted once so it is not double-counted. Returns ``self``.
+
+        Assumes both operands used ``forgetting == 1`` (the usual partition/fusion
+        case): with forgetting < 1 the retained prior has been decayed per step, so
+        subtracting the full initial prior over-removes it. Fuse un-forgotten
+        estimators.
         """
         if other.n != self.n:
             raise ValueError("cannot fuse filters with different state sizes")

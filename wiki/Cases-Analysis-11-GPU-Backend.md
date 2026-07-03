@@ -6,10 +6,10 @@ bandwidth-saturated) and gives **~nothing** for a single streaming pass over
 host/disk data (PCIe-bound ~= CPU). Use fp32 on consumer GPUs -- their fp64 is
 throttled.
 
-Source: `../../src/dtfit/adaptations/_backend.py`,
-`batched.py`.
-Tested in: [GPU/batched throughput (8)](Case-08-GPU-Batched-Projection),
-[Fused multi-channel big data (10)](Case-10-Fused-Partitioned-Batched).
+Source: [`_core/_backend.py`](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit/src/dtfit/_core/_backend.py),
+[`scale/_batched.py`](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit/src/dtfit/scale/_batched.py).
+Tested in: [GPU/batched throughput (8)](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit-experimental/src/dtfit_experimental/experiments/cases/08_gpu_batched_projection/08_gpu_batched_projection.ipynb),
+[Fused multi-channel big data (10)](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit-experimental/src/dtfit_experimental/experiments/cases/10_fused_partitioned_batched/10_fused_partitioned_batched.ipynb).
 Install: `pip install cupy-cuda13x` (the `gpu` extra).
 
 ## What it is

@@ -13,7 +13,10 @@ signatures, arguments, return types, and behavior.
 > [../experimental/adaptations-api.md](Experimental-Adaptations-API).
 > (The overlapping-window ensemble `ensemble_fit` and the **stochastic-series**
 > solution have been promoted -- see [fitting.md](API-Fitting#ensemble_fit) and
-> [stochastic.md](API-Stochastic).) This page covers the **stable** `dtfit` API.
+> [stochastic.md](API-Stochastic).) The `InformationFilter` fusion primitive also
+> lives in `dtfit-experimental` now (`from dtfit_experimental import
+> InformationFilter`), not in the stable streaming surface. This page covers the
+> **stable** `dtfit` API.
 
 ## Conventions
 
@@ -37,7 +40,7 @@ signatures, arguments, return types, and behavior.
 | **One-call entry points** | `auto_estimate`, `auto_forecast` | [auto.md](API-Auto) |
 | **Model framework** | `models`, `Model`, `suggest_models` (+ catalog families) | [models.md](API-Models) |
 | **Stochastic series** | `fit_stochastic`, `StochasticModel`, `StochasticFilter`, `Stochastic`, `stochastic` (estimators) | [stochastic.md](API-Stochastic) |
-| **Streaming / online** | `EACFilter`, `LSIFilter`, `FilterBank`, `FusedChiSquareDetector`, `InformationFilter` | [streaming.md](API-Streaming) |
+| **Streaming / online** | `EACFilter`, `LSIFilter`, `FilterBank`, `FusedChiSquareDetector` | [streaming.md](API-Streaming) |
 | **Scaling backends** | `fit_many`, `FittingProblem`, `PartitionedLSI`, `PartitionedEAC`, `PartitionedBatchLSI`, `fit_lsi_batched` (`project_spectra` lives in `dtfit.scale`) | [scaling.md](API-Scaling) |
 | **Diagnostics** | `fit_report`, `residual_diagnostics`, `FitDisplay`, `ResidualsDisplay` | [diagnostics.md](API-Diagnostics) |
 | **Logging** | `enable_logging`, `logger` | [below](#logging) |
@@ -65,8 +68,7 @@ from dtfit.stochastic import (hurst_spectral, ar1_reversion, garch_persistence,
 from dtfit import NonlineRegressor
 
 # streaming
-from dtfit import (EACFilter, LSIFilter, FilterBank, FusedChiSquareDetector,
-                   InformationFilter)
+from dtfit import (EACFilter, LSIFilter, FilterBank, FusedChiSquareDetector)
 
 # scaling
 from dtfit import (fit_many, FittingProblem,

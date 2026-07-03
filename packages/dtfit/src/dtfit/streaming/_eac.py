@@ -27,7 +27,7 @@ The symbolic model and its derivatives are compiled once in ``__init__``; every
 path is real-time safe.
 """
 
-from typing import Any, Callable, Sequence
+from typing import Any, Sequence
 
 import numpy as np
 import sympy as sp
@@ -278,38 +278,9 @@ class EACFilter(_RecursiveFilter):
         self._y: list[float] = []
         self._rbuf: list[tuple] = []   # external-regressor window (aligned with _t)
 
-        # Compile model and per-parameter derivatives once (off the hot path).
-        # Regressor symbols are passed positionally before the parameters.
-        self._f: Callable[..., Any] = sp.lambdify(
-            [t_sym, *reg_syms, *self.params], model, "numpy"
-        )
-        self._jac: list[Callable[..., Any]] = [
-            sp.lambdify([t_sym, *reg_syms, *self.params], sp.diff(model, p), "numpy")
-            for p in self.params
-        ]
-        # Time derivatives, for coast() dead-reckoning through gaps. Only
-        # meaningful without external regressors (a measured regressor has no
-        # closed-form time derivative); coast() guards on that.
-        self._dfdt: Callable[..., Any] = sp.lambdify(
-            [t_sym, *reg_syms, *self.params], sp.diff(model, t_sym), "numpy"
-        )
-        self._d2fdt2: Callable[..., Any] = sp.lambdify(
-            [t_sym, *reg_syms, *self.params], sp.diff(model, t_sym, 2), "numpy"
-        )
-        # Mixed derivatives d/dp_k(df/dt) and d/dp_k(d2f/dt2), for coast_cov()'s
-        # gap-growing uncertainty band (no-regressor models only).
-        self._dfdt_jac: list[Callable[..., Any]] = [
-            sp.lambdify([t_sym, *reg_syms, *self.params],
-                        sp.diff(sp.diff(model, t_sym), p), "numpy")
-            for p in self.params
-        ]
-        self._d2fdt2_jac: list[Callable[..., Any]] = [
-            sp.lambdify([t_sym, *reg_syms, *self.params],
-                        sp.diff(sp.diff(model, t_sym, 2), p), "numpy")
-            for p in self.params
-        ]
-        # Extrapolable/nuisance split for coast() on regressor models.
-        self._compile_regressor_coast(model, t_sym, reg_syms)
+        # Compile the model, its derivatives and the coast split once, off the
+        # hot path (shared with LSIFilter via the base class).
+        self._compile_model(model, t_sym, reg_syms)
 
     def _area_jac(self, j: int, t_arr: np.ndarray, reg_cols=None) -> np.ndarray:
         if reg_cols is None:

@@ -6,18 +6,21 @@ at construction; each update is pure NumPy. Concept:
 [../guides/methods-explained.md#streaming](Guides-Methods-Explained#streaming);
 math: [../methods/equal_areas_filter.md](Methods-Equal-Areas-Filter).
 
-- [`EACFilter`](#edafilter) -- area-measurement filter (cheaper; monotone/saturating)
+- [`EACFilter`](#eacfilter) -- area-measurement filter (cheaper; monotone/saturating)
 - [`LSIFilter`](#lsifilter) -- spectrum-measurement filter (oscillatory plants)
 - [`FilterBank`](#filterbank) -- many streams in lockstep
 - [`FusedChiSquareDetector`](#fused) -- pooled multi-stream fault detection
-- [`InformationFilter`](#informationfilter) -- inverse-covariance (info-form) linear estimator; additive/associative fusion
+
+(The inverse-covariance `InformationFilter` fusion primitive is **no longer part
+of the stable streaming surface** -- it was demoted to `dtfit-experimental`;
+import it as `from dtfit_experimental import InformationFilter`.)
 
 Each filter is the **streaming twin of a batch method**: `EACFilter` <->
 [`fit_eac`](API-Fitting#fit_eac), `LSIFilter` <-> [`fit_lsi`](API-Fitting#fit_lsi).
 
 ---
 
-<a name="edafilter"></a>
+<a name="eacfilter"></a>
 ## `EACFilter`
 
 ```python
@@ -207,7 +210,7 @@ this matters.
 
 `predict_cov` returns the **predictive variance of the model output** at `x`,
 propagated from the parameter covariance by the delta method:
-`Var[f(x)] = J(x)^T P J(x)` where `J(x) = df/dparams`. Where [`stderr_`](#edafilter)
+`Var[f(x)] = J(x)^T P J(x)` where `J(x) = df/dparams`. Where [`stderr_`](#eacfilter)
 gives the uncertainty of each *parameter*, `predict_cov` maps that covariance into
 *output* space, so the streamed estimate carries a calibrated one-sigma band:
 
@@ -299,10 +302,20 @@ axes of a trajectory, or a sensor array. Build it from a model with
 - `partial_fit(t, y, *, n_jobs=1) -> self` -- ingest one sample **per stream**
   (`t` shared scalar or per-stream array; `y` length `K`). `n_jobs>1` fans the
   updates across a thread pool (wins when `K` and the window are large).
-- `run(t_seq, Y, *, n_jobs=1, track=False) -> dict` -- drive every stream over a
-  whole block (`Y` is `(n_steps, K)`); each worker thread runs a disjoint subset
-  of streams to completion (no per-step barrier -- the throughput primitive).
-  Returns `{"params": (K, n_params), "n_drifts": (K,), ["track": (n_steps, K)]}`.
+- `run(t_seq, Y, *, n_jobs=1, track=False, backend="thread") -> dict` -- drive
+  every stream over a whole block (`Y` is `(n_steps, K)`); each worker runs a
+  disjoint subset of streams to completion (no per-step barrier -- the throughput
+  primitive). Returns
+  `{"params": (K, n_params), "n_drifts": (K,), ["track": (n_steps, K)]}`.
+  `backend="thread"` (default) fans the streams across worker threads, which only
+  overlaps the GIL-released native kernel work -- so for the Python-level
+  recursive-filter loop it is usually no faster than serial. `backend="process"`
+  instead runs disjoint stream subsets in **separate interpreters** (each with its
+  own GIL), so the per-sample Python work runs genuinely concurrently; it wins on
+  large workloads (many streams x long records) where the compute dwarfs the
+  spawn/pickling overhead. The process backend needs `n_jobs>1` and a bank built
+  via `from_model` (so the filters are reconstructable in the workers); it falls
+  back to threads otherwise.
 - `params_array()` / `params_` / `drift_flags_` -- collected per-stream state.
 - `predict(x)` -- per-stream predictions.
 - `fused_detector(**kwargs) -> FusedChiSquareDetector` -- attach the pooled detector.
@@ -354,53 +367,17 @@ for i, (t, y) in enumerate(stream):       # y length K
 
 ---
 
-<a name="informationfilter"></a>
-## `InformationFilter` -- inverse-covariance (information-form) linear estimator
+## Moved: `InformationFilter`
 
-The covariance-form Kalman update the trackers run inverts the innovation
-covariance (dimension = measurement size) every step. `InformationFilter`
-maintains the **inverse** `Y = P^-1` (the *information matrix*) and `yv = P^-1 p`
-(the *information vector*) instead, which flips three properties that matter for
-embedded / sensor-fusion use:
-
-- **the measurement update is purely additive** -- `Y += H^T R^-1 H`,
-  `yv += H^T R^-1 z` -- so absorbing a measurement needs no inverse, and
-  independent estimators **fuse by adding information** (exact, associative,
-  order-independent);
-- **you invert the smaller matrix**: a readout solves the `n_params x n_params`
-  system `Y theta = yv` once, rather than inverting an `m x m` innovation
-  covariance each step (a win when the measurement dimension `m` exceeds the
-  state dimension `n`);
-- it is **fixed-point friendlier** -- adding information never suffers the
-  covariance-collapse conditioning of `(I - K H) P`.
-
-This is the linear-Gaussian primitive (recursive least squares in information
-form, with an optional forgetting factor) -- the on-MCU / fusion building block.
+The inverse-covariance (information-form) linear estimator that used to live here
+has been **demoted to `dtfit-experimental`** -- it is an experimental fusion
+primitive (additive/associative information fusion) that has not cleared the
+promotion gate, and it is no longer exported from `dtfit`. Import it from the
+experimental package instead:
 
 ```python
-InformationFilter(n_params, *, prior_precision=1e-6, forgetting=1.0)
+from dtfit_experimental import InformationFilter
 ```
 
-| name | default | meaning |
-|---|---|---|
-| `n_params` | -- | state dimension |
-| `prior_precision` | `1e-6` | diagonal of the initial information matrix `Y0 = prior_precision * I` (weak prior; `~0` is uninformative but leaves `Y` singular until enough data arrives) |
-| `forgetting` | `1.0` | exponential forgetting in `(0, 1]` (`1` = none); down-weights accumulated information each step so slowly-varying parameters are tracked |
-
-**Methods & attributes**
-
-- `partial_fit(h, z, r=1.0) -> self` -- absorb one measurement `z = h . theta +
-  noise` (variance `r`). `h` is a length-`n` row for scalar `z`, or `(m, n)` for a
-  vector `z` (with scalar or length-`m` `r`).
-- `theta_` / `p` -- current estimate (the small solve `Y theta = yv`).
-- `cov_` / `P` -- covariance `P = Y^-1` (inverts the small `n x n`).
-- `fuse(other) -> self` -- add another estimator's information (exact, associative
-  fusion; the shared prior is subtracted once).
-
-```python
-from dtfit import InformationFilter
-f = InformationFilter(n_params=2)
-for h, z in stream:            # h: (2,) row, z: scalar
-    f.partial_fit(h, z, r=0.04)
-theta = f.theta_               # estimate;  fused = a.fuse(b)  # any order
-```
+It shares no code with the nonlinear dtfit filters above; see the experimental
+package for its API.

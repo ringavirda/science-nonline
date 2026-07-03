@@ -5,21 +5,27 @@ Where the `cases` suite evaluates each EAC/LSI adaptation in isolation, this sui
 
 ## Domains
 
-| domain | report | status | runtime (s) |
+| domain | notebook | status | runtime (s) |
 |---|---|---|---|
-| Forecasting -- comprehensive cross-method study | [forecasting/report.md](Domain-Forecasting) | ok | 33 |
-| Model parameter estimation -- comprehensive | [parameter_estimation/report.md](Domain-Parameter-Estimation) | ok | 15 |
-| Big-data processing -- batch, streaming & distributed | [big_data/report.md](Domain-Big-Data) | ok | 53 |
-| Embedded real-time control -- comprehensive online ID | [embedded_control/report.md](Domain-Embedded-Control) | ok | 6 |
+| Forecasting -- comprehensive cross-method study | [forecasting.ipynb](Domain-Forecasting) | ok | 33 |
+| Model parameter estimation -- comprehensive | [parameter_estimation.ipynb](Domain-Parameter-Estimation) | ok | 15 |
+| Big-data processing -- batch, streaming & distributed | [big_data.ipynb](Domain-Big-Data) | ok | 53 |
+| Embedded real-time control -- comprehensive online ID | [embedded_control.ipynb](Domain-Embedded-Control) | ok | 6 |
+| Real-time GPS/inertial trajectory -- control-systems sensor fusion | [realtime_gps.ipynb](Domain-Realtime-GPS) | ok | -- |
+| Real-time GPS/inertial -- **on-silicon hardware rig** | [Domain-Realtime-GPS-Hardware](Domain-Realtime-GPS-Hardware) ([realtime_gps_hw.ipynb](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit-hardware/src/dtfit_hardware/realtime_gps_hw.ipynb)) | ok | 50 |
+| Stochastic series -- dtfit on random data | [stochastic_series.ipynb](Domain-Stochastic-Series) | ok | -- |
 
 ## dtfit methods tested vs baselines, per domain
 
 | domain | dtfit methods + established baselines |
 |---|---|
 | Forecasting | dtfit LSI, EAC, #2 Fourier-LSI, #5 boosting, auto-merged pipeline -- on 12 series x 2 horizons (8 measured datasets + 4 physics/signal waveforms: RLC transient, AC+harmonics, AM, chirp), with the structurally-correct model per series, vs random walk, seasonal-naive, drift, poly-extrap, Holt-Winters ETS, Theta, (S)ARIMA, MLP, LSTM |
-| Model parameter estimation | dtfit LSI, EAC, #6 adaptive-EAC, #3 ensemble, #4 joint, merged selector -- on 15 nonlinear model families (oscillatory/exp/multi-exp/peak/sigmoid/rational-saturating/power) x an applicability map, noise & outlier sweeps, sparse/transient/short-record/multi-channel regimes, real COVID/FX recovery, vs NLLS, robust NLLS, MLP, Gaussian process |
+| Model parameter estimation | dtfit LSI, EAC, #6 adaptive-EAC, #3 ensemble, #4 joint, merged selector -- on 16 nonlinear model families (oscillatory/exp/multi-exp/peak/sigmoid/rational-saturating/power) x an applicability map, noise & outlier sweeps, sparse/transient/short-record/multi-channel regimes, real COVID/FX recovery, vs NLLS, robust NLLS, MLP, Gaussian process |
 | Big-data processing | dtfit GEMM batch (fit_lsi_batched), fused streaming PartitionedBatchLSI, distributed merge (#1), streaming EACFilter -- 4 multi-channel panels + real 321-channel electricity; exactness, GB-scale memory wall, numerical stability (float32/float64/Kahan), mergeability, O(1)/sample online cost; vs per-channel NLLS, vectorised polynomial lstsq, sklearn SGD partial_fit, RLS |
 | Embedded real-time control | dtfit EACFilter, LSIFilter, FilterBank + fused chi^2 detector + inflate -- 4 plant shapes + applicability map, robustness profile (Gaussian noise / outliers / dropout), multi-axis fault detection, deployable footprint, real FX streaming; vs EKF, RLS, constant-accel Kalman, sliding-window refit |
+| Real-time GPS/inertial trajectory | dtfit streaming LSIFilter/EACFilter (now with external regressors) + full-IMU strapdown fused inside the LSI filter + fused NIS/CUSUM maneuver detector -- on a simulated 9-DOF rig (3-D maneuvering target, GPS fixes, 3-axis gyro + accelerometer + magnetometer) with dropouts & multipath glitches: smoothing/forecast, dropout coasting, glitch robustness, maneuver detection, on-MCU budget, generalization batch; well-known-trajectory benchmarks (exact truth, CT-EKF/IMM) + public RTK/INS datasets; vs constant-accel Kalman, gyro-aided coordinated-turn EKF. On-silicon twin in `dtfit-hardware` |
+| Real-time GPS/inertial -- **hardware rig** | the on-silicon reproduction ([Domain-Realtime-GPS-Hardware](Domain-Realtime-GPS-Hardware)): on-MCU float32 streaming LSI on an Arduino Nano 33 BLE Sense + NEO-M8N, real logged car drives (1 Hz & 5 Hz), on-MCU cost (~267 us/update, sub-kB, golden 4.4e-16), complementary-filter gyro fusion, + public **comma2k19** highway and **UrbanNav** deep-urban benchmarks with absolute truth; vs Kalman-CA, CT-EKF |
+| Stochastic series | dtfit fit_stochastic, StochasticModel.simulate, StochasticFilter, the functional estimators (Hurst / AR(1) / GARCH / cycle), vendored ADF (promoted to `dtfit.stochastic`) -- 6 process families (ARFIMA, AR(1)/OU, GARCH, AR(2) cycle, trend+cycle) recovered vs known truth + regime router, forecast skill, 7-series real gallery, generative round-trip, streaming tracking + break detection; vs OLS/GPH, R/S, DFA, lag-1 ACF, FFT-peak, random walk, drift, AR(1), ARIMA, ETS, Theta, seasonal-naive, LSIFilter (filter cost) |
 
 ## Relationship to the `cases` suite
 

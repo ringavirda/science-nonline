@@ -26,6 +26,7 @@ that prove effective across a range of applications are **promoted into the stab
         fit_lsi_basis,        # #2 pluggable orthogonal basis (Fourier/...)
         fit_joint,            # #4 joint shared-parameter multi-channel fit
         boosted_fit,          # #5 stage-wise residual boosting
+        InformationFilter,    # inverse-covariance (info-form) fusion primitive
     )
 
 These APIs are experimental and may change until promoted. Several adaptations
@@ -56,6 +57,13 @@ e.g. CO2); it needs a confirming second domain to clear the ``>=2 domains`` gate
 #4 ``fit_joint`` is the substantial new solver still under evaluation. See the
 ``experiments/cases/analysis`` notes for the measured verdicts.
 
+``InformationFilter`` -- the inverse-covariance (information-form) linear
+primitive with additive, associative fusion -- also lives here: it is coherent and
+tested but is exercised by no domain study and is not used by the covariance-form
+``EACFilter`` / ``LSIFilter``, so it has not cleared the >=2-domain promotion gate.
+It was moved out of stable ``dtfit`` for that reason and stays here until a
+sensor-fusion / embedded domain exercises it.
+
 The shared spectral/backend machinery (``dtfit._core._spectral`` / ``dtfit._core._backend``)
 moved to stable with the map-reduce estimators and is reused by the adaptations
 that remain here.
@@ -65,6 +73,7 @@ from dtfit._core._backend import available_backends, resolve_backend, Backend
 from .basis_lsi import fit_lsi_basis
 from .joint import fit_joint, JointResult
 from .boosting import boosted_fit, BoostedModel
+from .information import InformationFilter
 
 # The stochastic-series adaptations were promoted into stable ``dtfit`` -- they now
 # live physically there (``from dtfit.stochastic import fit_stochastic,
@@ -80,4 +89,5 @@ __all__ = [
     "JointResult",
     "boosted_fit",
     "BoostedModel",
+    "InformationFilter",
 ]

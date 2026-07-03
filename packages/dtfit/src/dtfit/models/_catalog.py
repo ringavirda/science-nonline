@@ -69,8 +69,16 @@ def cubic() -> Model:
 
 
 def power_law() -> Model:
-    """A scaling law ``a*(x + 1)**b`` (the +1 keeps it finite at x=0)."""
+    """A scaling law ``a*(x + 1)**b`` (the +1 keeps it finite at x=0).
+
+    The model uses ``(x + 1)**b``, so it requires ``x > -1``.
+    """
     def seed(x, y):
+        x = np.asarray(x, float)
+        if np.any(x <= -1.0):
+            raise ValueError(
+                "power_law() requires x > -1 (the model uses (x + 1)**b)"
+            )
         return {"a": (float(np.clip(y[0], 1e-6, None)), -INF, INF),
                 "b": (1.0, -INF, INF)}
     return Model("a*(x + 1)**b", name="power_law", shape="bulk", category="trend",
@@ -78,20 +86,33 @@ def power_law() -> Model:
 
 
 def logarithmic() -> Model:
-    """A learning / log-growth curve ``a + b*log(x + 1)``."""
+    """A learning / log-growth curve ``a + b*log(x + 1)`` (requires ``x > -1``)."""
     def seed(x, y):
-        lx = np.log(np.asarray(x, float) - float(np.min(x)) + 1.0)
-        b, a = np.polyfit(lx, y, 1)
+        x = np.asarray(x, float)
+        if np.any(x <= -1.0):
+            raise ValueError(
+                "logarithmic() requires x > -1 (the model uses log(x + 1))"
+            )
+        # Seed on the *same* basis the model expression uses (log(x + 1)); the
+        # old ``log(x - min(x) + 1)`` diverged from the model whenever x did not
+        # start near 0, producing a systematically wrong p0.
+        b, a = np.polyfit(np.log(x + 1.0), y, 1)
         return {"a": (float(a), -INF, INF), "b": (float(b), -INF, INF)}
     return Model("a + b*log(x + 1)", name="logarithmic", shape="bulk",
                  category="trend", seeder=seed)
 
 
 def sqrt_law() -> Model:
-    """A diffusion-like ``a + b*sqrt(x)`` (e.g. distance vs time)."""
+    """A diffusion-like ``a + b*sqrt(x)`` (e.g. distance vs time; requires ``x >= 0``)."""
     def seed(x, y):
-        sx = np.sqrt(np.clip(np.asarray(x, float) - float(np.min(x)), 0, None))
-        b, a = np.polyfit(sx, y, 1)
+        x = np.asarray(x, float)
+        if np.any(x < 0.0):
+            raise ValueError(
+                "sqrt_law() requires x >= 0 (the model uses sqrt(x))"
+            )
+        # Seed on the model's own basis (sqrt(x)); the old ``sqrt(x - min(x))``
+        # diverged from the model expression for x not anchored at 0.
+        b, a = np.polyfit(np.sqrt(x), y, 1)
         return {"a": (float(a), -INF, INF), "b": (float(b), -INF, INF)}
     return Model("a + b*sqrt(x)", name="sqrt_law", shape="bulk", category="trend",
                  seeder=seed)

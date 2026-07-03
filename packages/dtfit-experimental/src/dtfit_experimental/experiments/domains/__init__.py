@@ -1,6 +1,6 @@
 """Domain validation suite for the dtfit methods.
 
-Where ``experiments/`` evaluates each EAC/LSI adaptation *in isolation* (one
+Where ``experiments/cases/`` evaluates each EAC/LSI adaptation *in isolation* (one
 optimization / structural idea per folder, scored on the promotion matrix), this
 suite asks a different question: **for each real application domain, what is the
 best combination of the methods, and does the merged pipeline actually work in a

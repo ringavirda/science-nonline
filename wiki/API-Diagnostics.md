@@ -1,10 +1,15 @@
 # API: diagnostics
 
-Tools **specific to evaluating a fitted dtfit model** -- they take a
-[`FittingResult`](API-Types) (or anything with `.predict` / `.coeffs`) and report
-goodness of fit, model-selection criteria, and residual structure. For plain
-scalar metrics on `(y_true, y_pred)` arrays, use `sklearn.metrics` /
-`scipy.stats` directly; dtfit doesn't reship those.
+Tools **specific to evaluating a fitted dtfit model** and report goodness of fit,
+model-selection criteria, and residual structure. [`fit_report`](#fit_report) and
+[`residual_diagnostics`](#residual_diagnostics) want a
+[`FittingResult`](API-Types) specifically -- they read both `.predict(x)` **and**
+`.coeffs` (for the parameter count), so a bare [`NonlineRegressor`](API-Estimator)
+does not qualify: it predicts, but exposes its coefficients as `coef_` (the sklearn
+convention), not `coeffs`. The [`*Display`](#displays) helpers are the estimator-
+friendly path -- their `from_estimator` only needs `.predict`, so they accept a
+`NonlineRegressor`. For plain scalar metrics on `(y_true, y_pred)` arrays, use
+`sklearn.metrics` / `scipy.stats` directly; dtfit doesn't reship those.
 
 ```python
 from dtfit.diagnostics import (fit_report, residual_diagnostics,

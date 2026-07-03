@@ -118,8 +118,9 @@ results = fit_lsi_batched(x, Y, "a*exp(b*x)", "x", order=6, backend="auto")
 ```
 
 Available backends depend on what's installed (NumPy always; CuPy/Torch if
-present) -- query via `from dtfit_experimental import available_backends` or just
-use `"auto"`.
+present) -- just pass `backend="auto"` and it resolves the best installed one. To
+enumerate them explicitly, `available_backends` lives in `dtfit._core._backend`
+(an internal module -- not part of the stable top-level surface).
 
 ---
 
@@ -133,6 +134,20 @@ big for memory in one pass, or fan it across workers and combine.
 PartitionedLSI(expr, var, *, domain, order=6, basis="legendre")
 PartitionedEAC(expr, var, *, domain, n_windows=8)   # area windows instead of a basis
 ```
+
+These are **approximate** map-reduce estimators, not bit-exact re-implementations
+of the batch fitters:
+
+- `PartitionedEAC` places its `n_windows` windows **uniformly in the domain
+  value** (not by sample index as batch [`fit_eac`](API-Fitting#fit_eac)), folds
+  each chunk's exact edge-split trapezoid data areas, and matches the model with a
+  Simpson quadrature over each window. It therefore recovers batch EAC's
+  parameters only **asymptotically** on dense, roughly uniform data -- it does
+  **not** return bit-identical parameters.
+- `PartitionedLSI`'s reduce is exact relative to its own trapezoid projection, but
+  parity with [`fit_lsi`](API-Fitting#fit_lsi) (Legendre least-squares projection
+  + Savitzky-Golay pre-filter + robust/auto order selection) is likewise
+  **asymptotic**, not bit-exact.
 
 The pattern (identical for both):
 
@@ -154,21 +169,31 @@ result = acc.fit(p0=[1.0, 1.0])      # FittingResult
 `domain` is the `(min, max)` of the variable over the *whole* stream (needed up
 front so every chunk projects onto the same basis).
 
+Every scale fitter now populates `converged` and `x_range` on its returned
+[`FittingResult`](API-Types) (`x_range` is the fitted `domain`), so the
+extrapolation guard that warns when you `predict` outside the fitted support works
+on these results too -- as it does for the batch fitters.
+
 <a name="partitionedbatch"></a>
 ## `PartitionedBatchLSI`
 
 ```python
-PartitionedBatchLSI(expr, var, *, domain, order=6, basis="legendre", ...)
+PartitionedBatchLSI(expr, var, *, domain, n_channels, order=6,
+                    basis="legendre", backend="auto", **basis_kwargs)
 ```
 
 The fused **multi-channel** streaming estimator -- `PartitionedLSI`'s reduce for
-`B` channels at once (each chunk is `(n, B)`):
+`B` channels at once (each chunk is `(n, B)`). `n_channels` (`= B`) is a
+**required keyword-only** argument: it sizes the `(B, n_coef)` accumulator up
+front, and `update` raises `ValueError` if a chunk's channel count disagrees.
+`backend` selects the per-chunk GEMM backend (`"auto"`/`"numpy"`/`"cupy"`/`"torch"`
+or a `Backend`; see [`project_spectra`](#project_spectra)).
 
 | method | meaning |
 |---|---|
-| `update(x_chunk, Y_chunk) -> self` | fold a multi-channel chunk |
+| `update(x_chunk, Y_chunk) -> self` | fold a multi-channel chunk (`Y_chunk` is `(n, B)`; feed chunks in domain order) |
 | `merge(other) -> self` | combine accumulators (distributed) |
-| `spectra()` | the reduced per-channel spectra |
-| `fit(...)` | solve every channel's match -> list of `FittingResult` |
+| `spectra()` | the reduced per-channel spectra, `(B, n_coef)` |
+| `fit(*, p0=None, bounds=None)` | solve every channel's spectral match -> `list[FittingResult]`; `bounds` are the per-parameter `(min, max)` pairs forwarded to each channel's bounded solve |
 
 Use it when you have **both** many channels and a stream too big for memory.

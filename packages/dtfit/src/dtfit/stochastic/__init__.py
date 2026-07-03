@@ -22,7 +22,9 @@ Layered API:
   with a fused change-point detector.
 
 The model-framework wrapper :class:`dtfit.Stochastic` exposes the batch solution
-through the ``.fit(x, y)`` / ``.predict`` convention of :class:`dtfit.Model`.
+through the ``.fit(x, y)`` convention of :class:`dtfit.Model`; the fitted
+:class:`StochasticModel` then ``.forecast()`` / ``.simulate()`` / ``.summary()``
+(there is no ``.predict`` -- a stochastic process is forecast, not point-evaluated).
 """
 
 from dtfit.stochastic._estimators import (

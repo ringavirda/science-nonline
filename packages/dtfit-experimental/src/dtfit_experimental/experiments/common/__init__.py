@@ -2,10 +2,11 @@
 
 The experiments are now self-contained Jupyter notebooks, each over a sibling
 ``backend.py`` (the single source of truth for its simulation/estimation infra).
-This package keeps only the **pure-compute** helpers those backends share —
-metrics, baselines, datasets and a few plotting helpers — plus the
-``EXPERIMENTS_DIR`` anchor used to locate bundled data. The old report-writer /
-parallel-runner harness was removed when the notebooks replaced ``run.py``.
+This package keeps the **pure-compute** helpers the backends share — metrics,
+baselines, datasets — plus a few plotting helpers the *notebooks* import (e.g.
+``common.plotting.fit_overlay``), and the ``EXPERIMENTS_DIR`` anchor used to
+locate bundled data. The old report-writer / parallel-runner harness was removed
+when the notebooks replaced ``run.py``.
 """
 
 from pathlib import Path

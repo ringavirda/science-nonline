@@ -26,10 +26,19 @@ def enable_logging(
 
     Returns:
         The configured ``"dtfit"`` logger.
+
+    Calling this more than once (common in notebooks) reconfigures the existing
+    dtfit stream handler rather than stacking a new one, so records are not
+    duplicated.
     """
-    handler = logging.StreamHandler()
+    handler = next(
+        (h for h in logger.handlers if isinstance(h, logging.StreamHandler)),
+        None,
+    )
+    if handler is None:
+        handler = logging.StreamHandler()
+        logger.addHandler(handler)
     handler.setFormatter(logging.Formatter(fmt))
-    logger.addHandler(handler)
     logger.setLevel(level)
     return logger
 

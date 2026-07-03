@@ -37,18 +37,18 @@ delay-load error.)
 
 ### Optional compiled kernels (faster fitting)
 
-The integral-based methods have an optional C backend (`dtfit._native`) for
+The integral-based methods have an optional C backend (`dtfit._core._native`) for
 their hot numeric loops — composite-Simpson window integrals and Gauss-Legendre
 projections. Build it with clang (needs LLVM and, on Windows, the Visual Studio
 Build Tools C++ workload):
 
 ```bash
-python build_native.py            # compile into src/dtfit/
+python build_native.py            # compile into src/dtfit/_core/
 python build_native.py --clean    # remove the build artifacts
 ```
 
 It is entirely optional: without it the package falls back to NumPy/SciPy with
-identical results (`dtfit._kernels.HAVE_NATIVE` reports the active backend).
+identical results (`dtfit._core._kernels.HAVE_NATIVE` reports the active backend).
 Building it speeds up the area-based methods substantially — the streaming
 `EACFilter` by roughly 6–13× and batch `EAC` by ~3× — while the
 already-vectorized Legendre/LSI paths are largely unchanged.

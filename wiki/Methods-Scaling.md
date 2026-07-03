@@ -8,11 +8,29 @@
 > `fit_many` (top-level); `project_spectra` via `from dtfit.scale import
 > project_spectra`. API: [../api/scaling.md](API-Scaling).
 
-The fitting *math* of [LSI](Methods-LSI)/[EAC](Methods-EAC) is unchanged here; these are
-alternative **execution backends** that run those methods on data too big for
-memory, spread across workers, or spanning thousands of channels. They are exact --
-not approximations -- because the empirical spectrum has two structural properties:
-it is **additive over the domain** and **linear across channels**.
+These are alternative **execution backends** that run the LSI/EAC *criteria* on
+data too big for memory, spread across workers, or spanning thousands of channels,
+exploiting two structural properties of the empirical spectrum: it is **additive
+over the domain** and **linear across channels**.
+
+**What is exact and what is asymptotic.** The *reduce itself* -- folding a stream
+chunk-by-chunk or merging workers -- is bit-exact relative to a single-pass run of
+the **same** estimator (boundary samples are carried so no connecting interval is
+dropped). Parity with the **in-memory** [LSI](Methods-LSI)/[EAC](Methods-EAC),
+however, is **not** exact:
+
+- `PartitionedLSI` projects onto the basis by plain trapezoid; [`fit_lsi`](Methods-LSI)
+  adds Savitzky-Golay pre-filtering, auto/robust order selection and a
+  least-squares Legendre projection. Parity is **asymptotic on dense uniform data**,
+  not bit-for-bit.
+- `PartitionedEAC` is an **approximate** streaming estimator: its windows are
+  **value-uniform** (placed by domain value, not by sample index as batch
+  [`fit_eac`](Methods-EAC)) and its model areas are a Simpson quadrature, so it
+  recovers batch EAC's parameters only **asymptotically** on dense, roughly uniform
+  data.
+
+So "runs LSI/EAC at scale" means it optimizes the same criterion, converging to the
+in-memory fit as the data densify -- not that it returns identical parameters.
 
 ## The two structural properties
 
@@ -72,7 +90,8 @@ Accumulate, then solve. `PartitionedLSI` accumulates the additive projection
 integrals $\mathbf s$; `PartitionedEAC` accumulates per-window areas. Both expose
 `update(x_chunk, y_chunk)` (fold a chunk), `merge(other)` (combine workers), and
 `fit(p0=...)` (solve the spectral / area match -- LSI's `solve_spectral`, EAC's
-midpoint-area least squares). Fixed memory, exact, one pass.
+window-area least squares). Fixed memory, one pass; the reduce is exact, parity
+with the in-memory fitter is asymptotic (see above).
 
 ```
 acc = PartitionedLSI("a*exp(b*t)", "t", domain=(0, 10), order=6)
@@ -81,10 +100,14 @@ for x_chunk, y_chunk in stream:   # one pass, O(order) memory
 result = acc.fit(p0=[1.0, 1.0])
 ```
 
-`PartitionedEAC` matches the model's window areas to the reduced data areas; it
-uses a **midpoint-rule** model area per window ($f(\text{center})\times\text{width}$)
-so the model side is cheap and consistent across solver iterations, while the data
-areas were accumulated by trapezoid during the reduce.
+`PartitionedEAC` matches the model's window areas to the reduced data areas over
+**value-uniform** windows (split by domain value, not sample index). The model area
+per window is a **Simpson quadrature** (9 nodes) -- consistent across solver
+iterations and converging to the true window integral -- while the data areas were
+accumulated during the reduce by an **exact edge-split trapezoid** (an interval
+straddling a window edge is split at the edge so no area is lost). Because the
+windows follow the domain value rather than the samples, this is an *approximation*
+of batch EAC, exact only asymptotically on dense uniform data.
 
 ### `project_spectra` / `fit_lsi_batched` -- GEMM-batched multi-channel
 
@@ -130,13 +153,20 @@ when it failed) -- batch and single fits return the same type.
   float64 vs compensated (Kahan) summation.
 - **Per-problem error capture** (`fit_many`) -- one failing problem does not abort
   the batch.
+- **Convergence & range metadata** -- every scale fitter
+  (`PartitionedLSI`/`PartitionedEAC`/`PartitionedBatchLSI`, `fit_lsi_batched`) now
+  sets `converged` and the fitted `x_range` on its [`FittingResult`](API-Types), so
+  the same `predict(warn_extrapolation=...)` guard that protects the in-memory
+  fitters applies to the at-scale results too.
 
 ## Worked example
 
-**Left:** a `PartitionedLSI` reduce over 8 chunks recovers the *identical* fit to
-whole-batch LSI -- the growth rate matches to `max|Deltacoef| ~= 5x10^-^7`, the only
-difference being trapezoid boundary terms; the map-reduce is exact, not
-approximate. **Right:** `fit_lsi_batched` recovers the per-channel growth rate of
+**Left:** a `PartitionedLSI` reduce over 8 chunks recovers the *identical*
+projection to a single unchunked pass of the same estimator -- the growth rate
+matches to `max|Deltacoef| ~= 5x10^-^7`, the only difference being trapezoid boundary
+terms; the *reduce* is exact, not approximate (parity with the in-memory `fit_lsi`,
+which adds savgol/robust/auto-order, is instead asymptotic). **Right:**
+`fit_lsi_batched` recovers the per-channel growth rate of
 **300 channels in one GEMM**, each landing on the truth diagonal.
 
 ![Partitioned exactness and GEMM-batched multi-channel recovery](figures/scaling.png)
@@ -153,6 +183,9 @@ approximate. **Right:** `fit_lsi_batched` recovers the per-channel growth rate o
 
 **Trade-off.** Streaming/partitioned estimators trade peak throughput for
 **bounded memory**; the GEMM-batched path trades memory (data resident) for
-**maximal throughput**. Both return the same parameters as the in-memory
-[LSI](Methods-LSI)/[EAC](Methods-EAC). For real-time *online* tracking (as opposed to batch
-at scale) use the [streaming filters](Methods-Legendre-Filter).
+**maximal throughput**. Their chunked/merged *reduce* is exact, and they converge
+to the in-memory [LSI](Methods-LSI)/[EAC](Methods-EAC) parameters **asymptotically on
+dense uniform data** -- `PartitionedEAC` in particular is an approximate estimator
+(value-uniform windows), not a bit-exact replica of batch `fit_eac`. For real-time
+*online* tracking (as opposed to batch at scale) use the
+[streaming filters](Methods-Legendre-Filter).
