@@ -1,0 +1,255 @@
+# Changelog
+
+All notable changes to `dtfit` are documented here. The format follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
+[SemVer](https://semver.org/) with the usual 0.x caveat — minor releases may
+carry breaking changes, and each one is listed explicitly under **Changed**.
+
+## [0.4.0] — 2026-07-09
+
+The "adoption" release: first-class (optional) pandas support, a public model
+registry, a generated docs site, and a split CI. Every addition is opt-in — with
+ndarray/list inputs every path stays numerically identical to v0.3 (the golden
+accuracy corpus is unchanged). pandas is an **optional** dependency; dtfit
+imports and all core tests pass without it.
+
+### Added
+
+- **Optional pandas I/O.** `fit_lsi`, `fit_eac`, `auto_estimate`, `auto_forecast`,
+  `fit_stochastic`, `Model.fit`, and `NonlineRegressor` accept a pandas `Series`
+  or a single-column `DataFrame` for their data (a multi-column `DataFrame`
+  raises a clear `ValueError`). The pandas handling lives in a new guarded
+  `dtfit._pandas` module — pandas is never hard-imported, so it stays an
+  optional install.
+- **pandas out where it's natural.** `FittingResult.predict(x)` and
+  `NonlineRegressor.predict(X)` return a pandas `Series` aligned to the input's
+  index when the input is a `Series`/single-column `DataFrame` (an
+  `(Series, Series)` pair with `return_std=True`); ndarray input still returns
+  ndarray, with identical values.
+- **Date-indexed forecasts.** `ForecastResult` gained `.index` (the length-horizon
+  *future* index continuing the input — a `DatetimeIndex` is extended by its
+  inferred frequency, an integer/`RangeIndex` by its step) and `.to_series()`
+  (the pandas view). `StochasticModel.forecast` returns an index-aligned `Series`
+  (and three aligned `Series` for a confidence interval) when the model was fit
+  on a pandas `Series`.
+- **Public model registry.** `dtfit.register(name, factory)` /
+  `dtfit.unregister(name)` (also `dtfit.models.register`) add a custom model
+  family to the catalog so `all_models()` and `suggest_models` see it; a name
+  collision raises unless `overwrite=True`. The recommender's shortlist is
+  **opened** so a custom family with an unknown shape-category is never silently
+  dropped from `suggest_models`.
+- A generated **docs site** (`mkdocs-material` + `mkdocstrings`, a new `docs`
+  optional-dependency extra), a **"dtfit vs scipy" comparison page** with
+  measured numbers, a `CITATION.cff`, and a documented **versioning/deprecation
+  policy** (a `DeprecationWarning` for at least one minor release before removal).
+- An explicit **1-D scope boundary**: multivariate `X` (a 2-D array with more
+  than one column, or a multi-column `DataFrame`) now raises a clear, early
+  error at every fitting entry point — stating that dtfit's integral criteria
+  are one-dimensional and pointing to same-axis `+` composition for a
+  sum-of-components signal — instead of a shape error or a silent flatten. A new
+  "Multivariate data" docs page covers the composition and backfitting patterns.
+
+### Changed
+
+- `fit_lsi`'s `var` parameter is now optional (matching `fit_eac`): a symbolic
+  model still requires it, a callable model defaults it to `"x"`.
+- `fit_lsi` now threads `solver_options` through its robust-IRLS inner re-solves
+  (previously only the main solve honored them), matching `fit_eac`.
+- CI is split into an independent `dtfit` job (path-filtered to
+  `packages/dtfit/**`) and a separate job for the research packages, so the
+  library has its own fast quality signal.
+
+### Fixed
+
+- A sliced or derived `ForecastResult` (`fc[:3]`, a reduction, a broadcast) no
+  longer carries the parent's length-horizon `.index`/`.std_band`: the
+  length-dependent metadata is dropped when the array's length changes, so
+  `fc[:3].std_band` is no longer a silently misaligned length-horizon band and
+  `fc[:3].to_series()` gives a clear error instead of a length crash. Scalar
+  provenance (`.model_name`, `.result`) still carries forward.
+
+## [0.3.0] — 2026-07-09
+
+The "capability" release: models can be plain Python callables, fits take
+per-point measurement uncertainties, and results carry their own fit-quality
+diagnostics. Every addition is opt-in — with the new arguments left at their
+defaults, all fits are numerically identical to v0.2 (the golden accuracy
+corpus is unchanged).
+
+### Added
+
+- **Callable models everywhere.** `fit_lsi`, `fit_eac`, `auto_estimate`,
+  `Model`, `NonlineRegressor`, and the streaming `EACFilter`/`LSIFilter` now
+  accept a plain Python function `f(x, *params)` or a `sympy.Expr`, in addition
+  to the expression string. A callable is resolved via the new public
+  `dtfit.methods.resolve_model`; its parameters follow the callable's
+  **signature order** (symbolic models keep sorted-name order). Callable models
+  fit with a forward-difference Jacobian; symbolic models keep the exact
+  `sympy.diff` Jacobian. `param_names=` supplies names for a callable whose
+  signature cannot be introspected (an `f(x, *params)` model or a builtin).
+- **Per-point weights.** `fit_lsi` and `fit_eac` take `sigma=` (per-sample
+  measurement std) and `absolute_sigma=` (scipy `curve_fit` covariance
+  semantics). LSI weights the empirical Legendre spectrum by `1/sigma`; EAC
+  weights each window-area residual by its propagated inverse area-std. The
+  contract matches `scipy.optimize.curve_fit`: `absolute_sigma=True` scales the
+  standard errors with `sigma`, `False` (default) treats it as relative.
+- **`sample_weight` on `NonlineRegressor.fit`** (sklearn convention),
+  translated to `sigma = 1/sqrt(weight)` and forwarded to the LSI/EAC routes.
+- **Fit-quality diagnostics on `FittingResult`:** `n_obs`, `rss`, `tss`, `nfev`,
+  `cost`, plus `.rsquared`, `.aic`, `.bic` properties and `.residuals(x, y)` —
+  reachable from the sklearn route via `result_`, and round-tripped by
+  `to_dict`/`from_dict`.
+- **Solver-option passthrough.** `fit_lsi`/`fit_eac` accept
+  `solver_options={"xtol": ..., "max_nfev": ...}` forwarded to the underlying
+  scipy solvers; the optimizer's `nfev` is recorded on the result.
+- **Structured `ForecastResult`** (exported top-level) from `auto_forecast`: an
+  `np.ndarray` subclass (so every existing caller keeps working) that also
+  carries `.model_name` (with fallback provenance — e.g.
+  `"linear (poly diverged)"`), `.result` (the underlying `FittingResult`), and
+  `.std_band` (a delta-method 1-sigma prediction band when available).
+- Callable-model uncertainty: `FittingResult` gained an optional `param_model`
+  so `predict(return_std=True)` produces a band for a callable-only fit (finite
+  difference), and `.model` works without an expression.
+
+### Changed
+
+- `fit_lsi`/`fit_eac` widened their `expr` parameter to
+  `str | sympy.Expr | Callable`, and `var` became optional (a label only for a
+  callable; defaults to `"x"`). Existing positional calls are unaffected.
+- A callable-only `FittingResult` has `expr=None`: `predict`/`.model` work, but
+  `to_dict()` raises (there is no expression to serialize) — as for any
+  expression-less result.
+- `Model.__add__` (composition) and the seed-detrend evaluator require symbolic
+  operands and raise a clear `TypeError`/error for a callable model.
+- Streaming `coast()`/`coast_cov()` raise `NotImplementedError` on a
+  callable-backed filter (they need symbolic time-derivatives); external
+  regressors remain symbolic-only.
+
+### Fixed
+
+- **Sigma-length contract unified across fitters.** `fit_lsi` and `fit_eac`
+  now share one `_resolve_sigma`: `sigma` is the **raw** input length and the
+  same non-finite rows are dropped under `nan_policy="omit"`. Previously LSI
+  validated `sigma` against the post-drop count while EAC expected full length,
+  so a full-length `sigma` (as `NonlineRegressor` forwards from `sample_weight`)
+  fit on EAC but raised on LSI under `nan_policy="omit"`.
+- `ForecastResult`'s uncertainty band is `.std_band`, not `.std`, so it no
+  longer shadows `numpy.ndarray.std` — `fc.std()` and `np.std(fc)` work.
+- `Model.fit(method="auto")` (the default) now forwards a callable model's
+  committed `param_names` through `auto_estimate`, so an `f(x, *params)` model
+  no longer crashes on re-introspection and a renamed callable keeps its names.
+
+## [0.2.0] — 2026-07-09
+
+The "trust" release: fitters no longer silently modify data, drop samples,
+swallow errors, or overstate convergence — and parameters can finally be
+addressed by name.
+
+### Added
+
+- **Name-keyed `p0`/`bounds`.** `fit_lsi`, `fit_eac`, `auto_estimate`,
+  `Model.fit`, and `NonlineRegressor` accept `p0={"a": 1.0, ...}` (must cover
+  all parameters; a `ValueError` names anything missing or unknown) and
+  `bounds={"a": (0, 10)}` (partial — unnamed parameters stay unbounded). The
+  normalizers are public: `dtfit.methods.normalize_p0` / `normalize_bounds`.
+- **One bounds convention.** Both fitters accept the per-parameter pair list
+  (canonical), the partial dict, or the scipy-style `(lo, hi)` 2-tuple;
+  `lo < hi` is validated (strictly) per parameter with the parameter named in
+  the error — to pin a parameter to a constant, substitute the value into the
+  model expression.
+- `EnsembleResult.n_failed` and `.last_error`: per-window fit failures are
+  counted and surfaced (plus a `UserWarning`) instead of silently swallowed;
+  `overlap` is validated to `[0, 0.9]`.
+- `NonlineRegressor.result_`: the full `FittingResult` (covariance, `stderr()`,
+  `confidence_intervals()`, `converged`) is now reachable from the sklearn
+  route, and the engine levers (`robust`, `huber_c`, `nan_policy`, `loss`,
+  `window_mode`, plus `bounds` on the EAC route) are constructor params.
+- sklearn conformance suite: `parametrize_with_checks` runs in CI (38 checks
+  pass; 14 documented exclusions stem from the single-feature API).
+- Fitted `NonlineRegressor` instances pickle cleanly (joblib-parallel
+  cross-validation works); samples are sorted by `x` before dispatch, making
+  fits sample-order invariant.
+- Warnings instead of silence across the package: failed `suggest_models`
+  candidates, `auto_estimate` bulk-candidate failures, `auto_forecast`
+  model-fallback swaps, failed `fit_stochastic` detection stages, failed
+  forecaster-backtest candidates, and the short-series (`n <= 50`) forecaster
+  fallback (also visible as a `" (short-series fallback)"` suffix on
+  `forecaster_name`) all emit `UserWarning`s.
+
+### Changed
+
+- **BREAKING — `fit_lsi(filter_data=...)` now defaults to `False`** (was
+  `True`): the Savitzky-Golay pre-filter is opt-in; a fitter must not silently
+  smooth your data. Recommended for very noisy telemetry.
+- **BREAKING — `fit_eac(active_ratio=...)` now defaults to `1.0`** (was `0.8`):
+  all samples are used; the fitter no longer silently discards the trailing
+  20%. `auto_estimate`'s EAC routes explicitly pin the study-tuned
+  `active_ratio=0.8` recipe, so the auto pipeline's validated behavior is
+  unchanged.
+- **BREAKING — 2-parameter bounds disambiguation:** a bounds 2-tuple of two
+  2-sequences (e.g. `([0, 0], [10, 10])`) is now read as per-parameter
+  `(lo, hi)` pairs, not the scipy `(lo_array, hi_array)` form. Pass a dict, a
+  pair list, or scalars to disambiguate. All other scipy-tuple inputs keep
+  working.
+- `NonlineRegressor` defaults aligned with the fitters: `alpha=0.0` (was a
+  divergent `0.2`), `filter_data=False`, `active_ratio=1.0` — the estimator and
+  the bare fitter now give the same answer for the same data.
+- Honest convergence reporting: the robust-IRLS paths of `fit_lsi`/`fit_eac`
+  propagate the last inner solver's actual status (message
+  `"robust IRLS (<inner status>)"`) instead of hard-coding success.
+- `fit_dsb` raises `ValueError` (was `RuntimeError`) for user-input errors.
+- `fit_stochastic(period=...)` is documented as being in **samples**; detected
+  and supplied periods are converted to `t` units internally (see Fixed).
+
+### Fixed
+
+- **`fit_stochastic` time-axis bug:** seasonal periods are FFT-detected in
+  sample units but were applied in `t` units, so any non-unit time axis
+  (seconds, years) fit the wrong seasonal frequency. Periods are now converted
+  via the median spacing of `t`; `simulate()` maps sample indices onto the
+  fitted axis. Results on the default `0..n-1` axis are unchanged.
+- **Streaming NaN poisoning:** `EACFilter`/`LSIFilter.partial_fit` appended the
+  sample before checking finiteness, so one NaN observation silently stalled
+  updates for up to a full window. Non-finite samples (in `t`, `y`, or a
+  regressor) are now skipped at entry with a `RuntimeWarning` and the filter
+  resumes on the next good sample.
+- **Partial bounds were dropped wholesale:** if a model seeder left any
+  parameter unbounded, *all* bounds were discarded (a `sigma > 0` guard
+  vanished silently). Mixed bounds now reach the solver — the
+  differential-evolution global stage runs only on fully-finite boxes, and the
+  local trust-region solve is always constrained.
+- `solve_weighted_nlls` tolerates infinite/mixed bounds (previously they were
+  dropped upstream or would crash the global stage).
+- `Model.fit(method="eac"/"adaptive")` no longer converts the seeded pair-list
+  bounds to the ambiguous scipy tuple before calling `fit_eac`.
+- `PartitionedLSI.update` crashed with `AttributeError` on plain Python
+  list/tuple chunks; `PartitionedBatchLSI.update` raised `IndexError` on 0-d
+  input. Array-likes now accumulate identically to ndarrays.
+- `fit_dsb`'s symbolic solver discarded any root containing an exactly-zero
+  component, wrongly rejecting models whose true parameter is 0; only
+  degenerate all-zero, complex, or incomplete roots are dropped now.
+- `fit_eac` clips the (default all-ones) initial guess into the bounds box
+  before solving, matching `fit_lsi` — a named bracket excluding 1.0 no longer
+  crashes with scipy's "Initial guess is outside of provided bounds".
+- Degenerate `lo == hi` bounds are rejected up front with the parameter named;
+  previously they succeeded or crashed with an opaque scipy error depending on
+  which solver path ran.
+- `PartitionedLSI`/`PartitionedBatchLSI` accept 0-d scalar chunks (treated as
+  one sample); previously they crashed on a boundary carry or were silently
+  dropped.
+- `NonlineRegressor(method="dsb")` accepts dict `p0` like the other routes
+  (it is normalized before reaching the positional-only `fit_dsb`).
+- `EACFilter`/`LSIFilter` validate `drift_reset` at construction (`"full"` or
+  `"inflate"`); a typo previously behaved silently as `"full"`.
+- `NonlineRegressor`: standard sklearn validation errors now surface for
+  sparse/NaN/empty/`y=None` inputs; plain-list 1-D inputs are promoted
+  correctly; with `nan_policy="omit"` the fitter is allowed to drop non-finite
+  pairs instead of being blocked by pre-validation.
+
+## [0.1.0] — 2026-06
+
+Initial development release: LSI/EAC/DSB batch fitters, `FittingResult`,
+model catalog with self-seeding and `suggest_models`, streaming
+`EACFilter`/`LSIFilter` + `FilterBank`, stochastic characterization and
+forecasting pipeline, map-reduce/batched/parallel scale layer, sklearn
+estimator, diagnostics, optional C kernels.

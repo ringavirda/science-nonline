@@ -66,3 +66,48 @@ def test_partitioned_eac_reduce_recovers(exp_stream):
         acc.update(xc, yc)
     r = acc.fit(p0=[1.0, 1.0])
     assert abs(r.coeffs[1] - b) < 0.2
+
+
+def test_partitioned_lsi_update_accepts_plain_lists(exp_stream):
+    # ``update`` coerces array-likes up front: feeding list/tuple chunks must
+    # not crash (the sample count once read ``.shape`` off the raw argument)
+    # and must accumulate exactly the ndarray-fed state.
+    t, y, _ = exp_stream
+    ref = PartitionedLSI("a*exp(b*t)", "t", domain=(0, 3), order=6)
+    alt = PartitionedLSI("a*exp(b*t)", "t", domain=(0, 3), order=6)
+    for k, (xc, yc) in enumerate(zip(np.array_split(t, 5), np.array_split(y, 5))):
+        ref.update(xc, yc)
+        if k % 2:  # alternate list and tuple chunks
+            alt.update(tuple(xc), tuple(yc))
+        else:
+            alt.update(list(xc), list(yc))
+    assert alt.n_samples == ref.n_samples == t.size
+    np.testing.assert_array_equal(alt.spectrum(), ref.spectrum())
+
+
+def test_partitioned_eac_update_accepts_plain_lists(exp_stream):
+    t, y, _ = exp_stream
+    ref = PartitionedEAC("a*exp(b*t)", "t", domain=(0, 3), n_windows=8)
+    alt = PartitionedEAC("a*exp(b*t)", "t", domain=(0, 3), n_windows=8)
+    for xc, yc in zip(np.array_split(t, 5), np.array_split(y, 5)):
+        ref.update(xc, yc)
+        alt.update(list(xc), list(yc))
+    assert alt.n_samples == ref.n_samples == t.size
+    np.testing.assert_array_equal(
+        alt.fit(p0=[1.0, 1.0]).coeffs, ref.fit(p0=[1.0, 1.0]).coeffs
+    )
+
+
+def test_partitioned_lsi_accepts_scalar_chunks():
+    """A 0-d/scalar chunk behaves exactly like the equivalent single-sample
+    1-d chunk: it concatenates with the boundary carry and counts as 1."""
+    x = np.linspace(0.0, 2.0, 21)
+    y = 2.0 * np.exp(-1.1 * x)
+    ref = PartitionedLSI("a*exp(-b*t)", "t", domain=(0.0, 2.0))
+    ref.update(x, y)
+    acc = PartitionedLSI("a*exp(-b*t)", "t", domain=(0.0, 2.0))
+    acc.update(x[:10], y[:10])
+    acc.update(np.array(x[10]), np.array(y[10]))   # 0-d scalar chunk
+    acc.update(x[11:], y[11:])
+    assert acc.n_samples == ref.n_samples
+    assert np.allclose(acc.spectrum(), ref.spectrum())

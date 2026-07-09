@@ -55,6 +55,35 @@ def error_bars(ax, names, values, *, ylabel="", title="", colors=None,
     return bars
 
 
+def panel_labels(fig, axes, labels=("(а)", "(б)", "(в)", "(г)", "(д)"),
+                 pad=0.015, fontsize=11):
+    """Place panel tags (а)/(б)/... on a common baseline directly below each
+    panel (below its x-axis and any legend), matching ДСТУ figure layout where
+    the tag sits under the panel rather than in its title. For a grid of panels
+    the tags are grouped per row, so each row gets its own baseline just below
+    that row's panels (a single shared baseline would push the top rows' tags to
+    the bottom of the whole figure). Call after ``fig.tight_layout()`` and save
+    with ``bbox_inches="tight"`` so the tags are not clipped.
+    """
+    axs = [ax for ax in np.ravel(axes) if ax.get_visible()]
+    fig.canvas.draw()  # realise a renderer so tight bounding boxes are valid
+    rend = fig.canvas.get_renderer()
+    inv = fig.transFigure.inverted()
+    spans = []
+    for ax in axs:
+        bb = ax.get_tightbbox(rend)
+        (x0, y0), (x1, _) = inv.transform(((bb.x0, bb.y0), (bb.x1, bb.y1)))
+        rowkey = round(ax.get_position().y0, 3)  # panels in one row share this
+        spans.append((x0, x1, y0, rowkey))
+    # one shared baseline per row: just below the lowest content in that row
+    base = {}
+    for _x0, _x1, y0, rk in spans:
+        base[rk] = min(base.get(rk, y0), y0)
+    for (x0, x1, _y0, rk), lab in zip(spans, labels):
+        fig.text(0.5 * (x0 + x1), base[rk] - pad, lab, ha="center", va="top",
+                 fontsize=fontsize)
+
+
 def savefig(fig, path: Path) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.tight_layout()

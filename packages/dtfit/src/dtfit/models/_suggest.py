@@ -8,6 +8,7 @@ scored shortlist instead of guessing a string.
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
 
 import numpy as np
@@ -26,6 +27,12 @@ _SHAPE_CATEGORIES = {
     "peak": {"peak"},
     "monotone": {"trend", "growth", "decay", "sigmoid", "saturating"},
 }
+
+# Every category the shape detector can reason about. A catalog family whose
+# category is OUTSIDE this set (e.g. a user-registered family's default
+# "general") carries no shape signal to prune on, so ``_shortlist`` always keeps
+# it -- an open vocabulary, so a registered family is never silently dropped.
+_KNOWN_CATEGORIES = frozenset().union(*_SHAPE_CATEGORIES.values())
 
 
 def _detect_categories(x: np.ndarray, y: np.ndarray) -> set[str]:
@@ -89,7 +96,11 @@ def _shortlist(x: np.ndarray, y: np.ndarray) -> list[Model]:
     out: list[Model] = []
     for factory in CATALOG.values():
         m = factory()
-        if m.category in cats:
+        # A known-category family is pruned to the detected shape (the historical
+        # behaviour). A family with an UNKNOWN category (a registered/custom
+        # one whose category is outside the recommender's vocabulary) has no
+        # shape signal, so it is ALWAYS kept -- it must never vanish silently.
+        if m.category in cats or m.category not in _KNOWN_CATEGORIES:
             out.append(m)
     return out
 
@@ -150,8 +161,9 @@ def suggest_models(
 
     Returns:
         :class:`Suggestion` list sorted best-first (lowest AIC). Candidates whose
-        fit fails are skipped. Use ``[s.name for s in suggest_models(x, y)][:3]``
-        for a quick shortlist, or inspect ``.report`` for the full diagnostics.
+        fit fails are skipped with a :class:`UserWarning` naming the failed
+        family. Use ``[s.name for s in suggest_models(x, y)][:3]`` for a quick
+        shortlist, or inspect ``.report`` for the full diagnostics.
     """
     models = candidates if candidates is not None else _shortlist(x, y)
     if include is not None:
@@ -165,7 +177,13 @@ def suggest_models(
         try:
             res = m.fit(x, y, method=method)
             rep = fit_report(res, x, y)
-        except Exception:
+        except Exception as exc:
+            # A failed candidate is skipped but never silently: the user whose
+            # true family errored must see why it is absent from the ranking.
+            warnings.warn(
+                f"candidate model '{m.name}' failed: {exc}",
+                UserWarning, stacklevel=2,
+            )
             continue
         if not np.isfinite(rep["r2"]):
             continue

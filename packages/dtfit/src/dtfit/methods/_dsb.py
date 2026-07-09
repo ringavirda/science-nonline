@@ -60,12 +60,12 @@ def fit_dsb(
     params = model_params(f_sym, t)
     n = len(params)
     if n == 0:
-        raise RuntimeError("Model expression has no free parameters to fit.")
+        raise ValueError("Model expression has no free parameters to fit.")
 
     p_coeffs = np.asarray(coeffs_poly, dtype=float)
     n_poly = p_coeffs.size
     if n_poly < n:
-        raise RuntimeError(
+        raise ValueError(
             f"Polynomial has {n_poly} coefficients but the model has {n} "
             "parameters; the balance would be underdefined. Fit a "
             "higher-degree polynomial first."
@@ -74,7 +74,7 @@ def fit_dsb(
     max_rank = n_poly
     rank = max_rank if rank is None else min(int(rank), max_rank)
     if rank < n:
-        raise RuntimeError(
+        raise ValueError(
             f"rank={rank} is below the {n} parameters; balance underdefined."
         )
 
@@ -89,7 +89,7 @@ def fit_dsb(
     param_set = set(params)
     informative = [eq for eq in balance if eq.free_symbols & param_set]
     if len(informative) < n:
-        raise RuntimeError(
+        raise ValueError(
             f"Only {len(informative)} of the first {rank} Maclaurin orders "
             f"constrain the {n} parameters; increase the polynomial degree "
             "(rank) so the balance can identify them."
@@ -150,16 +150,21 @@ def _solve_symbolic(
     coeffs: list[sp.Symbol],
 ) -> list[list[sp.Expr]]:
     """Solve the square symbolic balance, keeping only real, non-degenerate
-    candidates (drops complex / zero / incomplete roots). Raises if none remain."""
+    candidates. Drops complex / incomplete roots and the degenerate **all-zero**
+    root; a root where only *some* parameters are exactly 0 is a legitimate
+    solution (e.g. an offset that truly is 0) and is kept. Raises if none
+    remain."""
     raw = sp.nonlinsolve(system, coeffs)
     solutions: list[list[sp.Expr]] = []
     for sol in raw.args:
-        vals = [
-            sp.re(sp.N(v, chop=True))
-            for v in cast("Iterable[sp.Basic]", sol)
+        numeric = [
+            sp.N(v, chop=True) for v in cast("Iterable[sp.Basic]", sol)
         ]
-        if any(v == 0 or sp.im(v) != 0 for v in vals):
-            continue
+        if any(sp.im(v) != 0 for v in numeric):
+            continue  # complex (or symbolic/incomplete) root
+        vals = [sp.re(v) for v in numeric]
+        if all(v == 0 for v in vals):
+            continue  # degenerate all-zero root
         solutions.append(vals)
     if not solutions:
         raise RuntimeError("No suitable real solutions found in the symbolic balance.")

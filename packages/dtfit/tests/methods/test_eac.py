@@ -30,9 +30,12 @@ def test_eac_exactly_determined_has_no_covariance(arctan_data):
 
 def test_eac_bounds_and_robust_loss(arctan_data):
     x, y, true = arctan_data
+    # Per-parameter (lo, hi) pairs: the canonical bounds form. (The historical
+    # scipy-tuple ([0, 0], [10, 10]) spelling is ambiguous for 2 parameters and
+    # is now read as per-parameter pairs -- see normalize_bounds.)
     result = fit_eac(
         x, y, "a*atan(w*x)", "x", p0=[1.0, 1.0],
-        bounds=([0, 0], [10, 10]), loss="soft_l1",
+        bounds=[(0, 10), (0, 10)], loss="soft_l1",
     )
     a, w = result.coeffs
     assert 0 <= a <= 10 and 0 <= w <= 10
@@ -83,3 +86,110 @@ def test_fit_lsi_random_state_is_reproducible():
     a = fit_lsi(x, y, "a*exp(b*x)", "x", bounds=bounds, random_state=7).coeffs
     b = fit_lsi(x, y, "a*exp(b*x)", "x", bounds=bounds, random_state=7).coeffs
     np.testing.assert_allclose(a, b)  # same seed -> identical global search
+
+
+# --- p0 / bounds normalization (dict, positional, scipy-tuple forms) -------- #
+def test_eac_dict_p0_matches_positional(arctan_data):
+    x, y, _ = arctan_data
+    pos = fit_eac(x, y, "a*atan(w*x)", "x", p0=[2.0, 1.0]).coeffs
+    named = fit_eac(x, y, "a*atan(w*x)", "x", p0={"a": 2.0, "w": 1.0}).coeffs
+    np.testing.assert_allclose(named, pos)
+
+
+def test_eac_partial_dict_bounds(arctan_data):
+    x, y, true = arctan_data
+    # Only 'a' is bounded; 'w' stays unbounded -- the dict may be partial.
+    result = fit_eac(x, y, "a*atan(w*x)", "x", p0=[1.0, 1.0],
+                     bounds={"a": (0.0, 10.0)})
+    a, _ = result.coeffs
+    assert 0.0 <= a <= 10.0
+    assert abs(a - true["a"]) < 0.5
+
+
+def test_eac_scipy_tuple_bounds_three_params():
+    # n_params >= 3: the scipy-style (lo, hi) arrays form is unambiguous and
+    # must keep working.
+    rng = np.random.default_rng(2)
+    x = np.linspace(0, 4, 200)
+    y = 1.0 + 2.0 * np.exp(-1.5 * x) + rng.normal(0, 0.02, x.size)
+    result = fit_eac(x, y, "c + a*exp(-b*x)", "x", p0=[1.0, 1.0, 1.0],
+                     bounds=([0, 0, 0], [10, 10, 10]))
+    a, b, c = result.coeffs  # sorted names: a, b, c
+    assert np.all((result.coeffs >= 0) & (result.coeffs <= 10))
+    assert abs(a - 2.0) < 0.3 and abs(b - 1.5) < 0.3 and abs(c - 1.0) < 0.3
+
+
+def test_eac_p0_dict_missing_and_unknown_names_raise(arctan_data):
+    import pytest
+    x, y, _ = arctan_data
+    with pytest.raises(ValueError, match=r"missing \['w'\]"):
+        fit_eac(x, y, "a*atan(w*x)", "x", p0={"a": 1.0})
+    with pytest.raises(ValueError, match=r"unknown \['z'\]"):
+        fit_eac(x, y, "a*atan(w*x)", "x", p0={"a": 1.0, "w": 1.0, "z": 3.0})
+
+
+def test_eac_bounds_lo_above_hi_raises(arctan_data):
+    import pytest
+    x, y, _ = arctan_data
+    with pytest.raises(ValueError, match="'w'"):
+        fit_eac(x, y, "a*atan(w*x)", "x", p0=[1.0, 1.0],
+                bounds=[(0.0, 10.0), (5.0, 1.0)])
+
+
+def test_eac_active_ratio_defaults_to_all_samples(arctan_data):
+    """v0.2: the fitter no longer silently discards the trailing 20% -- the
+    default active region is the whole record; 0.8 is the opt-in transient
+    recipe and gives a (slightly) different window layout."""
+    x, y, true = arctan_data
+    full = fit_eac(x, y, "a*atan(w*x)", "x", p0=[1.0, 1.0])
+    lead = fit_eac(x, y, "a*atan(w*x)", "x", p0=[1.0, 1.0], active_ratio=0.8)
+    assert abs(full.coeffs[0] - true["a"]) < 0.5
+    assert not np.allclose(full.coeffs, lead.coeffs, atol=1e-12)
+
+
+def test_eac_robust_message_reflects_inner_solver(arctan_data):
+    x, y, _ = arctan_data
+    result = fit_eac(x, y, "a*atan(w*x)", "x", p0=[1.0, 1.0], robust=True)
+    # The robust path must carry the last inner solver's status, not the old
+    # hard-coded 'robust IRLS' success constant.
+    assert result.message != "robust IRLS"
+    assert result.message.startswith("robust IRLS (")
+
+
+def test_eac_converged_flag_propagates_solver_failure(monkeypatch, arctan_data):
+    """The ``converged`` FLAG must reflect the last solver on BOTH paths (the
+    robust path previously stamped an unconditional success)."""
+    import types
+
+    import dtfit.methods._eac as _eac_mod
+
+    x, y, _ = arctan_data
+
+    real_ls = _eac_mod.least_squares
+
+    def failing_ls(*args, **kwargs):
+        sol = real_ls(*args, **kwargs)
+        return types.SimpleNamespace(x=sol.x, jac=sol.jac, fun=sol.fun,
+                                     success=False, message="inner failed")
+
+    monkeypatch.setattr(_eac_mod, "least_squares", failing_ls)
+    plain = fit_eac(x, y, "a*atan(w*x)", "x", p0=[1.0, 1.0])
+    assert plain.converged is False
+    robust = fit_eac(x, y, "a*atan(w*x)", "x", p0=[1.0, 1.0], robust=True)
+    assert robust.converged is False
+    assert "inner failed" in robust.message
+
+
+def test_eac_default_guess_clipped_into_bounds(exp_data):
+    """A named bracket that excludes the default all-ones seed must not crash
+    ('Initial guess is outside of provided bounds'): the seed is clipped into
+    the box, matching fit_lsi's solver behavior."""
+    x, y, true = exp_data
+    res = fit_eac(x, y, "a*exp(-b*x)", "x", bounds={"a": (2.0, 5.0)})
+    assert res.converged
+    assert 2.0 <= res.params["a"] <= 5.0
+    assert abs(res.params["a"] - true["a"]) < 0.5
+    # legacy scipy-tuple form (3 params -- unambiguous) with 1.0 outside
+    res3 = fit_eac(x, y, "a*exp(-b*x) + c", "x",
+                   bounds=([2.0, 0.0, -1.0], [5.0, 10.0, 1.0]))
+    assert 2.0 <= res3.params["a"] <= 5.0

@@ -90,11 +90,11 @@ from dtfit.scale._partitioned import PartitionedLSI, PartitionedEAC, Partitioned
 from dtfit.scale._batched import fit_lsi_batched
 # High-level "just fit it" entry points distilled from the domain merged
 # pipelines (shape-routed estimation; structured fit-then-extrapolate forecast).
-from dtfit.auto import auto_estimate, auto_forecast
+from dtfit.auto import auto_estimate, auto_forecast, ForecastResult
 # Model framework: a catalog of self-seeding model families + a recommender,
 # so users pick structure (not sympy strings) and can infer the right model.
 from dtfit import models
-from dtfit.models import Model, Stochastic, suggest_models
+from dtfit.models import Model, Stochastic, suggest_models, register, unregister
 # Stochastic-series: fit the deterministic functionals of a random process to
 # characterize / forecast / generate it (fit_stochastic) and track it online
 # (StochasticFilter); the Stochastic model wraps it in the .fit() convention.
@@ -105,9 +105,12 @@ __all__ = [
     "NonlineRegressor",
     "auto_estimate",
     "auto_forecast",
+    "ForecastResult",
     "models",
     "Model",
     "suggest_models",
+    "register",
+    "unregister",
     "stochastic",
     "Stochastic",
     "fit_stochastic",

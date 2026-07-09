@@ -101,8 +101,11 @@ def test_soft_l1_beats_linear_under_outliers():
         return (abs(r.params["a"] - true[0]) / abs(true[0])
                 + abs(r.params["b"] - true[1]) / abs(true[1]))
 
-    lin = fit_eac(x, y, "a*exp(b*t)", "t")
-    rob = fit_eac(x, y, "a*exp(b*t)", "t", loss="soft_l1")  # auto f_scale
+    # active_ratio=0.8 is the leading-transient recipe this case was tuned
+    # with (the v0.2 default keeps all samples).
+    lin = fit_eac(x, y, "a*exp(b*t)", "t", active_ratio=0.8)
+    rob = fit_eac(x, y, "a*exp(b*t)", "t", active_ratio=0.8,
+                  loss="soft_l1")  # auto f_scale
     assert relerr(rob) < 0.6 * relerr(lin), "robust loss did not engage"
 
 

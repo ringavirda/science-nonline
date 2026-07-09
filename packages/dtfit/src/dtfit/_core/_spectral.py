@@ -361,9 +361,11 @@ def solve_spectral(
 
     Shared by every LSI variant: builds the model spectrum by evaluating the
     lambdified model at the basis nodes and projecting, then minimizes the
-    diagonal-weighted coefficient residual. When ``bounds`` are given a global
-    search (differential evolution) precedes the local refine, which makes the
-    multimodal cases (e.g. free-frequency Fourier fits) robust to ``p0``.
+    diagonal-weighted coefficient residual. When ``bounds`` are given (and all
+    finite) a global search (differential evolution) precedes the local
+    refine, which makes the multimodal cases (e.g. free-frequency Fourier
+    fits) robust to ``p0``; infinite / mixed bounds skip the global stage but
+    still constrain the local solve (see :func:`solve_weighted_nlls`).
     """
     t = sp.Symbol(var)
     f_sym = cast(sp.Expr, sp.sympify(expr))
@@ -388,7 +390,7 @@ def solve_spectral(
         return sqrt_w * (beta_data - spec)
 
     guess = np.ones(len(params)) if p0 is None else np.asarray(p0, float)
-    coeffs, jac, converged, message = solve_weighted_nlls(
+    coeffs, jac, converged, message, nfev = solve_weighted_nlls(
         residual, sqrt_w, beta_data, guess, p0=p0, bounds=bounds
     )
     cov = _covariance(jac, residual(coeffs), len(params))
@@ -399,7 +401,7 @@ def solve_spectral(
     # fit_lsi/fit_eac already provide.
     return FittingResult(coeffs=coeffs, cov=cov,
                          expr=expr, var=var, names=tuple(str(p) for p in params),
-                         converged=converged, message=message,
+                         converged=converged, message=message, nfev=nfev,
                          x_range=(basis.x0, basis.xn))
 
 
@@ -412,6 +414,7 @@ def solve_weighted_nlls(
     p0=None,
     bounds: list[tuple[float, float]] | None = None,
     seed: int | None = 0,
+    solver_options: dict[str, Any] | None = None,
 ):
     """The shared bounded/unbounded weighted-NLLS driver for the LSI spectral
     match, used by both :func:`solve_spectral` and :func:`dtfit.fit_lsi`.
@@ -423,22 +426,49 @@ def solve_weighted_nlls(
     search refined by L-BFGS-B (the multimodal-safe path for e.g. a free
     frequency). ``seed`` seeds the DE search for reproducibility.
 
-    Returns ``(coeffs, jac, converged, message)``.
+    Infinite / mixed bounds are tolerated: the global (differential-evolution)
+    stage needs a finite box and only runs when **every** bound is finite, but
+    the bounds are always passed to the local trf solve (scipy handles
+    ``+/-inf`` there), so a partially-bounded problem stays constrained
+    instead of being solved unbounded.
+
+    ``solver_options`` is an optional dict of solver tolerances forwarded to the
+    underlying optimizers where applicable: ``xtol`` / ``ftol`` / ``gtol`` /
+    ``max_nfev`` go to :func:`scipy.optimize.least_squares`; ``ftol`` / ``gtol``
+    and ``max_nfev`` (as ``maxfun``) map onto the L-BFGS-B refine. Unknown keys
+    are ignored.
+
+    Returns ``(coeffs, jac, converged, message, nfev)`` where ``nfev`` is the
+    number of residual / cost evaluations the solver reported (summed across the
+    global + local stages on the differential-evolution path).
     """
+    opts = solver_options or {}
+    ls_opts = {k: opts[k] for k in ("xtol", "ftol", "gtol", "max_nfev") if k in opts}
+    min_opts: dict[str, Any] = {}
+    if "ftol" in opts:
+        min_opts["ftol"] = opts["ftol"]
+    if "gtol" in opts:
+        min_opts["gtol"] = opts["gtol"]
+    if "max_nfev" in opts:
+        min_opts["maxfun"] = opts["max_nfev"]
+
     if bounds is not None:
         lo = [b[0] for b in bounds]
         hi = [b[1] for b in bounds]
-        local = None
-        if p0 is not None:
+        # DE needs a finite search box; trf accepts +/-inf bounds directly.
+        all_finite = bool(np.all(np.isfinite(lo)) and np.all(np.isfinite(hi)))
+        if p0 is not None or not all_finite:
             loc = least_squares(
-                residual, np.clip(guess, lo, hi), bounds=(lo, hi), method="trf"
+                residual, np.clip(guess, lo, hi), bounds=(lo, hi), method="trf",
+                **ls_opts,
             )
             denom = float(np.linalg.norm(sqrt_w * beta_data)) + 1e-30
-            if loc.success and float(np.linalg.norm(loc.fun)) / denom < 0.5:
-                local = loc
-        if local is not None:
-            return (np.asarray(local.x, dtype=np.float64), local.jac,
-                    bool(local.success), str(local.message))
+            good = loc.success and float(np.linalg.norm(loc.fun)) / denom < 0.5
+            if good or not all_finite:
+                # With any infinite bound the global stage cannot run, so the
+                # bounded local solve is the answer either way (honest status).
+                return (np.asarray(loc.x, dtype=np.float64), loc.jac,
+                        bool(loc.success), str(loc.message), int(loc.nfev))
 
         def cost(c: np.ndarray) -> float:
             r = residual(c)
@@ -449,13 +479,19 @@ def solve_weighted_nlls(
         res_g = cast(Any, differential_evolution)(
             cost, bounds, strategy="best1bin", popsize=15, seed=seed
         )
-        res = minimize(cost, res_g.x, method="L-BFGS-B", bounds=bounds)
+        res = minimize(
+            cost, res_g.x, method="L-BFGS-B", bounds=bounds,
+            options=min_opts or None,
+        )
         coeffs = np.asarray(res.x, dtype=np.float64)
-        return coeffs, _numeric_jac(residual, coeffs), bool(res.success), str(res.message)
+        # nfev over both stages: the global DE search plus the local refine.
+        nfev = int(getattr(res_g, "nfev", 0)) + int(getattr(res, "nfev", 0))
+        return (coeffs, _numeric_jac(residual, coeffs),
+                bool(res.success), str(res.message), nfev)
 
-    sol = least_squares(residual, guess, method="lm")
+    sol = least_squares(residual, guess, method="lm", **ls_opts)
     return (np.asarray(sol.x, dtype=np.float64), sol.jac,
-            bool(sol.success), str(sol.message))
+            bool(sol.success), str(sol.message), int(sol.nfev))
 
 
 def _numeric_jac(residual, c: np.ndarray, eps: float = 1e-6) -> np.ndarray:

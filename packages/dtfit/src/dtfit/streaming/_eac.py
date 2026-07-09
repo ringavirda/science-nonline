@@ -27,7 +27,7 @@ The symbolic model and its derivatives are compiled once in ``__init__``; every
 path is real-time safe.
 """
 
-from typing import Any, Sequence
+from typing import Any, Callable, Sequence
 
 import numpy as np
 import sympy as sp
@@ -51,7 +51,9 @@ class EACFilter(_RecursiveFilter):
     """
 
     @classmethod
-    def tracking(cls, expr: str, var: str, **overrides: Any) -> "EACFilter":
+    def tracking(
+        cls, expr: str | sp.Expr | Callable[..., Any], var: str, **overrides: Any
+    ) -> "EACFilter":
         """Responsive preset: auto-sized window for tracking drifting parameters.
 
         Equivalent to ``EACFilter(expr, var, adaptive_window=True, ...)``; any
@@ -60,7 +62,9 @@ class EACFilter(_RecursiveFilter):
         return cls(expr, var, **{"adaptive_window": True, **overrides})
 
     @classmethod
-    def robust(cls, expr: str, var: str, **overrides: Any) -> "EACFilter":
+    def robust(
+        cls, expr: str | sp.Expr | Callable[..., Any], var: str, **overrides: Any
+    ) -> "EACFilter":
         """Outlier-resilient preset: innovation-gated, self-adapting noise, gentle
         drift re-arm. Equivalent to ``EACFilter(expr, var, robust=True,
         adapt_r=True, drift_reset="inflate", ...)``; ``overrides`` win.
@@ -72,10 +76,11 @@ class EACFilter(_RecursiveFilter):
 
     def __init__(
         self,
-        expr: str,
+        expr: str | sp.Expr | Callable[..., Any],
         var: str,
         *,
         regressors: str | Sequence[str] | None = None,
+        param_names: Sequence[str] | None = None,
         p0: InitialGuess = None,
         window_size: int = 50,
         min_window: int | None = None,
@@ -95,17 +100,28 @@ class EACFilter(_RecursiveFilter):
     ) -> None:
         """
         Args:
-            expr: Model expression, e.g. ``"A * sin(w * t)"``. It may also
-                reference **external regressors** (see ``regressors``) so the model
-                is ``f(t, regressors, params)``.
-            var: Main variable name in ``expr``.
+            expr: Model, in any of three forms: a SymPy-expression **string**
+                (e.g. ``"A * sin(w * t)"``), a :class:`sympy.Expr`, or a plain
+                Python **callable** ``f(t, *params)``. A string / expression may
+                also reference **external regressors** (see ``regressors``) so the
+                model is ``f(t, regressors, params)``. A callable is evaluated
+                numerically -- it needs no symbolic form -- but has no closed-form
+                time derivatives, so :meth:`coast` / :meth:`coast_cov` are
+                unavailable for it and external regressors are not supported.
+            var: Main variable name in ``expr`` (a label only for a callable).
             regressors: Optional name(s) of external-regressor channels appearing
                 in ``expr``; everything else free is a parameter. When given, each
                 ``partial_fit`` / ``predict`` call supplies the regressor value(s)
                 for that sample, and the model -- now able to depend on exogenous
                 signals, not just ``t`` -- is still scored by the same integrated
-                **area** measurement.
-            p0: Initial parameter estimate (defaults to ones).
+                **area** measurement. Symbolic models only.
+            param_names: For a **callable** model, the parameter names in
+                signature order (those after the leading ``t``); introspected from
+                the callable's signature when omitted. Ignored for a symbolic
+                model, whose parameters come from the expression.
+            p0: Initial parameter estimate (defaults to ones). Ordered like
+                :attr:`params_` -- sorted names for a symbolic model, signature
+                order for a callable.
             window_size: Target (maximum) sliding-window length used for area
                 integration. The window **grows** from ``min_window`` up to this
                 size as samples arrive, then slides; a larger window smooths more
@@ -169,31 +185,14 @@ class EACFilter(_RecursiveFilter):
                 behaviour); ``"inflate"`` instead multiplies the covariance by
                 ``drift_inflation`` and keeps the current estimate and window, a
                 gentler re-adaptation that does not discard hard-won parameter
-                information.
+                information. Any other value raises ``ValueError``.
             drift_inflation: Covariance inflation factor for
                 ``drift_reset="inflate"``.
         """
-        t_sym = sp.Symbol(var)
-        if regressors is None:
-            self.regressors: list[str] = []
-        elif isinstance(regressors, str):
-            self.regressors = [regressors]
-        else:
-            self.regressors = list(regressors)
-        reg_syms = [sp.Symbol(r_) for r_ in self.regressors]
-        # Bind var + regressor names to plain Symbols so names that clash with a
-        # SymPy singleton (S, I, E, N, ...) are still usable as regressors.
-        _locals = {var: t_sym, **dict(zip(self.regressors, reg_syms))}
-        # sympy's stub omits the (str, locals=dict) overload it accepts at runtime.
-        model = sp.sympify(expr, locals=_locals)  # pyright: ignore[reportCallIssue]
-        self._has_reg = bool(self.regressors)
-        _exclude = {t_sym, *reg_syms}
-        self.params = sorted(
-            (s for s in model.free_symbols if s not in _exclude), key=str
-        )
-        n = len(self.params)
-        if n == 0:
-            raise RuntimeError("Model expression has no free parameters to fit.")
+        # Resolve the model (string / sympy.Expr / callable), set up regressors,
+        # determine the canonical parameter order and compile the fast-path
+        # callables once off the hot path (shared with LSIFilter via the base).
+        n = self._setup_model(expr, var, regressors, param_names)
 
         self.p = np.ones(n) if p0 is None else np.asarray(p0, dtype=float)
         self._p_init = np.eye(n) * 10.0
@@ -229,7 +228,7 @@ class EACFilter(_RecursiveFilter):
         self.adapt_r = bool(adapt_r)
         self._robust = bool(robust)
         self._huber_c = float(huber_c)
-        self.drift_reset = drift_reset
+        self.drift_reset = self._validate_drift_reset(drift_reset)
         self.drift_inflation = float(drift_inflation)
         self._r_ewma = float(r)  # adaptive measurement-noise estimate
 
@@ -278,10 +277,6 @@ class EACFilter(_RecursiveFilter):
         self._y: list[float] = []
         self._rbuf: list[tuple] = []   # external-regressor window (aligned with _t)
 
-        # Compile the model, its derivatives and the coast split once, off the
-        # hot path (shared with LSIFilter via the base class).
-        self._compile_model(model, t_sym, reg_syms)
-
     def _area_jac(self, j: int, t_arr: np.ndarray, reg_cols=None) -> np.ndarray:
         if reg_cols is None:
             d = self._jac[j](t_arr, *self.p)
@@ -296,12 +291,16 @@ class EACFilter(_RecursiveFilter):
 
         ``regressors`` (required iff the model declares external regressors) is a
         ``{name: value}`` mapping or a value sequence ordered like ``regressors``.
+
+        A non-finite sample (NaN/inf in ``t``, ``y`` or a regressor value) is
+        **skipped at entry** with a ``RuntimeWarning``: it never enters the
+        window, so it cannot poison the innovations of the following
+        ``window_size`` updates, and the whole filter state (window, estimate,
+        covariance, ``last_residual_``) is left untouched.
         """
         self.drift_flag_ = False  # true only on the exact step a drift fires
-        self._t.append(float(t_new))
-        self._y.append(float(y_new))
-        if self._has_reg:
-            self._rbuf.append(self._reg_tuple(regressors))
+        if not self._ingest(t_new, y_new, regressors):
+            return self  # non-finite sample skipped; state untouched
         cap = self._W_eff if self.adaptive_window else self.W
         while len(self._t) > cap:
             self._t.pop(0)

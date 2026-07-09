@@ -40,15 +40,19 @@ dependencies = [
 [project.optional-dependencies]
 viz = ["matplotlib>=3.7"]
 dev = ["pytest>=7", "pytest-cov>=4", "ruff>=0.4", "mypy>=1.8"]
+# Documentation site (mkdocs-material + mkdocstrings autodoc). Not a runtime
+# dependency: install with `pip install -e ".[docs]"` and build from this
+# directory with `mkdocs build --strict`. See docs/ and mkdocs.yml.
+docs = ["mkdocs>=1.6", "mkdocs-material>=9.5", "mkdocstrings[python]>=0.26"]
 # The experiment / benchmark suite and the experimental adaptations (with their
 # heavier deps: matplotlib/torch/statsmodels/pandas, and the optional cupy GPU
 # backend) live in the separate `dtfit-experimental` distribution -- see
 # `experimental/pyproject.toml` and its `bench` / `gpu` extras.
 
 [project.urls]
-Homepage = "https://github.com/ringavirda/science-pylab"
-Repository = "https://github.com/ringavirda/science-pylab"
-Issues = "https://github.com/ringavirda/science-pylab/issues"
+Homepage = "https://github.com/ringavirda/science-nonline"
+Repository = "https://github.com/ringavirda/science-nonline"
+Issues = "https://github.com/ringavirda/science-nonline/issues"
 
 [tool.setuptools.dynamic]
 version = { attr = "dtfit.__about__.__version__" }

@@ -658,3 +658,211 @@ def test_filter_presets_configure_and_track():
     # an explicit override beats the preset default
     h = LSIFilter.robust("A*sin(w*x)", "x", adapt_noise=False)
     assert h.adapt_noise is False
+
+
+@pytest.mark.parametrize("cls,kw", [
+    (EACFilter, dict(window_size=20, n_sub=2)),
+    (LSIFilter, dict(window_size=20, order=4)),
+])
+def test_nonfinite_sample_skipped_at_entry(cls, kw):
+    """A NaN observation (or timestamp) mid-stream is skipped at ingestion
+    with a ``RuntimeWarning``: it never enters the window, so the state stays
+    bit-identical to the same stream without the bad sample and the very next
+    good sample updates normally. Regression: the sample used to be appended
+    *before* the finiteness guard, poisoning every innovation until it slid
+    out (~window_size rejected updates)."""
+    rng = np.random.default_rng(3)
+    t = np.linspace(0, 8, 160)
+    y = 2.0 + 0.7 * t + rng.normal(0, 0.05, t.size)
+
+    def make():
+        return cls("c0 + c1*t", "t", p0=[1.0, 1.0],
+                   q_diag=[1e-3, 1e-3], r=0.5, **kw)
+
+    clean, dirty = make(), make()
+    mid = 80
+    for i, (ti, yi) in enumerate(zip(t, y)):
+        clean.partial_fit(ti, yi)
+        if i == mid:
+            res_before = dirty.last_residual_
+            with pytest.warns(RuntimeWarning,
+                              match="non-finite sample skipped"):
+                assert dirty.partial_fit(ti - 1e-4, float("nan")) is dirty
+            with pytest.warns(RuntimeWarning,
+                              match="non-finite sample skipped"):
+                dirty.partial_fit(float("nan"), yi)     # NaN timestamp
+            assert dirty.last_residual_ == res_before  # untouched by skips
+        dirty.partial_fit(ti, yi)
+        # bit-identical every step: the skipped samples changed nothing, and
+        # updating resumed immediately on the next good sample (previously
+        # ~window_size updates were rejected while the NaN slid out).
+        np.testing.assert_array_equal(dirty.p, clean.p)
+        np.testing.assert_array_equal(dirty.P, clean.P)
+
+
+def test_nonfinite_regressor_skipped_at_entry():
+    """A NaN in an external-regressor channel is skipped like a NaN in y."""
+    for cls, kw in [(EACFilter, dict()), (LSIFilter, dict(order=3))]:
+        flt = cls("a*u + b", "t", regressors="u", p0=[1.0, 0.0],
+                  window_size=10, **kw)
+        for ti in np.linspace(0, 1, 30):
+            flt.partial_fit(ti, 2.0 * ti + 1.0, regressors={"u": ti})
+        p_before = flt.p.copy()
+        n_before = len(flt._t)
+        with pytest.warns(RuntimeWarning, match="non-finite sample skipped"):
+            flt.partial_fit(1.05, 3.1, regressors={"u": float("nan")})
+        np.testing.assert_array_equal(flt.p, p_before)
+        assert len(flt._t) == n_before   # nothing entered the window
+
+
+@pytest.mark.parametrize("cls", [EACFilter, LSIFilter])
+def test_drift_reset_validated_at_construction(cls):
+    """``drift_reset`` accepts only 'full'/'inflate'; any other string used to
+    silently behave as 'full' -- now it raises up front."""
+    for ok in ("full", "inflate"):
+        assert cls("a*t", "t", drift_reset=ok).drift_reset == ok
+    with pytest.raises(ValueError, match="drift_reset"):
+        cls("a*t", "t", drift_reset="typo")
+
+
+# --------------------------------------------------------------------------- #
+# Callable models -- the filters accept a plain Python f(t, *params) in place of
+# a SymPy-expression string, evaluated numerically (no symbolic form needed).
+# The normal partial_fit/predict/params_/stderr_ path works; only the
+# coast()/coast_cov() dead-reckoning (which needs symbolic time-derivatives) is
+# unavailable for a callable.
+# --------------------------------------------------------------------------- #
+def _sine_callable(t, A, w):
+    """A plain callable twin of the ``"A*sin(w*t)"`` expression string."""
+    return A * np.sin(w * t)
+
+
+@pytest.mark.parametrize("cls,kw", [
+    (EACFilter, dict(window_size=50, q_diag=[0.05, 0.001], r=20.0)),
+    (LSIFilter, dict(window_size=50, order=5, q_diag=[1e-3, 5e-4], r=5.0)),
+])
+def test_callable_model_tracks_like_string(cls, kw):
+    """A filter built from a callable ``f(t, A, w)`` recovers the sine about as
+    well as the equivalent string-expression filter -- the callable path is a
+    purely additive alternative that leaves the symbolic path bit-identical."""
+    rng = np.random.default_rng(0)
+    t = np.linspace(0, 40, 2000)
+    y = 3.0 * np.sin(1.5 * t) + rng.normal(0, 0.3, t.size)
+
+    def err(model):
+        flt = cls(model, "t", p0=[1.0, 1.0], **kw)
+        assert flt._symbolic_model is isinstance(model, str)
+        for ti, yi in zip(t, y):
+            flt.partial_fit(ti, yi)
+        p = flt.params_
+        return abs(p["A"] - 3.0) + abs(p["w"] - 1.5)
+
+    e_str = err("A*sin(w*t)")
+    e_call = err(_sine_callable)
+    assert e_call < 1.2                      # the callable filter lands close
+    assert e_call < 2.0 * e_str + 0.2        # and about as well as the string one
+
+
+@pytest.mark.parametrize("cls,kw", [
+    (EACFilter, dict(window_size=40, q_diag=[5e-3], r=0.5, n_sub=2, adapt_r=True)),
+    (LSIFilter, dict(window_size=40, order=4, q_diag=[5e-3], r=0.5)),
+])
+def test_callable_model_tracks_drifting_parameter(cls, kw):
+    """A callable-backed filter tracks a *drifting* parameter as well as the
+    string-expression filter: here a linearly ramping amplitude of a fixed-rate
+    sine. Both follow the ramp with a comparable RMS tracking error."""
+    rng = np.random.default_rng(1)
+    t = np.linspace(0, 30, 1500)
+    amp = 2.0 + 0.05 * t                       # amplitude drifts from 2.0 to 3.5
+    y = amp * np.sin(1.2 * t) + rng.normal(0, 0.1, t.size)
+
+    def track_rms(model):
+        flt = cls(model, "t", p0=[2.0, 1.2], **kw)
+        est = np.full(t.size, np.nan)
+        for i, (ti, yi) in enumerate(zip(t, y)):
+            flt.partial_fit(ti, yi)
+            est[i] = flt.params_["A"]
+        good = ~np.isnan(est)
+        return float(np.sqrt(np.mean((est[good] - amp[good]) ** 2)))
+
+    rms_str = track_rms("A*sin(w*t)")
+    rms_call = track_rms(_sine_callable)
+    assert rms_call < 0.5                       # follows the drift closely
+    assert rms_call < 1.5 * rms_str + 0.1       # about as well as the string filter
+
+
+@pytest.mark.parametrize("cls", [EACFilter, LSIFilter])
+def test_callable_model_coast_raises(cls):
+    """coast()/coast_cov() need symbolic time-derivatives, so they raise on a
+    callable-backed filter with a message pointing at the expression-string form.
+    The normal predict()/predict_cov() path still works for a callable."""
+    t = np.linspace(0, 6, 300)
+    y = 3.0 * np.sin(1.2 * t)
+    flt = cls(_sine_callable, "t", p0=[3.0, 1.2], window_size=40)
+    for ti, yi in zip(t, y):
+        flt.partial_fit(ti, yi)
+    for method in (flt.coast, flt.coast_cov):
+        with pytest.raises(NotImplementedError, match="symbolic model"):
+            method(np.array([100.0]))
+    # predict / predict_cov remain available on the callable filter.
+    assert flt.predict(np.array([1.0, 2.0])).shape == (2,)
+    assert np.all(flt.predict_cov(np.array([1.0, 2.0])) >= 0.0)
+
+
+def test_callable_model_preserves_signature_order():
+    """A callable's parameters follow SIGNATURE order (not the sorted order a
+    string model uses): ``f(t, w, A)`` yields names ``('w', 'A')`` and ``p0``
+    lines up with that order."""
+    def f(t, w, A):
+        return A * np.sin(w * t)
+
+    for cls in (EACFilter, LSIFilter):
+        flt = cls(f, "t", p0=[1.3, 2.5])
+        assert list(flt.params_) == ["w", "A"]
+        assert flt.params_["w"] == 1.3 and flt.params_["A"] == 2.5
+
+
+def test_callable_model_param_names_kwarg_for_varargs():
+    """A callable whose signature cannot be introspected (``f(t, *ps)``) is usable
+    when ``param_names`` is supplied, which then fixes the parameter order."""
+    def g(t, *ps):
+        A, w = ps
+        return A * np.sin(w * t)
+
+    for cls in (EACFilter, LSIFilter):
+        flt = cls(g, "t", param_names=["A", "w"], p0=[3.0, 1.5])
+        assert list(flt.params_) == ["A", "w"]
+    # without param_names the un-introspectable callable is rejected up front.
+    with pytest.raises(ValueError):
+        EACFilter(g, "t")
+
+
+@pytest.mark.parametrize("cls", [EACFilter, LSIFilter])
+def test_callable_model_rejects_regressors(cls):
+    """External regressors are a symbolic-only feature; combining them with a
+    callable model raises at construction (there is no symbolic form to split)."""
+    with pytest.raises(ValueError, match="regressors"):
+        cls(_sine_callable, "t", regressors="S")
+
+
+@pytest.mark.parametrize("cls", [EACFilter, LSIFilter])
+def test_callable_model_stderr_and_predict_cov(cls):
+    """The running uncertainty read-out works for a callable model: stderr_ is a
+    finite per-parameter mapping and predict_cov contracts as data arrives."""
+    rng = np.random.default_rng(2)
+    t = np.linspace(0, 20, 800)
+    y = 2.0 + 0.5 * t + rng.normal(0, 0.05, t.size)
+
+    def line(x, c0, c1):
+        return c0 + c1 * x
+
+    flt = cls(line, "t", p0=[0.0, 0.0], window_size=40, q_diag=[1e-4, 1e-4])
+    flt.partial_fit(t[0], y[0])
+    early = float(flt.predict_cov(np.array([10.0]))[0])
+    for ti, yi in zip(t[1:], y[1:]):
+        flt.partial_fit(ti, yi)
+    assert set(flt.stderr_) == {"c0", "c1"}
+    assert all(np.isfinite(v) and v >= 0 for v in flt.stderr_.values())
+    assert float(flt.predict_cov(np.array([10.0]))[0]) < early
+    p = flt.params_
+    assert abs(p["c0"] - 2.0) < 0.3 and abs(p["c1"] - 0.5) < 0.1

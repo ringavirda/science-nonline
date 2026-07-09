@@ -51,6 +51,37 @@ def test_ensemble_rejects_bad_args():
         dt.ensemble_fit(t, y, "a*exp(b*t)", "t", aggregate="nope")
 
 
+@pytest.mark.parametrize("overlap", [-0.1, 0.95, 1.0, 1.5])
+def test_ensemble_rejects_bad_overlap(overlap):
+    t, y, _ = _exp_data()
+    with pytest.raises(ValueError, match="overlap"):
+        dt.ensemble_fit(t, y, "a*exp(b*t)", "t", overlap=overlap)
+
+
+def test_ensemble_counts_failed_windows_and_warns():
+    """Per-window failures are no longer swallowed silently: they are counted,
+    the last error is kept, and a UserWarning is emitted."""
+    t, y, _ = _exp_data()
+    # NaN-poison a stretch of samples: subwindows covering it raise (default
+    # nan_policy="raise"), later subwindows stay clean and fit fine.
+    y = y.copy()
+    y[100:140] = np.nan
+    with pytest.warns(UserWarning, match="subwindow fits"):
+        e = dt.ensemble_fit(t, y, "a*exp(b*t)", "t", n_windows=6,
+                            p0=[1.0, 1.0])
+    assert e.n_failed > 0
+    assert e.last_error is not None and "non-finite" in e.last_error
+    assert e.members.shape[0] >= 1
+    assert abs(e.coeffs[1] - 0.9) < 0.2  # surviving windows still recover
+
+
+def test_ensemble_clean_fit_has_no_failures():
+    t, y, _ = _exp_data()
+    e = dt.ensemble_fit(t, y, "a*exp(b*t)", "t", n_windows=6, p0=[1.0, 1.0])
+    assert e.n_failed == 0
+    assert e.last_error is None
+
+
 def test_ensemble_recovers_under_outliers():
     """The median aggregation still recovers the parameters under spike
     contamination (median over noise draws). The head-to-head superiority over a

@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+message: "If you use dtfit in your research, please cite it as below."
+title: "dtfit: robust streaming and embedded nonlinear parameter estimation"
+abstract: >-
+  Differential-transformation fitting: methods for fitting models that are
+  nonlinear in their parameters (exponential, transcendental, mixed) for
+  nonlinear smoothing, parameter estimation and forecasting, with a focus on
+  streaming/recursive, out-of-memory and embedded use.
+type: software
+authors:
+  - given-names: Oleksandr
+    family-names: Tuhanskykh
+    email: ringanaro@gmail.com
+version: 0.4.0
+license: MIT
+repository-code: "https://github.com/ringavirda/science-nonline"
+url: "https://github.com/ringavirda/science-nonline"
+keywords:
+  - regression
+  - nonlinear
+  - time-series
+  - differential-transformations
+  - statistical-learning
+  - streaming
+  - forecasting
+  - parameter-estimation
+  - embedded

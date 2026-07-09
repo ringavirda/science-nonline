@@ -28,17 +28,34 @@ m = models.Stochastic().fit(series)                  # a random series -> Stocha
 
 ```python
 Model(expr, var="x", *, name="", shape="bulk", category="general",
-      freq_param=None, seeder=None)
+      freq_param=None, seeder=None, param_names=None)
+
+Model.from_callable(func, names=None, *, var="x", name="", shape="bulk",
+                    category="general", freq_param=None, seeder=None)
 ```
 
-A model family: the expression plus a routing `shape`, an optional
-angular-frequency parameter, and an optional data-driven `seeder` that produces
-`{name: (p0, lo, hi)}`. You normally get `Model` instances from the
-[catalog](#catalog) rather than constructing them.
+A model family: the model plus a routing `shape`, an optional angular-frequency
+parameter, and an optional data-driven `seeder` that produces `{name: (p0, lo, hi)}`.
+You normally get `Model` instances from the [catalog](#catalog) rather than
+constructing them.
 
-**Key attributes:** `expr`, `var`, `name`, `shape` (`"bulk"` / `"oscillatory"` /
-`"transient"` / `"peak"` / `"composite"` -- decides the estimator under
-`method="auto"`), `category`, `freq_param`, `params` (the parameter-name tuple).
+**`expr` may be symbolic *or* a callable (v0.3).** Pass either a SymPy-expression
+string (e.g. `"a*exp(b*x)"`, the historical form) or a plain Python callable
+`f(x, *params)` — resolved through [`resolve_model`](API-Fitting#also-exported-from-dtfitmethods),
+so a callable's parameter order is the callable's **signature** order (not the
+sorted order symbolic models use) and it fits through the same engines.
+[`Model.from_callable(func, names=..., var=..., ...)`](#from_callable) is a
+convenience wrapper for the callable path (`names` = the parameter names after the
+leading `x`; `param_names` on the constructor does the same). Composition with `+`
+and the seed-detrend evaluator require **symbolic** operands; a callable model
+raises a clear error there (see [`__add__`](#__add__-composition-with-)).
+
+**Key attributes:** `expr` (the SymPy string when symbolic, else `None`), `func`
+(the Python callable when non-symbolic, else `None`), `is_symbolic` (`True` for a
+string model, `False` for a callable), `var`, `name`, `shape` (`"bulk"` /
+`"oscillatory"` / `"transient"` / `"peak"` / `"composite"` -- decides the estimator
+under `method="auto"`), `category`, `freq_param`, `params` (the parameter-name
+tuple, in **sorted** order for a symbolic model, **signature** order for a callable).
 
 ### `fit(x, y, *, method="auto", p0=None, bounds=None) -> FittingResult`
 Fit this family to the data, **self-seeding** `p0`/`bounds` from the model's
@@ -48,8 +65,8 @@ seeder unless you override them.
 |---|---|---|
 | `"auto"` (default) | routes by `shape` through [`auto_estimate`](API-Auto#auto_estimate) | yes |
 | `"lsi"` | [`fit_lsi`](API-Fitting#fit_lsi) (passing `freq_param`) | yes |
-| `"eac"` | [`fit_eac`](API-Fitting#fit_eac) | yes (as `(lower, upper)` tuples) |
-| `"adaptive"` | [`fit_eac`](API-Fitting#fit_eac) with `window_mode="curvature"` | yes (as `(lower, upper)` tuples) |
+| `"eac"` | [`fit_eac`](API-Fitting#fit_eac) | yes (per-parameter pair list) |
+| `"adaptive"` | [`fit_eac`](API-Fitting#fit_eac) with `window_mode="curvature"` | yes (per-parameter pair list) |
 
 > **Bounds on the `"adaptive"` path.** Both EAC paths now forward the seeded (or
 > explicitly passed) `bounds` to [`fit_eac`](API-Fitting#fit_eac): `"eac"` (uniform
@@ -58,21 +75,77 @@ seeder unless you override them.
 > code now honours them, so a self-seeded model's positivity/width guards hold on
 > both paths.
 
+> **Partially-bounded seeds are kept (v0.2).** A seeder that bounds some
+> parameters and leaves others infinite no longer loses *all* its bounds: the
+> mixed pairs reach the solver, constraining the local trust-region solve (the
+> global differential-evolution stage runs only on fully-finite boxes). A fully
+> unbounded seed still maps to the unconstrained path. Failed `suggest_models`
+> candidates now emit a `UserWarning` naming the family instead of vanishing
+> silently from the ranking.
+
 ### `seed(x, y) -> dict`
 The data-driven `{name: (p0, lo, hi)}` seed map (empty if the family has no
 seeder).
+
+<a name="from_callable"></a>
+### `Model.from_callable(func, names=None, *, var="x", name="", shape="bulk", category="general", freq_param=None, seeder=None) -> Model`
+Build a `Model` from a Python callable `func(x, *params)` (a convenience wrapper
+over the constructor's callable path). `names` are the parameter names after the
+leading `x`, in call order; they are **introspected from the signature** when
+omitted and are only *required* for a callable with no inspectable signature (a
+builtin) or a `*params` signature. The parameter order is the callable's signature
+order. A callable model fits through the same engines but **cannot compose** with
+`+` (see [`__add__`](#__add__-composition-with-)).
+
+```python
+import numpy as np
+from dtfit.models import Model
+
+def decay(x, a, b):
+    return a * np.exp(-b * x)
+
+m = Model.from_callable(decay, shape="bulk")   # params ('a', 'b') in signature order
+fit = m.fit(x, y)                              # same self-seeding fit path
+```
 
 ### `__add__` (composition with `+`)
 `model_a + model_b` builds a new additive model (e.g. `trend + seasonal`).
 Colliding parameter names in the right operand are renamed, and the seeders
 compose so the combined model is **still self-seeding**: the second component is
 seeded on the detrended residual of the first. Both operands must share the same
-`var`.
+`var`. **Symbolic composition only** — both operands must be symbolic (string)
+models; composing a **callable** model raises `TypeError` (a callable's expression
+cannot be renamed / detrended symbolically). Fit the callable model on its own, or
+compose the symbolic forms.
 
 ```python
 trend_plus_cycle = models.linear() + models.sine()
 fit = trend_plus_cycle.fit(x, y)
 ```
+
+<a name="multivariate-data"></a>
+### Multivariate data
+
+**dtfit is one-dimensional.** LSI projects onto Legendre polynomials over a
+scalar interval and EAC integrates windows on a scalar axis, so **multivariate
+`X` (several predictors) is not supported** — every fitting entry point raises a
+clear error on a 2-D `X` (or a multi-column `DataFrame`) rather than silently
+producing a wrong fit.
+
+The case usually mistaken for multivariate is a **1-D signal that is a sum of
+components on one axis** (trend + cycle, baseline + peak). That is still 1-D, and
+the `+` composition above fits it directly: `models.linear() + models.sine()` is
+`a0 + a1*t + A*sin(w*t)` **in the single variable `t`** — not `g(t) + h(u)` over
+two different inputs.
+
+For a genuinely separable multi-predictor model `y = g1(x1) + g2(x2)` (distinct
+predictors), dtfit does not fit it in one call. Either **backfit** — alternate
+1-D `fit_lsi`/`fit_eac` fits on the partial residuals (`g1` on `y - g2`, then `g2`
+on `y - g1`, repeat) so each component keeps dtfit's seeding/robustness — or use a
+general nonlinear-least-squares tool (`scipy.optimize.curve_fit` / `lmfit`), which
+is dimension-agnostic. dtfit is complementary to those; its edge (1-D streaming,
+out-of-memory map-reduce, embedded, robustness without tuning) does not apply to a
+scattered multivariate cloud.
 
 ---
 
@@ -113,6 +186,31 @@ suggest_models(x, y, include=["growth", "decay"])
 One ranked candidate. Attributes: `name`, `model` ([`Model`](#model)), `result`
 ([`FittingResult`](API-Types)), `report` (the full [`fit_report`](API-Diagnostics)
 dict). Convenience properties: `aic`, `bic`, `r2`.
+
+---
+
+<a name="register"></a>
+## `register` / `unregister` (v0.4)
+
+```python
+dtfit.register(name, factory, *, overwrite=False)   # also dtfit.models.register
+dtfit.unregister(name)
+```
+
+Add your own family to the catalog so `all_models()` **and** `suggest_models`
+see it. `factory` is a zero-argument callable returning a [`Model`](#model) (like
+every built-in catalog entry); it is probed once at registration for a clear
+early error. A name collision raises `ValueError` unless `overwrite=True`.
+A registered family with a custom `category` is **never silently dropped** from
+the `suggest_models` shortlist (the recommender's shape-category vocabulary was
+opened in v0.4).
+
+```python
+import dtfit, numpy as np
+dtfit.register("myline", lambda: dtfit.Model("a0 + a1*x", name="myline"))
+[s.name for s in dtfit.suggest_models(x, y)]   # "myline" is a candidate now
+dtfit.unregister("myline")
+```
 
 ---
 
@@ -223,8 +321,8 @@ than forcing the raised-order recipe, which can over-fit a trend+cycle spectrum)
 the cycle is still recovered, just via the seed rather than the recipe. Either way
 the self-seeding path handles the frequency for you. The **bare**
 [`NonlineRegressor("...sin...", method="lsi")`](API-Estimator) does *not* (its
-default smoothing + low order erase the cycle); pass `freq_param=` or use the
-model/`auto_estimate` path instead. See the
+low default order and unseeded frequency guess miss the cycle); pass
+`freq_param=` or use the model/`auto_estimate` path instead. See the
 [LSI oscillatory recipe](Methods-LSI#the-oscillatory-recipe).
 
 ### `suggest_models` coverage

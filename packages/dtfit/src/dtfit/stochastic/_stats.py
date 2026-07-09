@@ -6,6 +6,8 @@ Pure numpy/scipy, no dtfit dependencies."""
 
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
 
 
@@ -154,7 +156,10 @@ def _is_nonstationary(y: np.ndarray, *, alpha: float = 0.05) -> bool:
         return False
     try:
         return _adf_pvalue(_adf_tau(np.asarray(y, dtype=float))) > alpha
-    except Exception:
+    except Exception as exc:
+        warnings.warn(
+            f"stochastic stage unit-root (ADF) failed: {exc}; falling back to "
+            "the near-unit AR(1) coefficient gate", UserWarning, stacklevel=2)
         b = float(np.polyfit(y[:-1], y[1:], 1)[0])
         return b > 0.98
 

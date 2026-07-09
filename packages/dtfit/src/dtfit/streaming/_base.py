@@ -12,7 +12,8 @@ methods read (``p``, ``P``, ``params``, ``regressors``, ``_f``, ``_has_reg``,
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+import warnings
+from collections.abc import Mapping, Sequence
 from typing import Any, Callable
 
 import numpy as np
@@ -22,7 +23,10 @@ class _RecursiveFilter:
     """Mixin base: the measurement-agnostic surface of a streaming filter."""
 
     # Set by each subclass's ``__init__`` (declared here for the type checkers).
-    params: list                 # the model's sympy parameter symbols
+    params: list                 # parameter names: sympy symbols (symbolic model)
+    #                              or plain name strings (callable model)
+    _symbolic_model: bool        # True for a str / sympy.Expr model; False for a
+    #                              plain Python callable (no time derivatives)
     p: np.ndarray                # current parameter estimate
     P: np.ndarray                # parameter (Kalman state) covariance
     regressors: list[str]        # external-regressor channel names ([] if none)
@@ -41,6 +45,8 @@ class _RecursiveFilter:
     _f_drift_d2t: Callable[..., Any] | None
     _has_reg: bool
     _t: list[float]              # current window sample times (newest last)
+    _y: list[float]              # current window observations (aligned with _t)
+    _rbuf: list[tuple]           # external-regressor window (aligned with _t)
 
     @property
     def params_(self) -> dict[str, float]:
@@ -64,6 +70,124 @@ class _RecursiveFilter:
         the streamed estimate (embedded control, fault detection)."""
         se = np.sqrt(np.clip(np.diag(self.P), 0.0, None))
         return {str(s): float(v) for s, v in zip(self.params, se)}
+
+    def _setup_model(
+        self,
+        expr: Any,
+        var: str,
+        regressors: str | Sequence[str] | None,
+        param_names: Sequence[str] | None,
+    ) -> int:
+        """Resolve the model input and compile the fast-path callables.
+
+        ``expr`` may be a SymPy-expression **string**, a :class:`sympy.Expr`, or a
+        plain Python **callable** ``f(t, *params)``. Sets up the external-regressor
+        channels, determines the canonical parameter order (:attr:`params`),
+        records whether the model is symbolic (:attr:`_symbolic_model`) and
+        lambdifies / wraps the model evaluator and per-parameter Jacobian once off
+        the hot path. Shared verbatim by both filters' ``__init__`` (the block was
+        duplicated in each). Returns the parameter count.
+
+        A callable model has no closed-form time derivatives, so :meth:`coast` /
+        :meth:`coast_cov` are unavailable for it (they guard on
+        :attr:`_symbolic_model`), and external regressors -- a symbolic-only
+        feature -- are rejected.
+        """
+        import sympy as sp
+
+        from dtfit.methods._modelinput import resolve_model
+
+        if regressors is None:
+            self.regressors = []
+        elif isinstance(regressors, str):
+            self.regressors = [regressors]
+        else:
+            self.regressors = list(regressors)
+        self._has_reg = bool(self.regressors)
+
+        if callable(expr) and not isinstance(expr, (str, sp.Expr)):
+            # Callable model f(t, *params): no symbolic form -> no time
+            # derivatives (coast() is unavailable) and no external regressors.
+            if self.regressors:
+                raise ValueError(
+                    "external regressors are only supported for symbolic "
+                    "(string / sympy.Expr) models, not for a callable model; "
+                    "embed the side-channel in the callable or pass an "
+                    "expression string."
+                )
+            spec = resolve_model(expr, var, param_names=param_names)
+            self.params = list(spec.names)
+            n = len(self.params)
+            if n == 0:
+                raise RuntimeError("Model callable has no free parameters to fit.")
+            self._symbolic_model = False
+            self._compile_callable_model(spec)
+            return n
+
+        # Symbolic model (string / sympy.Expr) -- unchanged from the historical
+        # path so behaviour stays bit-identical.
+        t_sym = sp.Symbol(var)
+        reg_syms = [sp.Symbol(r_) for r_ in self.regressors]
+        # Bind var + regressor names to plain Symbols so names that clash with a
+        # SymPy singleton (S, I, E, N, ...) are still usable as regressors.
+        _locals = {var: t_sym, **dict(zip(self.regressors, reg_syms))}
+        # sympy's stub omits the (str, locals=dict) overload it accepts at runtime.
+        model = sp.sympify(expr, locals=_locals)  # pyright: ignore[reportCallIssue]
+        _exclude = {t_sym, *reg_syms}
+        self.params = sorted(
+            (s for s in model.free_symbols if s not in _exclude), key=str
+        )
+        n = len(self.params)
+        if n == 0:
+            raise RuntimeError("Model expression has no free parameters to fit.")
+        self._symbolic_model = True
+        # Compile the model, its derivatives and the coast split once, off the
+        # hot path (shared with the subclasses via this base class).
+        self._compile_model(model, t_sym, reg_syms)
+        return n
+
+    def _compile_callable_model(self, spec: Any) -> None:
+        """Wrap a callable model's :class:`~dtfit.methods.ModelSpec` as the
+        ``_f`` / ``_jac`` fast-path callables, matching the ``(t, *params)`` call
+        signature the symbolic lambdas expose so the measurement hot path is
+        untouched.
+
+        ``spec.eval`` already broadcasts a constant model to the sample shape and
+        ``spec.param_derivs`` returns the per-parameter sensitivities (a
+        forward-difference for a callable). A callable has no symbolic time
+        derivatives, so the :meth:`coast` / :meth:`coast_cov` dead-reckoning
+        callables are left unset -- those methods guard on
+        :attr:`_symbolic_model` and raise ``NotImplementedError``.
+        """
+        self._spec = spec
+
+        def _f(t: Any, *p: float) -> np.ndarray:
+            return spec.eval(np.asarray(t, dtype=float), p)
+
+        self._f = _f
+        self._jac = [self._make_param_deriv(spec, k) for k in range(len(spec.names))]
+        # No time derivatives / regressor-coast split for a callable model.
+        self._dfdt = None            # type: ignore[assignment]
+        self._d2fdt2 = None          # type: ignore[assignment]
+        self._dfdt_jac = []
+        self._d2fdt2_jac = []
+        self._f_reg = None
+        self._f_drift = None
+        self._f_drift_dt = None
+        self._f_drift_d2t = None
+
+    @staticmethod
+    def _make_param_deriv(spec: Any, k: int) -> Callable[..., np.ndarray]:
+        """A ``(t, *params) -> d f / d p_k`` callable for parameter ``k``.
+
+        Mirrors one entry of the symbolic ``_jac`` list; delegates to
+        :meth:`ModelSpec.param_derivs` (a forward difference for a callable).
+        """
+
+        def _deriv(t: Any, *p: float) -> np.ndarray:
+            return spec.param_derivs(np.asarray(t, dtype=float), p)[k]
+
+        return _deriv
 
     def _compile_model(self, model, t_sym, reg_syms) -> None:
         """Lambdify the model, its per-parameter Jacobian, its time derivatives
@@ -144,6 +268,49 @@ class _RecursiveFilter:
             )
         return tuple(float(v) for v in vals)
 
+    @staticmethod
+    def _validate_drift_reset(drift_reset: str) -> str:
+        """Validate the ``drift_reset`` mode at construction. ``_on_drift``
+        branches ``if drift_reset == "inflate" ... else <full>``, so any other
+        string would silently behave as ``"full"``; reject it up front."""
+        if drift_reset not in ("full", "inflate"):
+            raise ValueError(
+                f"drift_reset must be 'full' or 'inflate', got {drift_reset!r}"
+            )
+        return drift_reset
+
+    def _ingest(self, t_new, y_new, regressors) -> bool:
+        """Validate one incoming ``(t, y[, regressors])`` sample and append it
+        to the sliding window.
+
+        Finiteness is checked **at entry, before the append**: a NaN/inf that
+        entered the window would poison every innovation until it slid out
+        (~``window_size`` updates), with the non-finite update guard rejecting
+        each of those steps. A skipped sample leaves the whole filter state --
+        window, parameters, covariance, ``last_residual_`` -- untouched.
+
+        Returns:
+            True if the sample was appended; False if it was skipped (a
+            ``RuntimeWarning`` is emitted -- Python's default warning filter
+            dedupes repeats per call site).
+        """
+        t_val = float(t_new)
+        y_val = float(y_new)
+        reg = self._reg_tuple(regressors) if self._has_reg else ()
+        if not (np.isfinite(t_val) and np.isfinite(y_val)
+                and all(np.isfinite(v) for v in reg)):
+            # stacklevel=3: attribute the warning to the caller of
+            # partial_fit (this helper sits one frame below it).
+            warnings.warn(
+                "non-finite sample skipped", RuntimeWarning, stacklevel=3
+            )
+            return False
+        self._t.append(t_val)
+        self._y.append(y_val)
+        if self._has_reg:
+            self._rbuf.append(reg)
+        return True
+
     def _predict_cols(self, xa: np.ndarray, regressors) -> list[np.ndarray]:
         """Regressor columns broadcast to ``xa`` for :meth:`predict`."""
         if regressors is None:
@@ -219,6 +386,11 @@ class _RecursiveFilter:
             regressors: Future regressor value(s) at ``x`` (required iff the model
                 declares external regressors), as for :meth:`predict`.
         """
+        if not self._symbolic_model:
+            raise NotImplementedError(
+                "coast() needs a symbolic model for its time-derivatives; "
+                "construct the filter from an expression string to use coasting"
+            )
         xa = np.asarray(x, dtype=float)
         if self._has_reg:
             if regressors is None or self._f_reg is None:
@@ -285,6 +457,11 @@ class _RecursiveFilter:
             order: Match the :meth:`coast` order (1 constant-velocity, default; 2
                 constant-acceleration).
         """
+        if not self._symbolic_model:
+            raise NotImplementedError(
+                "coast_cov() needs a symbolic model for its time-derivatives; "
+                "construct the filter from an expression string to use coasting"
+            )
         if self._has_reg:
             raise NotImplementedError(
                 "coast_cov() is undefined for models with external regressors; "

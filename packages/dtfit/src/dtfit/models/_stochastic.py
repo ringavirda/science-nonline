@@ -61,10 +61,13 @@ class Stochastic:
         explicit time index ``t`` plus the ``series``) -- mirroring the catalog's
         ``fit(x, y)``. The result is also stored on :attr:`model_`.
         """
+        # Pass inputs through unchanged so ``fit_stochastic`` can capture a
+        # pandas index (a Series/DataFrame in -> an indexed forecast out); it
+        # coerces to float arrays internally.
         if y is None:
-            series, t = np.asarray(x, dtype=float), None
+            series, t = x, None
         else:
-            series, t = np.asarray(y, dtype=float), np.asarray(x, dtype=float)
+            series, t = y, x
         self.model_ = fit_stochastic(
             series, t, period=self.period, max_harmonics=self.max_harmonics,
             forecaster=self.forecaster, **self.gates)

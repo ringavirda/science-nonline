@@ -236,7 +236,11 @@ def gen(model, rng, *, n=220, noise=0.05, outliers=0.0, sparse=False):
     return t, y, clean
 
 
-def _eac_bounds(b):
+def _scipy_bounds(b):
+    """Pair-list -> scipy ``(lo_list, hi_list)`` for the *baseline* fitters
+    (curve_fit-style). dtfit's own fitters take the pair list directly as of
+    v0.2 -- do NOT route their bounds through this (a 2-parameter family's
+    tuple is ambiguous and now reads as per-parameter pairs)."""
     return ([x[0] for x in b], [x[1] for x in b]) if b else None
 
 
@@ -256,7 +260,7 @@ def est_lsi(m, t, y):
 
 def est_eac(m, t, y, loss="linear"):
     p0 = list(m["p0"]) if m.get("p0") else None
-    r = dt.fit_eac(t, y, m["expr"], "t", p0=p0, bounds=_eac_bounds(m["bounds"]),
+    r = dt.fit_eac(t, y, m["expr"], "t", p0=p0, bounds=m["bounds"],
                    loss=loss)
     return dict(zip(sorted(m["names"]), r.coeffs))
 
@@ -270,7 +274,7 @@ def est_adaptive(m, t, y):
 def est_ensemble(m, t, y):
     r = ensemble_fit(t, y, m["expr"], "t", method="eac", n_windows=8,
                      overlap=0.5, aggregate="median", p0=m["p0"],
-                     bounds=_eac_bounds(m["bounds"]))
+                     bounds=m["bounds"])
     return dict(zip(sorted(m["names"]), r.coeffs))
 
 
@@ -287,13 +291,13 @@ def est_merged(m, t, y):
 
 
 def est_nlls(m, t, y):
-    p = bl.scipy_curve_fit(t, y, m["func"], m["p0"], bounds=_eac_bounds(m["bounds"]))
+    p = bl.scipy_curve_fit(t, y, m["func"], m["p0"], bounds=_scipy_bounds(m["bounds"]))
     return dict(zip(m["names"], p))
 
 
 def est_robust_nlls(m, t, y):
     p = bl.robust_curve_fit(t, y, m["func"], m["p0"],
-                            bounds=_eac_bounds(m["bounds"]), loss="soft_l1")
+                            bounds=_scipy_bounds(m["bounds"]), loss="soft_l1")
     return dict(zip(m["names"], p))
 
 
@@ -305,7 +309,7 @@ def est_moment(m, t, y):
     that LSI's Legendre reconditioning removes -- the fair "what does the
     reconditioning buy?" foil across every family."""
     p = bl.moment_match_fit(t, y, m["func"], m["p0"],
-                            bounds=_eac_bounds(m["bounds"]))
+                            bounds=_scipy_bounds(m["bounds"]))
     return dict(zip(m["names"], p))
 
 
@@ -518,7 +522,7 @@ def joint_channels(rng):
     for (tx, yx) in chans:
         try:
             r = dt.fit_eac(tx, yx, "K*(1-exp(-t/tau))", "t", p0=[1.0, 1.0],
-                           bounds=([0.1, 0.05], [10, 5]))
+                           bounds=[(0.1, 10), (0.05, 5)])
             indep.append(float(r.coeffs[1]))     # sorted names [K, tau] -> tau
         except Exception:
             pass

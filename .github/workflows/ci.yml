@@ -11,7 +11,42 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
+  # Path filter: decide which package suites a change actually affects, so the
+  # stable `dtfit` package is gated independently of the heavier research
+  # packages (dtfit-experimental / dtfit-hardware). A change under
+  # packages/dtfit/** runs the dtfit job; a research-only change does not drag
+  # the whole dtfit matrix along, and vice versa. The workflow file itself is in
+  # both filters so a CI change re-runs everything.
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      dtfit: ${{ steps.filter.outputs.dtfit }}
+      research: ${{ steps.filter.outputs.research }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            dtfit:
+              - 'packages/dtfit/**'
+              - '.github/workflows/ci.yml'
+            research:
+              # The research packages install dtfit as a dependency, so a dtfit
+              # change must re-test them too.
+              - 'packages/dtfit/**'
+              - 'packages/dtfit-experimental/**'
+              - 'packages/dtfit-hardware/**'
+              - '.github/workflows/ci.yml'
+
+  # The stable, published package -- gated on its own: ruff, the accuracy gate,
+  # mypy and the pytest coverage floor, across the full OS/Python matrix, with
+  # the optional native kernels built on Linux.
+  dtfit:
+    needs: changes
+    if: ${{ needs.changes.outputs.dtfit == 'true' }}
     runs-on: ${{ matrix.os }}
     # Enforce the optional native build only where CI actually builds it (Linux);
     # Windows/macOS run the pure-Python fallback, so native-required tests skip.
@@ -35,11 +70,8 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
 
-      - name: Install all three packages (with viz + dev extras)
-        run: |
-          pip install -e "packages/dtfit[viz,dev]"
-          pip install -e "packages/dtfit-experimental[dev]"
-          pip install -e "packages/dtfit-hardware[dev]"
+      - name: Install dtfit (with viz + dev extras)
+        run: pip install -e "packages/dtfit[viz,dev]"
 
       # The optional C kernels need clang; only the Linux runner builds them.
       # Windows/macOS deliberately run on the NumPy/SciPy fallback, so CI also
@@ -53,7 +85,7 @@ jobs:
         working-directory: packages/dtfit
 
       - name: Lint (ruff)
-        run: ruff check packages
+        run: ruff check packages/dtfit
 
       # Explicit, fast-failing accuracy gate over the whole model catalogue:
       # recovery matrix + every-method-runs guard (Phase 1), default-config
@@ -74,6 +106,49 @@ jobs:
           pytest --cov --cov-report=term-missing --cov-report=xml --cov-fail-under=70
         working-directory: packages/dtfit
 
+      # Publish the coverage report once (one OS/interpreter) as a build
+      # artifact, so the number is visible/trendable without an external service.
+      - name: Upload coverage report
+        if: runner.os == 'Linux' && matrix.python-version == '3.12'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: packages/dtfit/coverage.xml
+          if-no-files-found: error
+
+  # The research packages (adaptations + hardware host-glue). They depend on
+  # dtfit but are gated separately so their heavier deps / looser gates never
+  # block the stable dtfit package.
+  research:
+    needs: changes
+    if: ${{ needs.changes.outputs.research == 'true' }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      # dtfit is a runtime dependency of both research packages; install it
+      # (with the dev tools: ruff/mypy/pytest) first, then the two packages.
+      - name: Install dtfit + research packages (with dev extras)
+        run: |
+          pip install -e "packages/dtfit[dev]"
+          pip install -e "packages/dtfit-experimental[dev]"
+          pip install -e "packages/dtfit-hardware[dev]"
+
+      - name: Lint (ruff)
+        run: ruff check packages/dtfit-experimental packages/dtfit-hardware
+
       - name: Type check + test — dtfit-experimental
         run: |
           mypy --python-version ${{ matrix.python-version }}
@@ -88,13 +163,3 @@ jobs:
           mypy --python-version ${{ matrix.python-version }}
           pytest
         working-directory: packages/dtfit-hardware
-
-      # Publish the coverage report once (one OS/interpreter) as a build
-      # artifact, so the number is visible/trendable without an external service.
-      - name: Upload coverage report
-        if: runner.os == 'Linux' && matrix.python-version == '3.12'
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-xml
-          path: packages/dtfit/coverage.xml
-          if-no-files-found: error

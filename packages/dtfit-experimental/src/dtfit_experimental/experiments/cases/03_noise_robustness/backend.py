@@ -151,8 +151,8 @@ def outlier_sweep(fam, fracs, n=120, seeds=5):
                 acc["EAC-ensemble"].append(np.nan)
             try:
                 r = dt.fit_eac(x, y, fam["expr"], fam["var"], p0=fam["p0"],
-                               loss="soft_l1", bounds=([-10] * len(fam["p0"]),
-                                                       [10] * len(fam["p0"])))
+                               loss="soft_l1",
+                               bounds=[(-10, 10)] * len(fam["p0"]))
                 acc["EAC-softl1"].append(r2_clean(clean, np.asarray(r.model(x))))
             except Exception:
                 acc["EAC-softl1"].append(np.nan)

@@ -143,8 +143,8 @@ Before trusting any fit:
    dynamic range; map a wide `x` into roughly `[0, 1.5]` and scale `y` to O(1)
    first (invertible, doesn't change R^2). This is the single most common cause of
    a bad dtfit fit.
-2. **Pick `active_ratio` to match where the information is** (EAC): `1.0` for
-   saturating tails, the default `0.8` for early transients.
+2. **Pick `active_ratio` to match where the information is** (EAC): the default
+   `1.0` for saturating tails (full record), `0.8` for early transients.
 3. **Seed oscillations.** Always pass `freq_param` for sinusoids.
 4. **Give bounds for hard models.** Bounds turn on LSI's global search and keep it
    out of wrong local minima.

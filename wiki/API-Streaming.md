@@ -24,10 +24,10 @@ Each filter is the **streaming twin of a batch method**: `EACFilter` <->
 ## `EACFilter`
 
 ```python
-EACFilter(expr, var, *, regressors=None, p0=None, window_size=50,
-          min_window=None, adaptive_window=False, window_tol=0.02,
-          q_diag=None, r=1.0, alpha=0.001, cusum_k=0.5, cusum_h=5.0, n_sub=1,
-          adapt_r=False, robust=False, huber_c=3.0,
+EACFilter(expr, var, *, regressors=None, param_names=None, p0=None,
+          window_size=50, min_window=None, adaptive_window=False,
+          window_tol=0.02, q_diag=None, r=1.0, alpha=0.001, cusum_k=0.5,
+          cusum_h=5.0, n_sub=1, adapt_r=False, robust=False, huber_c=3.0,
           drift_reset="full", drift_inflation=100.0)
 ```
 
@@ -49,9 +49,10 @@ and only pass overrides, rather than tuning the full knob set below:
 
 | name | default | meaning |
 |---|---|---|
-| `expr`, `var` | -- | model expression and main variable, e.g. `"A*sin(w*t)"`; `expr` may also reference [external regressors](#regressors) |
-| `regressors` | `None` | name(s) of [external-regressor](#regressors) channels appearing in `expr` (everything else free is a parameter); when given, each `partial_fit` / `predict` supplies the regressor value(s) for that sample |
-| `p0` | `None` | initial parameter estimate (defaults to ones) |
+| `expr`, `var` | -- | model and main variable, e.g. `"A*sin(w*t)"`. `expr` may be a SymPy-expression **string**, a `sympy.Expr`, or a plain Python **callable** `f(t, *params)`; a string/expression may also reference [external regressors](#regressors). A callable is evaluated numerically (no symbolic form) — but has no closed-form time derivatives, so [`coast`](#coast) / [`coast_cov`](#coast_cov) are **unavailable** for it and external regressors are not supported. `var` is a label only for a callable |
+| `regressors` | `None` | name(s) of [external-regressor](#regressors) channels appearing in `expr` (everything else free is a parameter); when given, each `partial_fit` / `predict` supplies the regressor value(s) for that sample. **Symbolic models only** (a callable rejects regressors) |
+| `param_names` | `None` | for a **callable** model, the parameter names in **signature order** (those after the leading `t`); introspected from the callable's signature when omitted. Ignored for a symbolic model, whose parameters come from the expression |
+| `p0` | `None` | initial parameter estimate (defaults to ones); ordered like `params_` — sorted names for a symbolic model, signature order for a callable |
 | `window_size` | `50` | target (**maximum**) sliding-window length for the area integration; the window **grows** from `min_window` up to this size as samples arrive, then slides. Larger => smoother/more rigid, smaller => more responsive |
 | `min_window` | `None` | smallest window at which the filter starts producing an estimate (the area measurement is accumulative, so it does not idle until `window_size` samples arrive). Defaults to **half** `window_size` (a scalar area over few noisy points is unreliable); with `adaptive_window` a small floor so the window can collapse here on a drift. Clamped to `[2*n_sub, window_size]` |
 | `adaptive_window` | `False` | size the window **automatically from the data**, using `window_size` as the maximum: grow from `min_window` while the state covariance is still shrinking, collapse back to `min_window` on a detected drift. Best-effort for the area filter -- it cannot size a *global*-parameter model (a polynomial's intercept) well; for robust auto-sizing use [`LSIFilter`](#lsifilter) |
@@ -65,7 +66,7 @@ and only pass overrides, rather than tuning the full knob set below:
 | `adapt_r` | `False` | adapt `R` online from an EWMA of the squared innovation (Mehra-style); pair with `n_sub>1` |
 | `robust` | `False` | gate each update by the normalized innovation -- a window whose per-dof Mahalanobis innovation exceeds `huber_c` has its measurement-noise inflated (gain shrunk) by a Huber weight, so an outlier-corrupted window cannot yank the estimate. The drift detector still sees the raw innovation, so a genuine regime shift is still detected |
 | `huber_c` | `3.0` | robust gate threshold in innovation standard deviations (per dof); ~3 keeps clean windows unweighted |
-| `drift_reset` | `"full"` | on a detected drift, `"full"` resets covariance + clears the window; `"inflate"` multiplies covariance by `drift_inflation` and keeps the estimate (gentler) |
+| `drift_reset` | `"full"` | on a detected drift, `"full"` resets covariance + clears the window; `"inflate"` multiplies covariance by `drift_inflation` and keeps the estimate (gentler). Validated at construction — any other value raises `ValueError` |
 | `drift_inflation` | `100.0` | covariance inflation factor for `drift_reset="inflate"` |
 
 **Methods & attributes**
@@ -73,7 +74,10 @@ and only pass overrides, rather than tuning the full knob set below:
 - `partial_fit(t_new, y_new, regressors=None) -> self` -- ingest one sample; returns
   early until the window reaches `min_window`. `update` is an alias
   (recursive-filter naming). Pass [`regressors=`](#regressors) iff the model
-  declares external regressors.
+  declares external regressors. A **non-finite sample** (NaN/inf in `t`, `y`, or a
+  regressor) is skipped at entry with a `RuntimeWarning` — it never enters the
+  window and the filter resumes on the next good sample (before v0.2 one NaN
+  silently stalled updates for up to a full window).
 - `predict(x, regressors=None) -> ndarray` -- evaluate the current model at `x`.
 - [`coast(x, *, order=1)`](#coast) -- dead-reckon *past the fitted window* (gap
   extrapolation).
@@ -116,11 +120,11 @@ print(flt.params_)
 ## `LSIFilter`
 
 ```python
-LSIFilter(expr, var, *, regressors=None, p0=None, window_size=50,
-          min_window=None, adaptive_window=False, window_tol=0.001, order=5,
-          q_diag=None, r=1.0, alpha=0.001, cusum_k=0.5, cusum_h=5.0,
-          adapt_r=False, adapt_noise=False, robust=False, huber_c=3.0,
-          drift_reset="full", drift_inflation=100.0)
+LSIFilter(expr, var, *, regressors=None, param_names=None, p0=None,
+          window_size=50, min_window=None, adaptive_window=False,
+          window_tol=0.001, order=5, q_diag=None, r=1.0, alpha=0.001,
+          cusum_k=0.5, cusum_h=5.0, adapt_r=False, adapt_noise=False,
+          robust=False, huber_c=3.0, drift_reset="full", drift_inflation=100.0)
 ```
 
 Drop-in sibling of `EACFilter` with the same `partial_fit` / `predict` / `params_`
@@ -138,10 +142,13 @@ the full knob set:
   Equivalent to `LSIFilter(expr, var, robust=True, adapt_noise=True,
   drift_reset="inflate", ...)`; `overrides` win.
 
-It shares `EACFilter`'s `regressors`, `p0`, `window_size` (target/**maximum**,
-window grows from `min_window`), `min_window`, `adaptive_window`, `q_diag`, `r`,
-`alpha`, `cusum_k`, `cusum_h`, `adapt_r`, `robust`, `huber_c`, `drift_reset` and
-`drift_inflation` arguments, and the same [`coast`](#coast) /
+It shares `EACFilter`'s `regressors`, `param_names`, `p0`, `window_size`
+(target/**maximum**, window grows from `min_window`), `min_window`,
+`adaptive_window`, `q_diag`, `r`, `alpha`, `cusum_k`, `cusum_h`, `adapt_r`,
+`robust`, `huber_c`, `drift_reset` and `drift_inflation` arguments — including the
+**callable-model** support (`expr` may be a `f(t, *params)` callable, with
+`param_names` for a non-introspectable signature; `coast`/`coast_cov` and external
+regressors then unavailable) — and the same [`coast`](#coast) /
 [`predict_cov`](#predict_cov) / [external-regressor](#regressors) methods. It
 differs in:
 
@@ -165,6 +172,10 @@ support. `predict(x)` evaluates the fitted `f(x)` directly -- exact inside the
 window the parameters were identified on, but a higher-order model *diverges* once
 `x` runs past it (a fitted cubic's `c3*x**3` blows up), so a measurement gap (no
 `partial_fit` while `x` advances) turns a good fit into an unbounded extrapolation.
+
+**Symbolic models only.** `coast` (and [`coast_cov`](#coast_cov)) need closed-form
+time-derivatives, so a **callable**-backed filter raises `NotImplementedError` —
+construct the filter from an expression string to use coasting.
 
 `coast` anchors at the last in-window sample `a = self._t[-1]` and propagates a
 Taylor expansion from there:
@@ -249,7 +260,8 @@ band = (mu - sigma, mu + sigma)         # honest, gap-growing pseudo-measurement
 
 At and before the anchor (`x <= a`) it returns `predict_cov`, so it is a drop-in
 for the whole track. Match its `order` to the `coast` call. Not defined for models
-with external regressors (as `coast`).
+with external regressors or for a **callable** model (as `coast`) — both raise
+`NotImplementedError`.
 
 ---
 

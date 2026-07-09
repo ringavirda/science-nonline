@@ -66,8 +66,8 @@ the best kept; the choice is in `model.forecaster_name`.
 | argument | default | meaning |
 |---|---|---|
 | `y` | -- | the series (1-D) |
-| `t` | `None` | time index; defaults to `0..n-1` (uniform spacing) |
-| `period` | `None` | seasonal period to use, else detected from the spectrum |
+| `t` | `None` | time index; defaults to `0..n-1`. Periods are detected in **sample units** and converted to `t` units via the median spacing, so a custom axis (seconds, years) now fits the intended seasonal frequency (fixed in v0.2 — previously a non-unit axis misfit the season) |
+| `period` | `None` | seasonal period **in samples** (index steps of `y`, not `t` units), else detected from the spectrum |
 | `max_harmonics` | `4` | cap on the Fourier harmonics (count chosen by BIC) |
 | `forecaster` | `"auto"` | `"auto"` backtest-selects; a name from [`FORECASTERS`](#forecasters) forces one; a callable `(train, h) -> array` is used directly; a list of names/callables is a custom candidate set |
 | `trend_t`, `cycle_strength`, `min_cycles`, `lm_hurst`, `mr_phi`, `vol_persist` | -- | the detection gates (above). Tuned defaults; override per series |
@@ -99,7 +99,7 @@ generator.
 |---|---|
 | `regime` | the primary regime label (`"trend+seasonal"`, `"mean-reverting"`, `"long-memory"`, `"random walk + drift"`, `"white noise / random walk"`, ...) |
 | `components` | tuple of detected components (`("trend", "seasonal")`, `("none",)`, ...) |
-| `forecaster_name` | the backtest-selected forecaster |
+| `forecaster_name` | the backtest-selected forecaster. For `n <= 50` the backtest is skipped: a `UserWarning` is emitted and the name carries a `" (short-series fallback)"` suffix so the untested choice is visible |
 | `trend_slope`, `has_trend` | linear trend |
 | `cycle_period`, `cycle_amp`, `has_cycle`, `n_harmonics`, `seasonal` | cycle / seasonal |
 | `hurst`, `has_long_memory` | long memory (`d = hurst - 0.5`) |

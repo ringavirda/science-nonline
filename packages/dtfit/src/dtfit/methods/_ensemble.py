@@ -20,6 +20,7 @@ robustness, so it is a specialised tool rather than the default path.
 
 from __future__ import annotations
 
+import warnings
 from typing import Callable
 
 import numpy as np
@@ -43,6 +44,9 @@ class EnsembleResult(FittingResult):
     Attributes:
         spread: Per-parameter inter-window standard deviation (uncertainty).
         members: ``(n_windows_fitted, n_params)`` raw per-window coefficients.
+        n_failed: Number of subwindow fits that raised and were skipped.
+        last_error: Message of the last skipped subwindow's exception
+            (``None`` when every window fit succeeded).
     """
 
     def __init__(
@@ -54,6 +58,8 @@ class EnsembleResult(FittingResult):
         expr: str,
         var: str,
         names: tuple[str, ...],
+        n_failed: int = 0,
+        last_error: str | None = None,
     ) -> None:
         spread = np.asarray(spread, dtype=float)
         super().__init__(
@@ -61,6 +67,8 @@ class EnsembleResult(FittingResult):
         )
         self.spread = spread
         self.members = np.asarray(members, dtype=float)
+        self.n_failed = int(n_failed)
+        self.last_error = last_error
 
 
 def ensemble_fit(
@@ -99,36 +107,52 @@ def ensemble_fit(
         raise ValueError(f"method must be 'lsi' or 'eac', got {method!r}")
     if aggregate not in ("median", "mean"):
         raise ValueError(f"aggregate must be 'median' or 'mean', got {aggregate!r}")
+    if not 0.0 <= overlap <= 0.9:
+        # overlap >= 1 would blow the window sizing up (division by <= 0) and
+        # anything above 0.9 gives near-duplicate windows; fail loudly.
+        raise ValueError(f"overlap must be in [0, 0.9], got {overlap!r}")
     x = np.asarray(data_x, dtype=float)
     y = np.asarray(data_y, dtype=float)
     n = x.size
 
     step = max(1, int(n / n_windows * (1.0 - overlap)))
-    win = max(int(n / n_windows / (1.0 - overlap)) if overlap < 1 else n, 8)
+    win = max(int(n / n_windows / (1.0 - overlap)), 8)
     win = min(win, n)
 
     members: list[np.ndarray] = []
     names: tuple[str, ...] = ()
     last_res: FittingResult | None = None
+    n_attempted = 0
+    n_failed = 0
+    last_error: str | None = None
     start = 0
     while start + win <= n and len(members) < n_windows * 3:
         sl = slice(start, start + win)
+        n_attempted += 1
         try:
             res = fitter(x[sl], y[sl], expr, var, p0=p0, **kwargs)
             members.append(np.asarray(res.coeffs, dtype=float))
             last_res = res
             names = res.names or names
-        except Exception:  # noqa: BLE001 - a corrupted window is simply skipped
-            pass
+        except Exception as exc:  # noqa: BLE001 - a corrupted window is skipped
+            n_failed += 1
+            last_error = f"{type(exc).__name__}: {exc}"
         start += step
-        if step == 0:
-            break
 
     if not members:  # every subwindow failed -> one whole-record fit
         res = fitter(x, y, expr, var, p0=p0, **kwargs)
         members.append(np.asarray(res.coeffs, dtype=float))
         last_res = res
         names = res.names or names
+
+    if n_failed > 0:
+        warnings.warn(
+            f"ensemble_fit: {n_failed} of {n_attempted} subwindow fits "
+            f"failed and were skipped (last error: {last_error}); the "
+            "aggregate uses the surviving fits.",
+            UserWarning,
+            stacklevel=2,
+        )
 
     M = np.vstack(members)
     coeffs = np.median(M, axis=0) if aggregate == "median" else np.mean(M, axis=0)
@@ -145,4 +169,5 @@ def ensemble_fit(
             spread = np.full(M.shape[1], np.nan)
     else:
         spread = np.std(M, axis=0)
-    return EnsembleResult(coeffs, spread, M, expr=expr, var=var, names=names)
+    return EnsembleResult(coeffs, spread, M, expr=expr, var=var, names=names,
+                          n_failed=n_failed, last_error=last_error)

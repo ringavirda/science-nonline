@@ -92,3 +92,18 @@ def test_channel_count_mismatch_raises(channels):
     acc = PartitionedBatchLSI("a*exp(b*t)", "t", domain=(0.0, 10.0), n_channels=3, order=6)
     with pytest.raises(ValueError, match="channels"):
         acc.update(x[:512], Y[:512])  # 8 channels != 3
+
+
+def test_update_accepts_plain_lists(channels):
+    # ``update`` coerces array-likes up front: list-of-lists chunks accumulate
+    # exactly the ndarray-fed state (and never touch ``.shape`` on the raw args).
+    x, Y, _, _ = channels
+    ref = PartitionedBatchLSI(
+        "a*exp(b*t)", "t", domain=(0.0, 10.0), n_channels=Y.shape[1], order=6)
+    alt = PartitionedBatchLSI(
+        "a*exp(b*t)", "t", domain=(0.0, 10.0), n_channels=Y.shape[1], order=6)
+    for i in range(0, x.size, 512):
+        ref.update(x[i:i + 512], Y[i:i + 512])
+        alt.update(list(x[i:i + 512]), [list(row) for row in Y[i:i + 512]])
+    assert alt.n_samples == ref.n_samples == x.size
+    np.testing.assert_array_equal(alt.spectra(), ref.spectra())

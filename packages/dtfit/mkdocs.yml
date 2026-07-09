@@ -1,0 +1,101 @@
+site_name: dtfit
+site_description: >-
+  Differential-transformation fitting -- robust streaming and embedded
+  nonlinear parameter estimation, forecasting and smoothing.
+site_author: Oleksandr Tuhanskykh
+repo_url: https://github.com/ringavirda/science-nonline
+repo_name: ringavirda/science-nonline
+edit_uri: edit/main/packages/dtfit/docs/
+docs_dir: docs
+site_dir: site
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.tracking
+    - navigation.instant
+    - content.code.copy
+    - content.code.annotate
+    - toc.follow
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            # The codebase documents grouped params on one line (e.g.
+            # ``data_x, data_y:``) and leaves some estimator __init__ params
+            # unannotated; silence griffe's docstring-vs-signature nitpicks so
+            # --strict is not tripped by them (real import errors still surface).
+            docstring_options:
+              warn_unknown_params: false
+              warn_missing_types: false
+            docstring_section_style: table
+            show_root_heading: true
+            show_root_full_path: false
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            show_source: false
+            members_order: source
+            separate_signature: true
+            show_signature_annotations: true
+            signature_crossrefs: true
+            merge_init_into_class: true
+            filters:
+              - "!^_"
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.details
+  - pymdownx.arithmatex:
+      generic: true
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
+
+nav:
+  - Home: index.md
+  - Guide:
+      - Choosing a method: guide/choosing-a-method.md
+      - "LSI -- Least-Squares Integral": guide/lsi.md
+      - "EAC -- Equal-Areas Criterion": guide/eac.md
+      - Multivariate data: guide/multivariate.md
+  - dtfit vs SciPy: comparison.md
+  - Versioning & deprecation: versioning.md
+  - API reference:
+      - Batch fitting: api/batch-fitting.md
+      - Models: api/models.md
+      - Forecasting: api/forecasting.md
+      - Streaming: api/streaming.md
+      - scikit-learn: api/sklearn.md

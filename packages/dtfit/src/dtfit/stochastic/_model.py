@@ -31,11 +31,13 @@ forecasts, and *generates* an arbitrary series; the streaming counterpart is
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass, field
-from typing import Callable
+from typing import Any, Callable
 
 import numpy as np
 
+from dtfit._pandas import as_series, capture_index, extend_index, to_1d_array
 from dtfit.methods import fit_lsi
 from ._estimators import (
     sample_acf, hurst_spectral, ar1_reversion, garch_persistence,
@@ -75,7 +77,7 @@ class StochasticModel:
     # deterministic mean (1st order)
     trend_slope: float
     has_trend: bool
-    cycle_period: float
+    cycle_period: float   # in SAMPLES (index steps of y), whatever the t units
     cycle_amp: float
     has_cycle: bool
     n_harmonics: int
@@ -94,13 +96,19 @@ class StochasticModel:
     forecaster_name: str   # the candidate model chosen by backtest selection
     _forecaster: Callable[[int], np.ndarray] = field(
         repr=False, default=lambda h: np.zeros(h))
-    # deterministic mean (trend + multi-harmonic seasonal) over a time axis --
-    # captured so :meth:`simulate` can regenerate the structured part of the
-    # series. The default (flat zero) is used by the unit-root branch, whose
-    # mean is the integrated random walk, not a function of ``t``.
+    # deterministic mean (trend + multi-harmonic seasonal) as a function of the
+    # SAMPLE INDEX 0..n-1 (it maps the index onto the fitted time axis
+    # internally) -- captured so :meth:`simulate` can regenerate the structured
+    # part of the series. The default (flat zero) is used by the unit-root
+    # branch, whose mean is the integrated random walk, not a function of ``t``.
     _mean_fn: Callable[[np.ndarray], np.ndarray] = field(
         repr=False,
         default=lambda t: np.zeros_like(np.asarray(t, dtype=float)))
+    # pandas index of the training Series/DataFrame (``None`` for ndarray input),
+    # remembered so :meth:`forecast` can label the horizon with the continuing
+    # future index ("pandas in -> pandas out"). Never consulted on the ndarray
+    # path, so ndarray fits stay bit-identical.
+    _index: Any = field(repr=False, default=None)
 
     def fingerprint(self) -> dict[str, object]:
         """The detected structure as a flat ``{name: value}`` dict (for tables)."""
@@ -139,16 +147,29 @@ class StochasticModel:
     def forecast(self, h: int, *, return_conf_int: bool = False,
                  alpha: float = 0.05, dist: str = "normal", df: float = 7.0):
         """Forecast ``h`` steps with the **backtest-selected** forecaster
-        (:attr:`forecaster_name`). With ``return_conf_int`` also returns
+        (:attr:`forecaster_name`). ``h`` is in **samples** (index steps of the
+        fitted series), whatever the units of the time axis ``t`` the model was
+        fit with. With ``return_conf_int`` also returns
         ``(lower, upper)`` bands whose growth matches that forecaster: bounded for
         mean reversion, ``h^(2H)`` for long memory, ``~sqrt(h)`` for a random
         walk / drift, and ~**constant** for a trend-stationary (trend/seasonal)
         forecast. ``dist="t"`` widens the band with a Student-t (``df``) quantile
-        instead of the Gaussian one, for fat-tailed innovations."""
+        instead of the Gaussian one, for fat-tailed innovations.
+
+        When the model was fit on a pandas ``Series`` the point forecast (and,
+        with ``return_conf_int``, the two bands) come back as pandas ``Series``
+        labelled by the length-``h`` future index continuing the training index
+        (a ``DatetimeIndex`` at its frequency, an integer-like index by its step);
+        an ndarray-fit model returns exactly the ndarray / tuple of ndarrays it
+        did before."""
         steps = np.arange(1, h + 1, dtype=float)
         point = np.asarray(self._forecaster(h), dtype=float)
+        # Future index continuing the training index when the model was fit on a
+        # pandas Series (``None`` -> plain ndarray, so ndarray-fit models and a
+        # pandas-free env stay bit-identical).
+        fidx = extend_index(self._index, h) if self._index is not None else None
         if not return_conf_int:
-            return point
+            return as_series(point, fidx)
         from scipy.stats import norm, t as student_t
         # Key the band growth off the SELECTED forecaster, not detected flags: a
         # trend+seasonal forecast whose residual is stationary must not fan out
@@ -182,7 +203,8 @@ class StochasticModel:
         else:
             raise ValueError(f"dist must be 'normal' or 't', got {dist!r}")
         sd = np.sqrt(np.clip(var, 0.0, None))
-        return point, point - z * sd, point + z * sd
+        return (as_series(point, fidx), as_series(point - z * sd, fidx),
+                as_series(point + z * sd, fidx))
 
     def simulate(self, n: int | None = None, *, seed: int | None = None,
                  rng: np.random.Generator | None = None,
@@ -306,10 +328,26 @@ def fit_stochastic(
     multi-harmonic seasonal continuation) is rolling-origin backtested and the
     **RMSE-optimal** one is chosen (defaulting to the random walk when nothing
     beats it). The choice is recorded in :attr:`StochasticModel.forecaster_name`.
+    A series too short to backtest (``n <= 50``) cannot be selected over: the
+    first candidate (the random walk) is used, a :class:`UserWarning` is
+    emitted, and the recorded name is suffixed with ``" (short-series
+    fallback)"`` so the fallback stays visible on the fitted model.
+
+    **Units.** The seasonal period is detected from the spectrum in **sample
+    units** (index steps of ``y``); when a custom time axis ``t`` is supplied
+    (seconds, years, any spacing) it is converted internally to ``t`` units via
+    the median spacing of ``t`` before the seasonal model is fit, so the fitted
+    frequency is correct on any axis. :attr:`StochasticModel.cycle_period` is
+    reported in **samples**, and the forecast horizon ``h`` of
+    :meth:`StochasticModel.forecast` is likewise in **samples**.
 
     Args:
-        y: The series. ``t`` defaults to ``0..n-1`` (uniform spacing).
-        period: A seasonal period to use (else it is detected from the spectrum).
+        y: The series. ``t`` defaults to ``0..n-1`` (uniform spacing); a custom
+            ``t`` only rescales the time axis (see **Units** above) -- detection
+            gates and forecasts are unchanged by the units of ``t``.
+        period: A seasonal period to use, in **samples** (index steps of ``y``,
+            NOT ``t`` units; it is converted internally like the detected one),
+            else it is detected from the spectrum.
         max_harmonics: Cap on the Fourier harmonics of the seasonal component
             (the actual count is chosen by BIC).
         forecaster: How to forecast. ``"auto"`` (default) backtest-selects the
@@ -324,9 +362,21 @@ def fit_stochastic(
         A :class:`StochasticModel` with the detected components, parameters and a
         backtest-selected :meth:`~StochasticModel.forecast`.
     """
-    y = np.asarray(y, dtype=float)
+    # Remember the training index (a pandas Series/DataFrame carries one) so the
+    # forecast can be labelled with the continuing future index; then coerce to a
+    # 1-D float ndarray. ``to_1d_array`` is bit-identical to ``np.asarray(...,
+    # float)`` for a 1-D ndarray / list, so the ndarray path is unchanged.
+    index = capture_index(y)
+    y = to_1d_array(y, "y")
     n = y.size
-    t = np.arange(n, dtype=float) if t is None else np.asarray(t, dtype=float)
+    t = np.arange(n, dtype=float) if t is None else to_1d_array(t, "t")
+    # Median sample spacing of the (possibly custom) time axis: periods are
+    # detected / supplied in SAMPLE units but the seasonal model is fit over
+    # ``t``, so they must be converted to t units (samples * dt) first. dt = 1
+    # for the default axis, so the conversion is then the identity.
+    dt = float(np.median(np.diff(t))) if n > 1 else 1.0
+    if not np.isfinite(dt) or dt <= 0.0:
+        dt = 1.0
     level = float(y.mean())
     sigma_walk = float(np.std(np.diff(y))) if n > 1 else 0.0
     band = 2.0 / np.sqrt(max(n, 1))
@@ -360,8 +410,10 @@ def fit_stochastic(
             if w.size > 2 and float(sample_acf(aw, 1)[1]) > band:
                 vol = float(garch_persistence(w, use="abs")["persistence"])
                 has_vol = vol > vol_persist
-        except Exception:
-            pass
+        except Exception as exc:
+            warnings.warn(
+                f"stochastic stage unit-root vol-clustering failed: {exc}",
+                UserWarning, stacklevel=2)
         comps = (["unit-root"] + (["drift"] if drift_sig else [])
                  + (["vol-clustering"] if has_vol else []))
         regime = "random walk + drift" if drift_sig else "random walk"
@@ -384,7 +436,7 @@ def fit_stochastic(
             vol_persistence=vol, has_vol_clustering=has_vol,
             sigma=float(np.std(w)), sigma_walk=sigma_walk,
             components=tuple(comps), regime=regime, forecaster_name=fname,
-            _forecaster=_bind_forecaster(ffn, y),
+            _forecaster=_bind_forecaster(ffn, y), _index=index,
         )
 
     # -- Stage 1: deterministic mean (series is stationary or trend-stationary).
@@ -423,9 +475,13 @@ def fit_stochastic(
     cyc_amp = float("nan")
     n_harm = 0
     seas_r2 = 0.0
+    # ``per`` is in SAMPLE units (FFT bins / the documented ``period=`` unit);
+    # the seasonal model is fit over the supplied ``t``, so convert to t units
+    # first -- otherwise any non-unit spacing fits the wrong frequency.
+    per_t = per * dt
     if has_cycle:
-        n_harm, s_coef = _fit_seasonal(t, d1, per, max_harmonics)
-        x_seas = _seasonal_design(t, per, n_harm)
+        n_harm, s_coef = _fit_seasonal(t, d1, per_t, max_harmonics)
+        x_seas = _seasonal_design(t, per_t, n_harm)
         cyc = x_seas @ s_coef
         cyc_amp = float(np.hypot(s_coef[0], s_coef[1]))   # fundamental amplitude
         seas_r2 = 1.0 - float(np.var(d1 - cyc)) / (float(np.var(d1)) + 1e-12)
@@ -441,7 +497,9 @@ def fit_stochastic(
     # 2-4. whiten with AR(1), then test long memory on the innovations
     try:
         phi = float(ar1_reversion(e)["phi"])
-    except Exception:
+    except Exception as exc:
+        warnings.warn(f"stochastic stage AR(1) failed: {exc}",
+                      UserWarning, stacklevel=2)
         phi = 0.0
     acf1 = float(sample_acf(e, 1)[1]) if n > 2 else 0.0
     has_mr = (mr_phi < phi < 0.99) and (abs(acf1) > band)
@@ -469,8 +527,9 @@ def fit_stochastic(
             if inn_p.size > 128 and float(hurst_spectral(inn_p)["H"]) <= veto_h:
                 has_lm = False
                 has_mr = True  # a stationary finite-order AR reverts to its mean
-    except Exception:
-        pass
+    except Exception as exc:
+        warnings.warn(f"stochastic stage Hurst/long-memory failed: {exc}",
+                      UserWarning, stacklevel=2)
 
     # 5. volatility clustering on the WHITENED residual: a persistent AR(1) level
     # has trivially autocorrelated |values|, so testing the raw residual gives a
@@ -482,8 +541,9 @@ def fit_stochastic(
         if innov.size > 2 and float(sample_acf(aw, 1)[1]) > band:
             vol = float(garch_persistence(innov, use="abs")["persistence"])
             has_vol = vol > vol_persist
-    except Exception:
-        pass
+    except Exception as exc:
+        warnings.warn(f"stochastic stage GARCH/vol-clustering failed: {exc}",
+                      UserWarning, stacklevel=2)
 
     comps = []
     if has_trend:
@@ -554,13 +614,17 @@ def fit_stochastic(
                                      max_harmonics=max_harmonics, y=y,
                                      margin=sel_margin)
 
-    # Deterministic mean over an arbitrary time axis (trend + multi-harmonic
+    # Deterministic mean over the SAMPLE INDEX (trend + multi-harmonic
     # seasonal), captured for StochasticModel.simulate to regenerate the
-    # structured part. Bind the fitted coefficients as defaults (no late binding).
+    # structured part. The coefficients were fit against the supplied ``t``, so
+    # the index is mapped onto that axis (t[0] + dt * index) before evaluating
+    # -- for the default axis this is the identity. Bind the fitted
+    # coefficients as defaults (no late binding).
     def _mean_fn(tt, _a0=mean_a0, _a1=mean_a1, _hc=bool(has_cycle),
-                 _p=float(per) if has_cycle else float("nan"),
-                 _nh=int(n_harm), _co=s_coef):
-        tt = np.asarray(tt, dtype=float)
+                 _p=float(per_t) if has_cycle else float("nan"),
+                 _nh=int(n_harm), _co=s_coef,
+                 _t0=float(t[0]) if n else 0.0, _dt=dt):
+        tt = _t0 + _dt * np.asarray(tt, dtype=float)
         m = _a0 + _a1 * tt
         if _hc and _co is not None:
             m = m + _seasonal_design(tt, _p, _nh) @ _co
@@ -577,5 +641,5 @@ def fit_stochastic(
         sigma=float(sigma), sigma_walk=float(sigma_walk),
         components=tuple(comps) if comps else ("none",), regime=regime,
         forecaster_name=fname, _forecaster=_bind_forecaster(ffn, y),
-        _mean_fn=_mean_fn,
+        _mean_fn=_mean_fn, _index=index,
     )

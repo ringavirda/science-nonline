@@ -6,6 +6,8 @@ import numpy as np
 import pytest
 
 from dtfit import fit_lsi, fit_eac, FittingResult
+from dtfit.methods import resolve_model, result_kwargs
+from dtfit.methods._common import _covariance, information_criteria
 
 
 @pytest.fixture
@@ -91,3 +93,114 @@ def test_no_expr_result_degrades_gracefully():
     assert np.asarray(r.model(x)).shape == x.shape
     with pytest.raises(ValueError):
         r.to_dict()
+
+
+# --- v0.3: param_model std band, fit-quality stats, absolute_sigma ---------
+def test_param_model_std_band_matches_expr_band(fit):
+    # A callable-only result (no expr) must reproduce the expr-based prediction
+    # std band by finite-differencing param_model, to ~1e-6.
+    r, t, y = fit
+    coeffs = r.coeffs
+
+    def f(x, a, b):
+        return a * np.exp(b * x)
+
+    spec = resolve_model(f)  # callable form of the same model
+    r_call = FittingResult(coeffs=coeffs, cov=r.cov, **result_kwargs(spec, coeffs))
+    assert r_call.expr is None and r_call.param_model is not None
+
+    y_ex, std_ex = r.predict(t, return_std=True)
+    y_ca, std_ca = r_call.predict(t, return_std=True)
+    assert np.all(np.isfinite(std_ca)) and np.all(std_ca >= 0)
+    np.testing.assert_allclose(y_ca, y_ex, rtol=1e-6, atol=1e-9)
+    np.testing.assert_allclose(std_ca, std_ex, rtol=1e-6, atol=1e-9)
+    # .model falls back to param_model for a callable-only result
+    np.testing.assert_allclose(np.asarray(r_call.model(t)), y_ex, rtol=1e-9)
+
+
+def test_rsquared_aic_bic_math():
+    rss, tss, n = 4.0, 20.0, 50
+    names = ("a", "b", "c")
+    r = FittingResult(coeffs=np.array([1.0, 2.0, 3.0]), names=names,
+                      rss=rss, tss=tss, n_obs=n)
+    assert r.rsquared == pytest.approx(1.0 - rss / tss)
+    aic, bic = information_criteria(rss, n, len(names))
+    assert r.aic == pytest.approx(aic)
+    assert r.bic == pytest.approx(bic)
+    # missing pieces -> None (not an error)
+    bare = FittingResult(coeffs=np.array([1.0]), names=("a",))
+    assert bare.rsquared is None and bare.aic is None and bare.bic is None
+
+
+def test_stats_roundtrip_and_summary(fit):
+    r, t, y = fit
+    yhat = r.predict(t)
+    rss = float(np.sum((y - yhat) ** 2))
+    tss = float(np.sum((y - np.mean(y)) ** 2))
+    r2 = FittingResult(coeffs=r.coeffs, cov=r.cov, expr=r.expr, var=r.var,
+                       names=r.names, rss=rss, tss=tss, n_obs=y.size, nfev=17)
+    d = r2.to_dict()
+    assert d["rss"] == rss and d["tss"] == tss and d["n_obs"] == y.size
+    assert d["nfev"] == 17
+    back = FittingResult.from_dict(d)
+    assert back.rss == pytest.approx(rss) and back.nfev == 17
+    assert back.rsquared == pytest.approx(r2.rsquared)
+    assert "R^2" in r2.summary()
+
+
+def test_residuals_helper(fit):
+    r, t, y = fit
+    res = r.residuals(t, y)
+    assert res.shape == t.shape
+    np.testing.assert_allclose(res, y - r.predict(t))
+
+
+# --- v0.4: pandas in -> pandas out on predict ------------------------------ #
+def test_predict_pandas_in_pandas_out(fit):
+    """When ``x`` is a pandas Series, ``predict`` returns a Series aligned to its
+    index with values identical to the ndarray prediction; an ndarray in still
+    returns an ndarray (guarded so a pandas-free env skips)."""
+    pd = pytest.importorskip("pandas")
+    r, t, _ = fit
+    idx = pd.date_range("2024-01-01", periods=t.size, freq="D")
+    ts = pd.Series(t, index=idx)
+
+    y_arr = r.predict(t)
+    y_ser = r.predict(ts)
+    assert isinstance(y_arr, np.ndarray)
+    assert isinstance(y_ser, pd.Series)
+    assert list(y_ser.index) == list(idx)
+    np.testing.assert_allclose(y_ser.to_numpy(), y_arr)
+
+    y2, std2 = r.predict(ts, return_std=True)
+    assert isinstance(y2, pd.Series) and isinstance(std2, pd.Series)
+    assert list(std2.index) == list(idx)
+
+
+def test_covariance_absolute_sigma_invariants():
+    rng = np.random.default_rng(0)
+    m, n = 40, 3
+    jac = rng.normal(size=(m, n))
+    res = rng.normal(size=m)
+    k = 3.7
+
+    cov_def = _covariance(jac, res, n)
+    cov_abs = _covariance(jac, res, n, absolute_sigma=True)
+    assert cov_def is not None and cov_abs is not None
+
+    # default cov = absolute cov * reduced chi-square
+    sigma2 = float(res @ res) / (m - n)
+    np.testing.assert_allclose(cov_def, sigma2 * cov_abs, rtol=1e-10)
+
+    # absolute-sigma cov ignores the residual magnitude (sigma^2 = 1)
+    cov_abs_scaled = _covariance(jac, k * res, n, absolute_sigma=True)
+    np.testing.assert_allclose(cov_abs_scaled, cov_abs, rtol=1e-10)
+
+    # default cov scales by k^2 when the residual is scaled by k (jac fixed)
+    cov_def_res = _covariance(jac, k * res, n)
+    np.testing.assert_allclose(cov_def_res, k**2 * cov_def, rtol=1e-10)
+
+    # default cov is invariant to a global rescale of the whole problem
+    # (scaling jac AND res together, i.e. rescaling the assumed sigma)
+    cov_def_global = _covariance(k * jac, k * res, n)
+    np.testing.assert_allclose(cov_def_global, cov_def, rtol=1e-10)

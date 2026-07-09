@@ -41,16 +41,23 @@ are mildly contaminated; reach for the ensemble when outliers are dense or the
 loss is hard to scale.
 """
 
+from collections.abc import Mapping, Sequence
 from typing import Any, Callable, cast
 
 import numpy as np
 import sympy as sp
+from scipy.integrate import simpson
 from scipy.optimize import least_squares
 
 from dtfit.log import echo
 from dtfit._core._kernels import simpson_windows, simpson_windows_rows
+from dtfit._pandas import is_dataframe, is_series, to_1d_array
 from dtfit.types import FittingResult, InitialGuess
-from ._common import model_params, _covariance, _validate_xy, _validate_p0
+from ._common import (
+    _covariance, _validate_xy, _validate_p0, _resolve_sigma,
+    normalize_p0, normalize_bounds,
+)
+from ._modelinput import resolve_model, result_kwargs
 
 
 def _dominant_cycles(x: np.ndarray, y: np.ndarray) -> float:
@@ -150,32 +157,88 @@ def _place_windows(
     return x_active, y_active, starts, stops, data_areas, m
 
 
+def _area_weights(
+    x_active: np.ndarray,
+    sigma_active: np.ndarray,
+    starts: np.ndarray,
+    stops: np.ndarray,
+) -> np.ndarray:
+    """Per-window least-squares weights from per-sample ``sigma``.
+
+    A window's area is a fixed linear combination of its samples -- the composite
+    Simpson quadrature weights ``s_i`` (obtained here by integrating the unit
+    vectors, so they match :func:`simpson_windows` exactly). With independent
+    per-sample noise of std ``sigma_i`` the area variance is
+    ``sum_i (s_i * sigma_i)**2``; the window weight is the inverse area standard
+    deviation ``1 / sqrt(area_var)``. Multiplying each area residual by it turns
+    the area-matching system into weighted least squares (residuals scaled by
+    ``1 / sigma_area``), so ``absolute_sigma`` then reads exactly as in
+    :func:`scipy.optimize.curve_fit`.
+    """
+    w = np.empty(starts.size, dtype=float)
+    for k in range(starts.size):
+        a, b = int(starts[k]), int(stops[k])
+        xw = np.ascontiguousarray(x_active[a:b], dtype=float)
+        length = xw.size
+        quad = np.empty(length, dtype=float)
+        unit = np.zeros(length, dtype=float)
+        for j in range(length):
+            unit[j] = 1.0
+            quad[j] = simpson(y=unit, x=xw)
+            unit[j] = 0.0
+        area_var = float(np.sum((quad * sigma_active[a:b]) ** 2))
+        w[k] = 1.0 / np.sqrt(area_var) if area_var > 0.0 else 0.0
+    return w
+
+
 def fit_eac(
     data_x: np.ndarray,
     data_y: np.ndarray,
-    expr: str,
-    var: str,
+    expr: str | sp.Expr | Callable[..., Any],
+    var: str | None = None,
     *,
-    active_ratio: float = 0.8,
+    active_ratio: float = 1.0,
     n_windows: int | None = None,
     window_mode: str = "uniform",
-    bounds: tuple | None = None,
+    bounds: (
+        Sequence[tuple[float, float]]
+        | Mapping[str, tuple[float, float]]
+        | tuple[Any, Any]
+        | None
+    ) = None,
     loss: str = "linear",
     f_scale: float | None = None,
     robust: bool = False,
     huber_c: float = 3.0,
-    p0: InitialGuess = None,
+    p0: InitialGuess | Mapping[str, float] = None,
+    sigma: np.ndarray | Sequence[float] | None = None,
+    absolute_sigma: bool = False,
+    solver_options: Mapping[str, Any] | None = None,
+    param_names: Sequence[str] | None = None,
     nan_policy: str = "raise",
 ) -> FittingResult:
     """Fit ``expr`` to ``(data_x, data_y)`` with the equal-areas criterion.
 
     Args:
         data_x, data_y: Observed samples.
-        expr: Model expression, e.g. ``"a * atan(w * t)"``.
-        var: Main variable name in ``expr``.
-        active_ratio: Fraction of the (leading) data used for window placement in
-            ``window_mode="uniform"``; the informative transient usually lives
-            here. Ignored by ``"curvature"`` placement (which spans all the data).
+        expr: The model, in any of three equivalent forms (resolved by
+            :func:`dtfit.methods.resolve_model`): a SymPy expression *string*
+            (e.g. ``"a * atan(w * x)"``), a :class:`sympy.Expr`, or a plain
+            Python callable ``f(x, *params)``. A symbolic model differentiates
+            exactly for its area Jacobian; a callable is forward-differenced.
+            The canonical parameter order is sorted-by-name for a symbolic model
+            and signature order for a callable -- the layout of ``coeffs`` /
+            ``p0`` / ``bounds`` / the covariance and of ``result.names``.
+        var: Main variable name in ``expr``. Required for a symbolic model; a
+            label only for a callable (defaults to ``"x"``).
+        active_ratio: Fraction of the (leading) data used for window placement
+            in ``window_mode="uniform"``. Defaults to ``1.0`` -- all samples
+            are used; the fitter must not silently discard trailing data.
+            ``active_ratio=0.8`` is the tuned recipe for signals whose
+            informative transient leads (a step take-off, a saturating rise):
+            it concentrates the windows on the leading transient and drops the
+            flat tail. Ignored by ``"curvature"`` placement (which spans all
+            the data).
         n_windows: Number of integration windows (area equations). Defaults to
             ``2 * n_params`` for an overdetermined, noise-averaging fit. Must be
             ``>= n_params``; clamped so each window keeps at least 3 samples.
@@ -187,8 +250,12 @@ def fit_eac(
             peak's rise) -- validated as the best estimator on concentrated
             transients and rational-saturating shapes in the parameter-estimation
             domain study.
-        bounds: Optional ``(lower, upper)`` parameter bounds (as accepted by
-            ``scipy.optimize.least_squares``); switches the solver to
+        bounds: Optional parameter bounds: a per-parameter ``(min, max)`` pair
+            list in sorted-name order (the canonical form), a partial
+            ``{name: (min, max)}`` dict (unnamed parameters stay unbounded),
+            or the legacy scipy-style ``(lower, upper)`` 2-tuple (see
+            :func:`dtfit.methods.normalize_bounds`, including its documented
+            2-parameter ambiguity rule). Any bounds switch the solver to
             trust-region.
         loss: Least-squares loss (e.g. ``"linear"`` or ``"soft_l1"`` for outlier
             robustness, as in the EAC paper). The loss acts on the *window-area*
@@ -213,7 +280,33 @@ def fit_eac(
             re-solves) and needs no ``f_scale`` tuning.
         huber_c: Robust winsorization threshold in residual sigmas for
             ``robust=True`` (~3 leaves clean samples untouched).
-        p0: Optional initial guess (defaults to ones).
+        p0: Optional initial guess (defaults to ones): a sequence in
+            parameter order (sorted-name for symbolic, signature order for a
+            callable) or a full ``{name: value}`` dict.
+        sigma: Optional per-sample measurement standard deviation of ``data_y``
+            (same length as the raw input). Each integration window's area
+            residual is weighted by ``1 / sigma_area`` -- with
+            ``sigma_area**2 = sum_i (simpson_weight_i * sigma_i)**2`` over the
+            window -- turning the area-matching system into weighted least
+            squares (heteroscedastic data). ``None`` (default) fits unweighted.
+            Entries must be finite and strictly positive.
+        absolute_sigma: If ``True``, treat ``sigma`` as absolute errors and do
+            **not** rescale the covariance by the reduced chi-square (the
+            residual is already ``1/sigma``-scaled), matching
+            :func:`scipy.optimize.curve_fit`. If ``False`` (default) only the
+            relative magnitudes of ``sigma`` matter and the covariance is scaled
+            by the residual variance.
+        solver_options: Optional mapping forwarded to
+            :func:`scipy.optimize.least_squares` on every solve (the main fit,
+            the ``f_scale`` seed fit and any robust IRLS re-solves) -- e.g.
+            ``{"xtol": 1e-12, "max_nfev": 500}``. The fitter's managed keys
+            (``loss`` / ``f_scale`` / ``bounds`` / ``method`` / ``jac``) always
+            win over it.
+        param_names: For a callable model, the parameter names (in signature
+            order) when they cannot be introspected from the signature (a
+            ``*args`` model or a signature-less builtin); validated against the
+            introspected names otherwise. For a symbolic model it is optional and
+            validated against the names parsed from the expression.
         nan_policy: ``"raise"`` (default) rejects non-finite samples; ``"omit"``
             drops NaN/inf ``(x, y)`` pairs before fitting -- useful for gappy
             sensor/GPS telemetry.
@@ -223,26 +316,51 @@ def fit_eac(
     complementary robust path.
 
     Returns:
-        FittingResult with the fitted coefficients, callable model and (when
-        overdetermined) a parameter covariance estimate.
+        FittingResult with the fitted coefficients, a callable model and (when
+        overdetermined) a parameter covariance estimate. Also carries the
+        fit-quality diagnostics ``n_obs`` / ``rss`` / ``tss`` (enabling
+        ``.rsquared`` / ``.aic`` / ``.bic``) and the optimizer's ``nfev`` /
+        ``cost``. For a callable model the result carries a bound ``f(x)`` model
+        and a ``param_model`` evaluator instead of ``expr`` (so ``.to_dict``
+        raises, as for any expression-less fit).
     """
     if window_mode not in ("uniform", "curvature"):
         raise ValueError(
             f"window_mode must be 'uniform' or 'curvature', got {window_mode!r}"
         )
-    t = sp.Symbol(var)
-    f_sym = cast(sp.Expr, sp.sympify(expr))
-    params = model_params(f_sym, t)
-    n = len(params)
+    # Resolve the model to the unified spec: a string / sympy.Expr keeps the
+    # historical sorted-name parameter order; a callable uses signature order.
+    # ``spec.eval`` / ``spec.param_derivs`` replace the ad-hoc lambdify pair --
+    # symbolic derivatives are still ``sp.diff`` (numerically identical to the
+    # old jac_funcs), while a callable forward-differences (the FD-Jacobian).
+    spec = resolve_model(expr, var, param_names=param_names)
+    names = list(spec.names)
+    n = len(names)
     if n == 0:
         raise RuntimeError("Model expression has no free parameters to fit.")
 
-    x, y = _validate_xy(data_x, data_y, min_size=2 * n, nan_policy=nan_policy)
+    p0_arr = normalize_p0(p0, names)
+    bounds_list = normalize_bounds(bounds, names)
+    # scipy's least_squares wants the (lo_array, hi_array) form.
+    scipy_bounds = (
+        ([b[0] for b in bounds_list], [b[1] for b in bounds_list])
+        if bounds_list is not None else None
+    )
+    so: dict[str, Any] = dict(solver_options) if solver_options else {}
 
-    model_func = sp.lambdify((t, *params), f_sym, "numpy")
-    jac_funcs = [
-        sp.lambdify((t, *params), sp.diff(f_sym, p), "numpy") for p in params
-    ]
+    # Accept pandas Series / single-column DataFrame inputs (pandas in): coerce
+    # to plain 1-D float arrays up front. Gated on the pandas types so a raw
+    # ndarray / list is passed through untouched and stays BIT-IDENTICAL
+    # (including the existing 2-D rejection in ``_validate_xy``). This unifies
+    # the historical ``np.asarray`` Series path with :func:`fit_lsi` and adds
+    # single-column DataFrame support.
+    if is_series(data_x) or is_dataframe(data_x):
+        data_x = to_1d_array(data_x, "data_x")
+    if is_series(data_y) or is_dataframe(data_y):
+        data_y = to_1d_array(data_y, "data_y")
+
+    x, y = _validate_xy(data_x, data_y, min_size=2 * n, nan_policy=nan_policy)
+    sigma_active = _resolve_sigma(sigma, data_x, data_y, x, nan_policy)
 
     # Contiguous window spans [start, stop) over the (active) region. The model
     # and its sensitivities are evaluated once over the whole region per solver
@@ -254,39 +372,73 @@ def fit_eac(
     )
     echo(f"EAC windows: {m} (params: {n}, mode: {window_mode})")
 
-    def _eval(func: Callable[..., Any], c: np.ndarray) -> np.ndarray:
-        v = func(x_active, *c)
-        if np.ndim(v) == 0:  # constant model/derivative -> broadcast
-            v = np.full_like(x_active, float(v))
+    # Per-window least-squares weights from the per-sample sigma: each window's
+    # area residual is scaled by 1 / sigma_area (see ``_area_weights``), turning
+    # the area-matching system into weighted least squares. ``x_active`` is always
+    # a leading slice of ``x`` (a prefix in "uniform", all of it in "curvature"),
+    # so the sigma aligns by that same prefix. ``None`` -> the unweighted system,
+    # bit-identical to the pre-sigma path.
+    area_w = (
+        _area_weights(x_active, sigma_active[: x_active.size], starts, stops)
+        if sigma_active is not None else None
+    )
+
+    def _clean(v: np.ndarray) -> np.ndarray:
+        """Neutralize singular samples in a model value / sensitivity array.
+
+        Factored so BOTH the model area and every parameter-sensitivity area
+        pass through the same cleanup. A transcendental sensitivity can be
+        singular at an ISOLATED sample (e.g. ``d/dn`` of ``x**n`` is
+        ``x**n*log(x)``, NaN at ``x=0``) while its integral over the window is
+        finite -- the limit there is 0. Neutralize such measure-zero blow-ups to
+        0 so the area stays well-posed. But a WIDESPREAD blow-up (a diverging
+        trial: ``exp(b*x)`` with ``b`` runaway) must NOT be silently zeroed --
+        that makes a divergent model's area look small and lets LM converge to a
+        wrong basin. Cap those at a large finite penalty (matched to the data
+        scale) so the residual stays large and the solver is pushed away from
+        the divergent region instead.
+        """
         v = np.ascontiguousarray(v, dtype=float)
         finite = np.isfinite(v)
         if finite.all():
             return v
-        # A transcendental sensitivity can be singular at an ISOLATED sample
-        # (e.g. d/dn of x**n is x**n*log(x), NaN at x=0) while its integral over
-        # the window is finite -- the limit there is 0. Neutralize such
-        # measure-zero blow-ups to 0 so the area stays well-posed. But a
-        # WIDESPREAD blow-up (a diverging trial: exp(b*x) with b runaway) must NOT
-        # be silently zeroed -- that makes a divergent model's area look small and
-        # lets LM converge to a wrong basin. Cap those at a large finite penalty
-        # (matched to the data scale) so the residual stays large and the solver
-        # is pushed away from the divergent region instead.
         if 1.0 - float(finite.mean()) <= 0.05:  # isolated singularities
             return np.nan_to_num(v, nan=0.0, posinf=0.0, neginf=0.0)
         scale = float(np.max(np.abs(v[finite]))) if finite.any() else 1.0
         penalty = 1e6 * max(scale, 1.0)
         return np.nan_to_num(v, nan=penalty, posinf=penalty, neginf=-penalty)
 
+    def _model_area(c: np.ndarray) -> np.ndarray:
+        mv = _clean(spec.eval(x_active, c))
+        return simpson_windows(mv, x_active, starts, stops)
+
     def residuals(c: np.ndarray) -> np.ndarray:
-        mv = _eval(model_func, c)
-        return simpson_windows(mv, x_active, starts, stops) - data_areas_arr
+        r = _model_area(c) - data_areas_arr
+        return r * area_w if area_w is not None else r
 
     def jacobian(c: np.ndarray) -> np.ndarray:
-        rows = np.vstack([_eval(jac_funcs[j], c) for j in range(n)])
-        return simpson_windows_rows(rows, x_active, starts, stops).T
+        rows = np.vstack([_clean(d) for d in spec.param_derivs(x_active, c)])
+        j = simpson_windows_rows(rows, x_active, starts, stops).T
+        return j * area_w[:, None] if area_w is not None else j
 
-    guess = _validate_p0(p0, params)
-    if bounds is not None or loss != "linear":
+    guess = _validate_p0(p0_arr, names)
+    if scipy_bounds is not None:
+        # Keep the (default all-ones) seed feasible inside the user's box,
+        # matching solve_weighted_nlls; scipy's trf rejects an out-of-bounds x0.
+        guess = np.clip(guess, scipy_bounds[0], scipy_bounds[1])
+
+    nfev_total = 0
+    have_nfev = False
+
+    def _tally(s: Any) -> None:
+        """Accumulate a solver's ``nfev``, tolerating a namespace without one."""
+        nonlocal nfev_total, have_nfev
+        nf = getattr(s, "nfev", None)
+        if nf is not None:
+            nfev_total += int(nf)
+            have_nfev = True
+
+    if scipy_bounds is not None or loss != "linear":
         method = "trf"
         fs = f_scale
         if loss != "linear" and fs is None:
@@ -296,10 +448,10 @@ def fit_eac(
             # robust scale of a clean window's area residual. This makes the robust
             # loss engage where the old fixed default (1.0, >> typical residuals)
             # silently left it quadratic.
-            seed_kwargs: dict[str, Any] = {}
-            seed_method = "trf" if bounds is not None else "lm"
-            if bounds is not None:
-                seed_kwargs["bounds"] = bounds
+            seed_kwargs: dict[str, Any] = dict(so)
+            seed_method = "trf" if scipy_bounds is not None else "lm"
+            if scipy_bounds is not None:
+                seed_kwargs["bounds"] = scipy_bounds
             seed = least_squares(
                 residuals, guess, jac=cast(Any, jacobian),
                 method=seed_method, **seed_kwargs
@@ -310,9 +462,10 @@ def fit_eac(
             guess = np.asarray(seed.x, dtype=float)
         elif fs is None:
             fs = 1.0  # linear loss ignores f_scale; keep scipy happy
-        kwargs: dict[str, Any] = {"loss": loss, "f_scale": fs}
-        if bounds is not None:
-            kwargs["bounds"] = bounds
+        # Managed keys (loss/f_scale/bounds) win over any user solver_options.
+        kwargs: dict[str, Any] = {**so, "loss": loss, "f_scale": fs}
+        if scipy_bounds is not None:
+            kwargs["bounds"] = scipy_bounds
         # cast: scipy's stub types `jac` as a str literal, omitting the
         # callable form the runtime accepts.
         sol = least_squares(
@@ -320,8 +473,9 @@ def fit_eac(
         )
     else:
         sol = least_squares(
-            residuals, guess, jac=cast(Any, jacobian), method="lm"
+            residuals, guess, jac=cast(Any, jacobian), method="lm", **so
         )
+    _tally(sol)
     coeffs = np.asarray(sol.x, dtype=np.float64)
 
     if robust:
@@ -331,38 +485,54 @@ def fit_eac(
         # is reassigned here and the ``residuals`` closure reads it lazily, so the
         # re-solve sees the winsorized data areas. A few passes suffice.
         for _ in range(3):
-            mv = _eval(model_func, coeffs)
+            mv = _clean(spec.eval(x_active, coeffs))
             resid = y_active - mv
             med = float(np.median(resid))
-            sigma = 1.4826 * float(np.median(np.abs(resid - med)))
-            if sigma <= 0.0:
+            rscale = 1.4826 * float(np.median(np.abs(resid - med)))
+            if rscale <= 0.0:
                 break
-            clip = huber_c * sigma
+            clip = huber_c * rscale
             y_eff = mv + (med + np.clip(resid - med, -clip, clip))
             data_areas_arr = simpson_windows(
                 np.ascontiguousarray(y_eff), x_active, starts, stops
             )
-            if bounds is not None:
+            if scipy_bounds is not None:
                 sol = least_squares(residuals, coeffs, jac=cast(Any, jacobian),
-                                    method="trf", bounds=bounds)
+                                    method="trf", bounds=scipy_bounds, **so)
             else:
                 sol = least_squares(residuals, coeffs, jac=cast(Any, jacobian),
-                                    method="lm")
+                                    method="lm", **so)
+            _tally(sol)
             coeffs = np.asarray(sol.x, dtype=np.float64)
     echo("EAC fitted coefficients:", coeffs)
 
-    cov = _covariance(sol.jac, sol.fun, n)
-    # On the robust path stamp a stable 'robust IRLS' label (matching fit_lsi)
-    # rather than surfacing whichever inner IRLS solver's raw message ran last.
-    converged = True if robust else bool(sol.success)
-    message = "robust IRLS" if robust else str(sol.message)
+    cov = _covariance(sol.jac, sol.fun, n, absolute_sigma=absolute_sigma)
+    # Honest convergence: propagate the last solver's actual status on both
+    # paths; the robust path labels it but must not stamp success.
+    converged = bool(sol.success)
+    message = f"robust IRLS ({sol.message})" if robust else str(sol.message)
 
-    # Do not lambdify the fitted model here: FittingResult rebuilds it lazily
-    # from expr+coeffs on first .model/.predict access (and drops it on pickling
-    # anyway), so an eager compile is wasted for batch/fit_many callers that only
-    # read coeffs/cov -- one SymPy lambdify saved per fit.
-    return FittingResult(coeffs=coeffs, cov=cov,
-                         expr=expr, var=var, names=tuple(str(p) for p in params),
-                         converged=converged, message=message,
-                         x_range=(float(np.min(x)), float(np.max(x))))
+    # Fit-quality diagnostics over the FULL (x, y): rss/tss/n_obs feed R^2 and
+    # AIC/BIC; nfev (summed across any robust IRLS re-solves) and cost are the
+    # optimizer's own accounting. A monkeypatched solver namespace may omit
+    # nfev/cost, so both are read defensively.
+    yhat = np.asarray(spec.eval(x, coeffs), dtype=float)
+    rss = float(np.sum((y - yhat) ** 2))
+    tss = float(np.sum((y - float(np.mean(y))) ** 2))
+    cost_val = getattr(sol, "cost", None)
+
+    # Build the result per the v0.3 contract: a symbolic model keeps the lambdify
+    # path (expr/var/names) so std bands and to_dict work unchanged; a callable
+    # carries a bound f(x) closure plus the params-explicit evaluator for
+    # finite-differenced std bands. The model rebuilds lazily on first access, so
+    # no eager compile is spent for callers that read only coeffs/cov.
+    return FittingResult(
+        coeffs=coeffs, cov=cov,
+        converged=converged, message=message,
+        x_range=(float(np.min(x)), float(np.max(x))),
+        n_obs=int(y.size), rss=rss, tss=tss,
+        nfev=nfev_total if have_nfev else None,
+        cost=None if cost_val is None else float(cost_val),
+        **result_kwargs(spec, coeffs),
+    )
 

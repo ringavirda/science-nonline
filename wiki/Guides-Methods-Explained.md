@@ -218,17 +218,19 @@ lowering the variance of the estimate -- and it lets EAC report a parameter
 - `n_windows` -- number of area equations. More windows localize information (and
   let a robust loss isolate outlier-contaminated windows); too many makes each
   window tiny and noisy. The default $2m$ is a safe start.
-- `active_ratio` -- what leading fraction of the data to window. The default `0.8`
-  assumes the information lives in an early transient; **set it to `1.0` for a
-  saturating shape whose asymptote lives in the tail** (e.g. `arctan`), or the
-  fit will be biased.
+- `active_ratio` -- what leading fraction of the data to window. The default `1.0`
+  windows the **full record** (safe for saturating shapes like `arctan` whose
+  asymptote lives in the tail); **set it to `0.8` for signals whose information
+  lives in an early transient** -- the study-tuned recipe that `dtfit.auto`'s
+  EAC routes pin explicitly.
 - `loss` + `f_scale` -- a robust loss (`"soft_l1"`, `"cauchy"`) down-weights
   windows an outlier has corrupted. This is the *single-fit* robustness path;
-  for densely contaminated records prefer the `ensemble_fit` path below. Important
-  caveat: the loss acts at the *window* level, and only "bites" when `f_scale` is
-  set near the size of a clean window's area residual (the default `1.0` usually
-  dwarfs them, silently behaving like plain least squares). See the worked
-  discussion in [example 02](Example-02-Fitting-Methods).
+  for densely contaminated records prefer the `ensemble_fit` path below. The
+  loss acts at the *window* level and "bites" when `f_scale` sits near the size
+  of a clean window's area residual; the default (`f_scale=None`) auto-scales
+  to `1.4826 * MAD` of a linear-loss seed fit's window-area residuals, so the
+  robust loss actually engages -- pass an explicit value to override. See the
+  worked discussion in [example 02](Example-02-Fitting-Methods).
 - `robust=True` (+ `huber_c`) -- a **self-scaling** robust *integral* loss.
   Instead of tuning `f_scale`, it IRLS-winsorizes each sample's residual to the
   current model (at `huber_c` MADs) and re-solves a few times, so you get outlier

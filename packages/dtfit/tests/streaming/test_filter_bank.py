@@ -3,6 +3,7 @@
 from typing import Any
 
 import numpy as np
+import pytest
 
 from dtfit.streaming import EACFilter, FilterBank
 
@@ -67,6 +68,25 @@ def test_filter_bank_matches_standalone_filters():
         for s in range(t.size):
             flt.partial_fit(t[s], Y[s, k])
         np.testing.assert_allclose(bank[k].p, flt.p, rtol=1e-9, atol=1e-9)
+
+
+def test_filter_bank_skips_nan_sample_without_shape_corruption():
+    """A NaN observation in one stream is skipped at ingestion (with a
+    warning); the bank's readout shapes stay intact and the poisoned stream's
+    estimate is unaffected (the skipped step returns the filter unchanged)."""
+    t, Y, bs = _streams(K=3, n=300)
+    Y[150, 1] = np.nan
+    kw: dict[str, Any] = dict(
+        p0=[1.0, 0.3], window_size=40, q_diag=[1e-4, 1e-3], r=0.3
+    )
+    bank = FilterBank.from_model("a*exp(b*t)", "t", 3, **kw)
+    with pytest.warns(RuntimeWarning, match="non-finite sample skipped"):
+        out = bank.run(t, Y, n_jobs=1, track=True)
+    assert out["params"].shape == (3, 2)
+    assert out["n_drifts"].shape == (3,)
+    assert out["track"].shape == (300, 3)
+    assert np.all(np.isfinite(out["params"]))
+    np.testing.assert_allclose(out["params"][:, 1], bs, atol=0.1)
 
 
 def test_filter_bank_predict_and_readout_shapes():

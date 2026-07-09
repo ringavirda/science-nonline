@@ -21,6 +21,12 @@ whole game*. This package makes that choice ergonomic:
       for s in suggest_models(x, y)[:3]:
           print(s.name, s.r2, s.aic)
 
+- **extensibility**: :func:`register` adds your own family to the catalog, so it
+  is returned by :func:`all_models` and considered by :func:`suggest_models`;
+  :func:`unregister` removes it again::
+
+      models.register("myline", lambda: Model("a0 + a1*x", name="myline"))
+
 Families are grouped by ``category`` (trend / growth / decay / sigmoid /
 saturating / peak / oscillatory) -- see :data:`CATALOG`.
 """
@@ -31,6 +37,8 @@ from ._suggest import suggest_models, Suggestion
 from ._catalog import (
     CATALOG,
     all_models,
+    register,
+    unregister,
     # trend
     linear,
     quadratic,
@@ -72,6 +80,8 @@ __all__ = [
     "Suggestion",
     "CATALOG",
     "all_models",
+    "register",
+    "unregister",
     "linear",
     "quadratic",
     "cubic",

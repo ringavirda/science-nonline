@@ -35,9 +35,9 @@ bench = ["matplotlib>=3.7", "pandas>=2.0"]
 dev = ["pytest>=7", "pytest-cov>=4", "ruff>=0.4", "mypy>=1.8"]
 
 [project.urls]
-Homepage = "https://github.com/ringavirda/science-pylab"
-Repository = "https://github.com/ringavirda/science-pylab"
-Issues = "https://github.com/ringavirda/science-pylab/issues"
+Homepage = "https://github.com/ringavirda/science-nonline"
+Repository = "https://github.com/ringavirda/science-nonline"
+Issues = "https://github.com/ringavirda/science-nonline/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]

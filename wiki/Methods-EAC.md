@@ -109,7 +109,7 @@ the curvature estimate softens toward equal spacing.
    $\partial f/\partial\theta_j$ (used for the Jacobian).
 3. **Window placement**:
    - `window_mode="uniform"` (default) takes the leading `active_ratio`
-     (default 0.8) of the data and splits it into $M$ equal windows
+     (default 1.0 -- the full record) of the data and splits it into $M$ equal windows
      ($M=$ `n_windows`, default $2m$);
    - `window_mode="curvature"` places $M$ curvature-weighted edges over the
      full record.
@@ -185,11 +185,11 @@ using it correctly:
 - **Integration as the denoiser** -- the equal-areas criterion is itself the noise
   guard; no separate pre-filter is needed.
 - **Active-region windowing** (`active_ratio`) concentrates equal windows on the
-  informative transient. **Caveat:** the default `0.8` assumes the information is
-  in a leading transient; for a **saturating** shape whose asymptote (and hence a
-  parameter) lives in the *tail*, set `active_ratio=1.0` (or use
-  `window_mode="curvature"`, which always uses the full record), or that
-  parameter is biased.
+  informative transient. The default `1.0` windows the full record -- safe for
+  saturating shapes whose asymptote (and hence a parameter) lives in the tail.
+  For a signal whose information lives in a **leading transient**, set
+  `active_ratio=0.8` (the study-tuned recipe `dtfit.auto`'s EAC routes pin), or
+  use `window_mode="curvature"`, which adapts its windows over the full record.
 - **Overdetermined averaging** (`n_windows` $>m$) -- extra area equations average
   out per-window integration noise and yield a parameter covariance.
 - **Bounds / robust loss** -- `bounds=` and a robust `loss=`/`f_scale=` switch the

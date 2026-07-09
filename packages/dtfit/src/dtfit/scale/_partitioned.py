@@ -88,14 +88,18 @@ class PartitionedLSI:
         sample into the next, so the interval connecting two disjoint chunks is
         not dropped by the trapezoid rule. Feed chunks in domain order.
         """
-        x = np.asarray(x_chunk, dtype=float)
-        y = np.asarray(y_chunk, dtype=float)
+        x = np.atleast_1d(np.asarray(x_chunk, dtype=float))
+        y = np.atleast_1d(np.asarray(y_chunk, dtype=float))
+        # count from the coerced array (a list/tuple chunk has no ``.shape``,
+        # a 0-d scalar chunk behaves as one sample), before the boundary carry
+        # below extends it
+        n_orig = x.shape[0]
         if self._last is not None and x.size:
             x = np.concatenate([[self._last[0]], x])
             y = np.concatenate([[self._last[1]], y])
         if x.size >= 2:
             self._s += self.basis.project_integral(x, y)
-            self.n_samples += x_chunk.shape[0] if np.ndim(x_chunk) else 0
+            self.n_samples += n_orig
             self._last = (float(x[-1]), float(y[-1]))
         return self
 
@@ -331,8 +335,8 @@ class PartitionedBatchLSI:
         previous chunk's last row is carried into this one so the connecting
         interval is integrated exactly (feed chunks in domain order).
         """
-        x = np.asarray(x_chunk, dtype=float)
-        Y = np.asarray(Y_chunk)
+        x = np.atleast_1d(np.asarray(x_chunk, dtype=float))
+        Y = np.atleast_1d(np.asarray(Y_chunk))
         if Y.ndim == 1:
             Y = Y[:, None]
         if Y.shape[1] != self.n_channels:
@@ -340,6 +344,9 @@ class PartitionedBatchLSI:
                 f"Y_chunk has {Y.shape[1]} channels but accumulator holds "
                 f"{self.n_channels}."
             )
+        # count from the coerced array (a list/tuple chunk has no ``.shape``,
+        # a 0-d scalar chunk behaves as one sample), before the boundary carry
+        # below extends it
         n_orig = x.shape[0]
         if self._last_x is not None and self._last_y is not None and x.size:
             x = np.concatenate([[self._last_x], x])

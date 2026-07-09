@@ -45,7 +45,30 @@ def test_dsb_fits_models_without_handwritten_discretes():
 
 def test_dsb_underdetermined_balance_raises():
     # atan's even Maclaurin orders vanish, so degree-2 poly cannot identify the
-    # three parameters -- DSB must say so rather than return garbage.
+    # three parameters -- DSB must say so rather than return garbage. Bad user
+    # input raises ValueError (v0.2; was RuntimeError).
     coeffs_poly = np.array([1.0, 2.0, 0.0])  # only orders 0,1 constrain params
-    with pytest.raises(RuntimeError):
+    with pytest.raises(ValueError, match="constrain"):
         fit_dsb(coeffs_poly, "a0 + a1*atan(a2*x)", "x")
+
+
+def test_dsb_user_input_errors_are_value_errors():
+    # no free parameters in the model
+    with pytest.raises(ValueError, match="no free parameters"):
+        fit_dsb(np.array([1.0, 2.0]), "2*x + 1", "x")
+    # fewer polynomial coefficients than parameters -> underdefined balance
+    with pytest.raises(ValueError, match="underdefined"):
+        fit_dsb(np.array([1.0]), "a0 + a1*x", "x")
+    # explicit rank below the parameter count
+    with pytest.raises(ValueError, match="underdefined"):
+        fit_dsb(np.array([1.0, 2.0, 3.0]), "a0 + a1*x + a2*x**2", "x", rank=2)
+
+
+def test_dsb_keeps_roots_with_a_zero_component():
+    # A model whose true offset is exactly 0: the symbolic square balance
+    # solves to (a0, a1) = (0, 2). The old filter discarded any root containing
+    # a zero component and silently fell back to numeric least squares; the
+    # zero-offset root is legitimate and must survive the symbolic path.
+    result = fit_dsb(np.array([0.0, 2.0]), "a0 + a1*x", "x")
+    np.testing.assert_allclose(result.coeffs, [0.0, 2.0], atol=1e-12)
+    assert result.message == "symbolic balance solved"

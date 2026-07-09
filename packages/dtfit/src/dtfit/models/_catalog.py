@@ -16,6 +16,9 @@ fit themselves.
 
 from __future__ import annotations
 
+import warnings
+from typing import Callable
+
 import numpy as np
 
 from dtfit.methods import fft_frequency_seed
@@ -366,7 +369,10 @@ def fourier_series(n_harmonics: int = 3) -> Model:
 # registry
 # The default candidate set used by ``suggest_models`` (fourier_series is a
 # parametric factory, offered separately rather than in the default sweep).
-CATALOG = {
+# ``register`` / ``unregister`` mutate this dict *in place*, so the reference the
+# recommender imported (``from ._catalog import CATALOG``) always sees new
+# families -- never rebind it.
+CATALOG: dict[str, Callable[[], Model]] = {
     # trend
     "linear": linear, "quadratic": quadratic, "cubic": cubic,
     "power_law": power_law, "logarithmic": logarithmic, "sqrt_law": sqrt_law,
@@ -391,3 +397,103 @@ CATALOG = {
 def all_models() -> list[Model]:
     """Fresh instances of every catalogued family."""
     return [factory() for factory in CATALOG.values()]
+
+
+# The shipped family names, snapshotted at import so ``register`` can flag an
+# overwrite of a builtin and ``unregister`` can refuse to remove one.
+_BUILTINS = frozenset(CATALOG)
+
+
+def register(
+    name: str,
+    factory: Callable[[], Model],
+    *,
+    overwrite: bool = False,
+) -> None:
+    """Register a custom model family into the catalog.
+
+    Once registered, the family is visible everywhere the builtins are: it is
+    returned by :func:`all_models`, appears under its ``name`` in :data:`CATALOG`,
+    and is considered by :func:`~dtfit.models.suggest_models` (a family whose
+    ``category`` is not one of the recommender's known shape categories -- e.g.
+    the default ``"general"`` -- is always kept in the default shortlist, so a
+    registered family never vanishes silently).
+
+    Parameters
+    ----------
+    name : str
+        The catalog key. Must be a non-empty string.
+    factory : Callable[[], Model]
+        A zero-argument callable returning a fresh :class:`Model` (matching the
+        builtin factories, e.g. ``lambda: Model("a*x", name="myline")``). It is
+        called once here to validate it, and again -- fresh -- on every use, so
+        return a new instance each call rather than a shared one.
+    overwrite : bool, optional
+        By default a collision with an existing family (builtin or previously
+        registered) raises :class:`ValueError`. Pass ``overwrite=True`` to
+        replace it; replacing a *builtin* additionally emits a
+        :class:`UserWarning`.
+
+    Raises
+    ------
+    ValueError
+        If ``name`` is empty/blank, if it collides with an existing family and
+        ``overwrite`` is false, or if ``factory`` raises when called.
+    TypeError
+        If ``factory`` is not callable or does not return a :class:`Model`.
+
+    See Also
+    --------
+    unregister : Remove a family added by :func:`register`.
+    """
+    if not isinstance(name, str) or not name.strip():
+        raise ValueError("model name must be a non-empty string")
+    if not callable(factory):
+        raise TypeError(
+            f"factory for model {name!r} must be a zero-argument callable "
+            f"returning a Model, got {type(factory).__name__}"
+        )
+    if name in CATALOG and not overwrite:
+        kind = "builtin" if name in _BUILTINS else "registered"
+        raise ValueError(
+            f"a {kind} model named {name!r} already exists; pass overwrite=True "
+            f"to replace it"
+        )
+    # Validate eagerly: a broken factory should fail here, not later inside
+    # all_models()/suggest_models where the traceback points away from the cause.
+    try:
+        probe = factory()
+    except Exception as exc:  # noqa: BLE001 - re-raised with context
+        raise ValueError(
+            f"factory for model {name!r} raised when called: {exc}"
+        ) from exc
+    if not isinstance(probe, Model):
+        raise TypeError(
+            f"factory for model {name!r} must return a Model, got "
+            f"{type(probe).__name__}"
+        )
+    if name in _BUILTINS:
+        warnings.warn(
+            f"overwriting the builtin model {name!r}", UserWarning, stacklevel=2
+        )
+    CATALOG[name] = factory
+
+
+def unregister(name: str) -> None:
+    """Remove a custom family previously added by :func:`register`.
+
+    Builtin families cannot be removed (:func:`register` with ``overwrite=True``
+    is the way to shadow one).
+
+    Raises
+    ------
+    ValueError
+        If ``name`` is a builtin family.
+    KeyError
+        If no family named ``name`` is registered.
+    """
+    if name in _BUILTINS:
+        raise ValueError(f"cannot unregister the builtin model {name!r}")
+    if name not in CATALOG:
+        raise KeyError(f"no model named {name!r} is registered")
+    del CATALOG[name]

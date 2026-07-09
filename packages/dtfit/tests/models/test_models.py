@@ -138,3 +138,349 @@ def test_model_from_raw_expr():
     y = 1.5 * np.exp(0.6 * x) + rng.normal(0, 0.02, x.size)
     r = m.fit(x, y, p0=[1.0, 1.0])
     assert r.params["b"] == pytest.approx(0.6, abs=0.1)
+
+
+def test_seed_arrays_keeps_partial_bounds():
+    # A seeder that bounds one parameter but leaves another unbounded must keep
+    # BOTH pairs: the solvers skip the global (DE) stage on infinite bounds, but
+    # the local solve still honours the finite ones. Mixed bounds used to be
+    # dropped wholesale (returned as None).
+    def seed(x, y):
+        return {"a": (2.0, -np.inf, np.inf), "s": (0.5, 1e-3, np.inf)}
+
+    m = Model("a*exp(-(x/s)**2)", name="bump", shape="bulk", seeder=seed)
+    x = np.linspace(0, 1, 20)
+    p0, bounds = m._seed_arrays(x, np.exp(-x))
+    assert p0 == [2.0, 0.5]
+    assert bounds == [(-np.inf, np.inf), (1e-3, np.inf)]
+
+
+def test_seed_arrays_fully_unbounded_maps_to_none():
+    # An all-(-inf, inf) seed carries no constraint: it maps to None so the
+    # solver keeps the unconstrained (LM) path instead of the bounded one.
+    def seed(x, y):
+        return {"a": (2.0, -np.inf, np.inf)}
+
+    m = Model("a*x", name="lin0", shape="bulk", seeder=seed)
+    p0, bounds = m._seed_arrays(np.linspace(0, 1, 5), np.linspace(0, 2, 5))
+    assert p0 == [2.0]
+    assert bounds is None
+
+
+def test_partial_bounds_survive_to_solver(monkeypatch):
+    # The (possibly partially-infinite) seeded bounds must reach the estimator
+    # untouched through Model.fit's auto route.
+    captured = {}
+
+    def fake_auto(x, y, expr, var, **kwargs):
+        captured.update(kwargs)
+        return "sentinel"
+
+    monkeypatch.setattr("dtfit.models._model.auto_estimate", fake_auto)
+
+    def seed(x, y):
+        return {"a": (1.0, -np.inf, np.inf), "s": (0.5, 1e-3, np.inf)}
+
+    m = Model("a*exp(-(x/s)**2)", name="bump", shape="bulk", seeder=seed)
+    x = np.linspace(0, 1, 20)
+    assert m.fit(x, np.exp(-x)) == "sentinel"
+    assert captured["p0"] == [1.0, 0.5]
+    assert captured["bounds"] == [(-np.inf, np.inf), (1e-3, np.inf)]
+
+
+def test_partial_bounds_positivity_guard_respected():
+    # Growing data would drive an unconstrained decay rate negative; the
+    # seeder's b > 0 guard must survive even though 'a' is unbounded.
+    def seed(x, y):
+        return {"a": (1.0, -np.inf, np.inf), "b": (0.3, 1e-9, np.inf)}
+
+    m = Model("a*exp(-b*x)", name="decay", shape="bulk", seeder=seed)
+    x = np.linspace(0.0, 3.0, 120)
+    y = 2.0 * np.exp(0.5 * x)
+    r = m.fit(x, y, method="lsi")
+    assert r.params["b"] >= 0.0
+
+
+def test_suggest_models_warns_on_failed_candidate():
+    # A candidate whose fit errors must be skipped with a UserWarning naming
+    # it (never silently), and the surviving families still get ranked.
+    def bad_seed(x, y):
+        raise RuntimeError("boom")
+
+    bad = Model("a*exp(b*x)", name="bad", shape="bulk", seeder=bad_seed)
+    rng = np.random.default_rng(6)
+    t = np.linspace(0, 5, 100)
+    y = 2.0 * t + 1.0 + rng.normal(0, 0.05, t.size)
+    with pytest.warns(UserWarning, match="candidate model 'bad' failed: boom"):
+        ranked = suggest_models(t, y, candidates=[bad, models.linear()])
+    names = [s.name for s in ranked]
+    assert "bad" not in names
+    assert "linear" in names
+
+
+# --- callable models -------------------------------------------------------
+def _decay(x, a, b, c):
+    """f(x) = a*exp(-b*x) + c -- signature order (a, b, c)."""
+    return a * np.exp(-b * x) + c
+
+
+def _line_ba(x, b, a):
+    """f(x) = a*x + b -- signature order (b, a) != sorted (a, b)."""
+    return a * x + b
+
+
+def test_callable_model_attributes_and_signature_order():
+    # A callable Model exposes is_symbolic=False, no expr, the callable in .func,
+    # and its parameters in *signature* order (not sorted).
+    m = Model.from_callable(_decay, name="cdecay", shape="bulk")
+    assert m.is_symbolic is False
+    assert m.expr is None
+    assert m.func is _decay
+    assert m.params == ("a", "b", "c")
+    assert "callable" in repr(m).lower() or "<callable>" in repr(m)
+
+    # Signature order is preserved verbatim, even when it differs from sorted.
+    m2 = Model.from_callable(_line_ba, name="cline")
+    assert m2.params == ("b", "a")
+
+
+def test_callable_model_recovers_params_lsi_and_auto():
+    # A callable Model fits and recovers its parameters through both an explicit
+    # engine (lsi) and the shape-routed auto path.
+    m = Model.from_callable(_decay, name="cdecay", shape="bulk")
+    rng = np.random.default_rng(0)
+    x = np.linspace(0, 5, 200)
+    y = 3.0 * np.exp(-0.8 * x) + 1.0 + rng.normal(0, 0.02, x.size)
+    for method in ("lsi", "auto"):
+        r = m.fit(x, y, method=method)
+        assert r.params["a"] == pytest.approx(3.0, abs=0.1)
+        assert r.params["b"] == pytest.approx(0.8, abs=0.1)
+        assert r.params["c"] == pytest.approx(1.0, abs=0.1)
+        # coefficients / names line up with the callable's signature order.
+        assert tuple(r.names) == ("a", "b", "c")
+
+
+def test_callable_model_fits_via_eac():
+    # The explicit equal-areas engine also accepts the callable straight through.
+    m = Model.from_callable(_decay, name="cdecay", shape="bulk")
+    rng = np.random.default_rng(1)
+    x = np.linspace(0, 5, 200)
+    y = 3.0 * np.exp(-0.8 * x) + 1.0 + rng.normal(0, 0.02, x.size)
+    r = m.fit(x, y, method="eac", p0=[2.5, 0.6, 0.8])
+    assert r.params["a"] == pytest.approx(3.0, abs=0.2)
+    assert r.params["b"] == pytest.approx(0.8, abs=0.15)
+    assert r.params["c"] == pytest.approx(1.0, abs=0.2)
+
+
+def test_callable_model_self_seeds_through_fit(monkeypatch):
+    # A callable Model's seeder feeds p0/bounds in *signature* order and the raw
+    # callable is passed straight through to the fitter (which resolves it).
+    captured: dict = {}
+
+    def fake_lsi(x, y, model, var, **kw):
+        captured["model"] = model
+        captured.update(kw)
+        return "sentinel"
+
+    monkeypatch.setattr("dtfit.models._model.fit_lsi", fake_lsi)
+
+    def seed(x, y):
+        return {"a": (3.0, 0.0, 10.0), "b": (0.5, 0.0, 5.0), "c": (1.0, -5.0, 5.0)}
+
+    m = Model.from_callable(_decay, name="cdecay", seeder=seed)
+    out = m.fit(np.linspace(0, 5, 50), np.ones(50), method="lsi")
+    assert out == "sentinel"
+    assert captured["model"] is _decay  # the callable itself, unresolved
+    assert captured["p0"] == [3.0, 0.5, 1.0]
+    assert captured["bounds"] == [(0.0, 10.0), (0.0, 5.0), (-5.0, 5.0)]
+
+
+def test_callable_model_self_seed_end_to_end():
+    # No explicit p0: the seeder alone drives a good fit.
+    def seed(x, y):
+        return {"a": (float(y.max()), 0.0, 100.0),
+                "b": (0.5, 1e-3, 10.0),
+                "c": (float(y.min()), -100.0, 100.0)}
+
+    m = Model.from_callable(_decay, name="cdecay", shape="bulk", seeder=seed)
+    rng = np.random.default_rng(2)
+    x = np.linspace(0, 5, 200)
+    y = 3.0 * np.exp(-0.8 * x) + 1.0 + rng.normal(0, 0.02, x.size)
+    r = m.fit(x, y, method="lsi")  # p0/bounds come from the seeder
+    assert r.params["b"] == pytest.approx(0.8, abs=0.1)
+    assert r.params["a"] == pytest.approx(3.0, abs=0.15)
+
+
+def test_callable_model_param_names_for_varargs():
+    # A callable with a *params signature is not introspectable: names must be
+    # supplied, and they become the canonical order.
+    def poly(x, *c):
+        return c[0] + c[1] * x + c[2] * x**2
+
+    m = Model.from_callable(poly, names=["a0", "a1", "a2"], shape="bulk")
+    assert m.params == ("a0", "a1", "a2")
+    x = np.linspace(-2, 2, 120)
+    y = 1.0 + 0.5 * x + 2.0 * x**2
+    r = m.fit(x, y, method="lsi", p0=[0.0, 0.0, 0.0])
+    assert r.params["a0"] == pytest.approx(1.0, abs=0.05)
+    assert r.params["a1"] == pytest.approx(0.5, abs=0.05)
+    assert r.params["a2"] == pytest.approx(2.0, abs=0.05)
+
+
+def test_callable_model_constructor_accepts_callable_with_param_names():
+    # The constructor path (not only from_callable) accepts a callable and an
+    # explicit param_names override.
+    m = Model(_decay, "t", name="cdecay", param_names=("a", "b", "c"))
+    assert m.is_symbolic is False
+    assert m.var == "t"
+    assert m.params == ("a", "b", "c")
+
+    # A param_names count that disagrees with the signature is rejected.
+    with pytest.raises(ValueError):
+        Model.from_callable(_decay, names=["a", "b"])  # signature has 3
+
+
+def test_callable_model_add_raises():
+    # Composition requires symbolic operands: any callable operand raises a clear
+    # TypeError, in either position and for callable+callable.
+    m = Model.from_callable(_decay, name="cdecay")
+    sym = Model("q*x", "x", name="lin")
+    with pytest.raises(TypeError, match="cannot compose a callable model"):
+        _ = m + sym
+    with pytest.raises(TypeError, match="cannot compose a callable model"):
+        _ = sym + m
+    with pytest.raises(TypeError, match="cannot compose a callable model"):
+        _ = m + m
+
+
+def test_symbolic_model_behavior_unchanged():
+    # A symbolic (string) Model keeps the historical attributes: is_symbolic,
+    # the expression string, no callable, sorted parameter order.
+    m = Model("a*exp(b*x)", "x", name="exp", shape="bulk")
+    assert m.is_symbolic is True
+    assert m.expr == "a*exp(b*x)"
+    assert m.func is None
+    assert m.params == ("a", "b")  # sorted
+    # composition still works between two symbolic models.
+    combined = m + Model("c*x", "x", name="lin")
+    assert combined.is_symbolic is True
+    assert "c" in combined.params
+
+
+# --- custom model registration --------------------------------------------
+@pytest.fixture
+def clean_catalog():
+    # Registration mutates the module-global CATALOG in place; snapshot and
+    # restore it so a test's registrations never leak into other tests.
+    from dtfit.models import _catalog
+    snapshot = dict(_catalog.CATALOG)
+    try:
+        yield
+    finally:
+        _catalog.CATALOG.clear()
+        _catalog.CATALOG.update(snapshot)
+
+
+def _make_myline():
+    # A zero-arg factory returning a fresh custom Model (default category
+    # 'general', which is outside the recommender's known shape vocabulary).
+    def seed(x, y):
+        a1, a0 = np.polyfit(x, y, 1)
+        return {"a0": (float(a0), -np.inf, np.inf),
+                "a1": (float(a1), -np.inf, np.inf)}
+    return Model("a0 + a1*x", name="myline", shape="bulk", seeder=seed)
+
+
+def test_register_adds_to_catalog_and_all_models(clean_catalog):
+    assert "myline" not in models.CATALOG
+    models.register("myline", _make_myline)
+    assert "myline" in models.CATALOG
+    # all_models() returns fresh instances of every catalogued family, custom too
+    assert any(m.name == "myline" for m in models.all_models())
+    # a fresh instance every call (factory-based, not a shared object)
+    a, b = models.CATALOG["myline"](), models.CATALOG["myline"]()
+    assert a is not b and a.name == b.name == "myline"
+
+
+def test_register_makes_model_visible_to_suggest(clean_catalog):
+    models.register("myline", _make_myline)
+    rng = np.random.default_rng(11)
+    t = np.linspace(0, 10, 150)
+    y = 2.0 * t + 1.0 + rng.normal(0, 0.05, t.size)
+    ranked = suggest_models(t, y)
+    names = [s.name for s in ranked]
+    # the registered family is considered and (being the true structure) fits
+    assert "myline" in names
+    top = next(s for s in ranked if s.name == "myline")
+    assert top.r2 > 0.99
+
+
+def test_custom_category_model_kept_in_default_shortlist(clean_catalog):
+    from dtfit.models._suggest import _shortlist
+    models.register("myline", _make_myline)
+    rng = np.random.default_rng(9)
+    t = np.linspace(0, 6 * np.pi, 300)
+    y = np.sin(2 * t) + rng.normal(0, 0.05, t.size)  # strongly oscillatory
+    short = {m.name for m in _shortlist(t, y)}
+    # oscillatory data prunes the peak/sigmoid builtins, but the custom
+    # 'general'-category family has no shape signal and must always survive.
+    assert "myline" in short
+    assert "gaussian" not in short and "logistic" not in short
+
+
+def test_register_collision_raises_and_overwrite_replaces(clean_catalog):
+    models.register("myfam", _make_myline)
+    # a second registration under the same name collides
+    with pytest.raises(ValueError, match="already exists"):
+        models.register("myfam", _make_myline)
+    # a builtin name also collides (without overwrite)
+    with pytest.raises(ValueError, match="already exists"):
+        models.register("linear", _make_myline)
+
+    def other():
+        return Model("a*x", name="myfam2", shape="bulk")
+
+    models.register("myfam", other, overwrite=True)
+    assert models.CATALOG["myfam"] is other
+
+
+def test_register_overwrite_builtin_warns(clean_catalog):
+    # Shadowing a shipped family is allowed with overwrite=True but is flagged.
+    with pytest.warns(UserWarning, match="builtin"):
+        models.register("linear", _make_myline, overwrite=True)
+    assert models.CATALOG["linear"] is _make_myline
+
+
+def test_register_rejects_bad_inputs(clean_catalog):
+    with pytest.raises(ValueError, match="non-empty"):
+        models.register("", _make_myline)
+    with pytest.raises(ValueError, match="non-empty"):
+        models.register("   ", _make_myline)
+    with pytest.raises(TypeError):
+        models.register("notcallable", 123)  # factory not callable
+    with pytest.raises(TypeError, match="must return a Model"):
+        models.register("badret", lambda: 42)  # returns a non-Model
+    with pytest.raises(ValueError, match="raised when called"):
+        models.register("boom", _boom_factory)  # factory raises
+    # none of the rejected names leaked into the catalog
+    for nm in ("", "   ", "notcallable", "badret", "boom"):
+        assert nm not in models.CATALOG
+
+
+def _boom_factory():
+    raise RuntimeError("nope")
+
+
+def test_unregister_removes_custom_and_refuses_builtin(clean_catalog):
+    models.register("myfam", _make_myline)
+    assert "myfam" in models.CATALOG
+    models.unregister("myfam")
+    assert "myfam" not in models.CATALOG
+    # re-registration after unregister works (name is free again)
+    models.register("myfam", _make_myline)
+    assert "myfam" in models.CATALOG
+    # builtins are protected, and unknown names error
+    with pytest.raises(ValueError, match="builtin"):
+        models.unregister("linear")
+    with pytest.raises(KeyError):
+        models.unregister("does_not_exist")

@@ -258,6 +258,115 @@ def test_forecaster_control():
         fit_stochastic(y, forecaster="nonsense")
 
 
+# --- time-axis units, short-series honesty, surfaced stage failures --------- #
+def test_time_axis_units_do_not_change_seasonality_or_forecast():
+    """Regression for the sample-units/t-units seasonal bug: the period is
+    FFT-detected in SAMPLE units, so on a non-unit time axis (seconds, years)
+    it must be converted to t units before the seasonal fit -- previously any
+    such axis fit the wrong frequency and erased the seasonal component."""
+    t, y = gen_trend_cycle(600, 0.02, 50.0, 3.0, 1.0, np.random.default_rng(5))
+    m1 = fit_stochastic(y, t)
+    m2 = fit_stochastic(y, 0.5 * t)             # seconds-like axis, dt = 0.5
+    m3 = fit_stochastic(y, 1900.0 + t / 12.0)   # years-like axis, dt = 1/12
+    assert m1.has_cycle and m1.seasonal
+    for m, dt in ((m2, 0.5), (m3, 1.0 / 12.0)):
+        assert m.has_cycle and m.seasonal
+        # cycle_period is documented in SAMPLES -> identical on any axis
+        assert m.cycle_period == pytest.approx(m1.cycle_period)
+        assert m.n_harmonics == m1.n_harmonics
+        assert m.cycle_amp == pytest.approx(m1.cycle_amp, rel=1e-6)
+        # the trend slope IS in t units, so it rescales with the spacing
+        assert m.trend_slope == pytest.approx(m1.trend_slope / dt, rel=1e-6)
+        # forecast horizons are in SAMPLES -> equivalent forecasts on any axis
+        assert np.allclose(m.forecast(40), m1.forecast(40))
+    # simulate()'s captured mean maps sample indices onto the fitted t axis,
+    # so the regenerated structure matches whatever the units of t were
+    idx = np.arange(m1.n, dtype=float)
+    assert np.allclose(m1._mean_fn(idx), m2._mean_fn(idx))
+
+
+def test_period_kwarg_is_in_samples_on_any_time_axis():
+    t = np.arange(400, dtype=float)
+    y = (3.0 * np.sin(2.0 * np.pi * t / 40.0)
+         + 0.5 * np.random.default_rng(8).standard_normal(400))
+    m = fit_stochastic(y, 0.5 * t, period=40)   # 40 SAMPLES, not 40 t-units
+    assert m.has_cycle and m.seasonal and m.cycle_period == 40.0
+    # the fundamental amplitude only comes out right if the sample-unit period
+    # was converted to t units before the seasonal fit (it was ~0 before)
+    assert abs(m.cycle_amp - 3.0) < 0.5
+
+
+def test_short_series_fallback_warns_and_is_visible_in_the_name():
+    k = np.arange(40, dtype=float)
+    y = (3.0 * np.sin(2.0 * np.pi * k / 8.0)
+         + 0.1 * np.random.default_rng(3).standard_normal(40))
+    with pytest.warns(UserWarning, match=r"too short to backtest-select"):
+        m = fit_stochastic(y)                    # cycle -> several candidates
+    assert m.forecaster_name == "random walk (short-series fallback)"
+    pt, lo, hi = m.forecast(5, return_conf_int=True)  # RW band via the prefix
+    assert pt.shape == (5,) and np.all(hi >= lo)
+    # the band must WIDEN with horizon (the sqrt(h) random-walk fan): the
+    # suffixed name still has to key the RW band via its prefix, not fall
+    # through to the constant trend-stationary band
+    assert np.all(np.diff(hi - lo) > 0)
+    # a single-candidate regime has nothing to select among -> no fallback tag
+    m2 = fit_stochastic(np.random.default_rng(0).standard_normal(40))
+    assert m2.forecaster_name == "random walk"
+
+
+def test_failing_forecast_candidate_warns_and_loses_selection():
+    y = gen_ar1(800, 0.6, np.random.default_rng(1))
+
+    def bad(train, h):
+        raise RuntimeError("candidate exploded")
+
+    with pytest.warns(UserWarning,
+                      match=r"candidate 'bad' failed during backtest"):
+        m = fit_stochastic(y, forecaster=[("bad", bad), "random walk"])
+    assert m.forecaster_name == "random walk"
+
+
+def _boom(*args, **kwargs):
+    raise RuntimeError("boom")
+
+
+def test_ar1_stage_failure_warns_and_gate_stays_off(monkeypatch):
+    import dtfit.stochastic._model as sm
+    monkeypatch.setattr(sm, "ar1_reversion", _boom)
+    with pytest.warns(UserWarning, match=r"stage AR\(1\) failed"):
+        m = fit_stochastic(gen_ar1(600, 0.6, np.random.default_rng(2)))
+    assert not m.has_mean_reversion
+
+
+def test_hurst_stage_failure_warns_and_gate_stays_off(monkeypatch):
+    import dtfit.stochastic._model as sm
+    monkeypatch.setattr(sm, "hurst_spectral", _boom)
+    with pytest.warns(UserWarning, match="stage Hurst/long-memory failed"):
+        m = fit_stochastic(gen_ar1(600, 0.6, np.random.default_rng(2)))
+    assert not m.has_long_memory
+
+
+def test_garch_stage_failure_warns_in_both_branches(monkeypatch):
+    import dtfit.stochastic._model as sm
+    monkeypatch.setattr(sm, "garch_persistence", _boom)
+    g = gen_garch(2000, 0.05, 0.08, 0.90, np.random.default_rng(3))
+    with pytest.warns(UserWarning, match="stage GARCH/vol-clustering failed"):
+        m = fit_stochastic(g)                    # stationary branch
+    assert not m.has_vol_clustering
+    with pytest.warns(UserWarning,
+                      match="stage unit-root vol-clustering failed"):
+        m = fit_stochastic(np.cumsum(g))         # unit-root branch
+    assert not m.has_vol_clustering and m.regime.startswith("random walk")
+
+
+def test_unit_root_gate_falls_back_with_a_warning(monkeypatch):
+    import dtfit.stochastic._stats as st
+    monkeypatch.setattr(st, "_adf_tau", _boom)
+    rw = np.cumsum(np.random.default_rng(0).standard_normal(400))
+    with pytest.warns(UserWarning, match=r"unit-root \(ADF\) failed"):
+        assert st._is_nonstationary(rw)          # AR(1)-coefficient fallback
+
+
 # --- the generative model: simulate round-trip ------------------------------ #
 @pytest.mark.parametrize("gen,attr", [
     (lambda r: gen_trend_cycle(600, 0.02, 50.0, 3.0, 1.0, r)[1], "has_cycle"),
@@ -312,6 +421,90 @@ def test_unit_root_gate_verdicts_without_statsmodels():
     assert not _is_nonstationary(0.05 * np.arange(400) + rng.standard_normal(400) * 3)
     assert not _is_nonstationary(gen_ar1(800, 0.6, rng))
     assert not _is_nonstationary(rng.standard_normal(400))
+
+
+# --- pandas in -> pandas out (optional dependency; ndarray path unchanged) --- #
+def test_fit_stochastic_series_forecast_is_a_future_indexed_series():
+    """Fitting on a Series with a DatetimeIndex remembers the index; the point
+    forecast is a Series on the length-h FUTURE index, and its values are exactly
+    the ndarray-fit model's forecast (only the wrapping is pandas-aware)."""
+    pd = pytest.importorskip("pandas")
+    _, y = gen_trend_cycle(600, 0.02, 50.0, 3.0, 1.0, np.random.default_rng(5))
+    idx = pd.date_range("2000-01-01", periods=y.size, freq="D")
+    ms = fit_stochastic(pd.Series(y, index=idx))
+    ma = fit_stochastic(y)                       # ndarray twin
+    assert ms._index is not None and ma._index is None
+    h = 30
+    fc = ms.forecast(h)
+    assert isinstance(fc, pd.Series) and len(fc) == h
+    assert isinstance(fc.index, pd.DatetimeIndex)
+    # the future index continues the training index at its inferred daily freq
+    expect = pd.date_range(idx[-1] + pd.Timedelta(days=1), periods=h, freq="D")
+    assert fc.index.equals(expect)
+    # values are bit-identical to the ndarray-fit forecast
+    ndfc = ma.forecast(h)
+    assert isinstance(ndfc, np.ndarray)
+    assert np.array_equal(fc.to_numpy(), ndfc)
+
+
+def test_fit_stochastic_series_conf_int_is_three_aligned_series():
+    pd = pytest.importorskip("pandas")
+    _, y = gen_trend_cycle(600, 0.02, 50.0, 3.0, 1.0, np.random.default_rng(5))
+    idx = pd.date_range("2000-01-01", periods=y.size, freq="D")
+    ms = fit_stochastic(pd.Series(y, index=idx))
+    ma = fit_stochastic(y)
+    h = 20
+    pt, lo, hi = ms.forecast(h, return_conf_int=True)
+    for obj in (pt, lo, hi):
+        assert isinstance(obj, pd.Series) and len(obj) == h
+    # the three bands share one future index, and it continues the training index
+    assert pt.index.equals(lo.index) and pt.index.equals(hi.index)
+    assert pt.index.equals(
+        pd.date_range(idx[-1] + pd.Timedelta(days=1), periods=h, freq="D"))
+    assert np.all(hi.to_numpy() >= lo.to_numpy())
+    # values identical to the ndarray path
+    apt, alo, ahi = ma.forecast(h, return_conf_int=True)
+    assert np.array_equal(pt.to_numpy(), apt)
+    assert np.array_equal(lo.to_numpy(), alo)
+    assert np.array_equal(hi.to_numpy(), ahi)
+
+
+def test_fit_stochastic_ndarray_forecast_is_unchanged_ndarrays():
+    """An ndarray-fit model returns plain ndarrays with or without pandas
+    installed (the pandas path is entered only when an index was remembered)."""
+    m = fit_stochastic(gen_ar1(1500, 0.7, np.random.default_rng(2)))
+    assert m._index is None
+    fc = m.forecast(10)
+    assert isinstance(fc, np.ndarray) and fc.shape == (10,)
+    pt, lo, hi = m.forecast(10, return_conf_int=True)
+    assert all(isinstance(o, np.ndarray) for o in (pt, lo, hi))
+
+
+def test_fit_stochastic_integer_index_forecast_continues_step():
+    """A step-2 integer index (RangeIndex) is continued by its step in the
+    forecast labels (the freq-not-inferable integer-like fallback)."""
+    pd = pytest.importorskip("pandas")
+    y = gen_ar1(1500, 0.7, np.random.default_rng(2))
+    idx = pd.RangeIndex(10, 10 + 2 * y.size, 2)
+    fc = fit_stochastic(pd.Series(y, index=idx)).forecast(5)
+    assert isinstance(fc, pd.Series)
+    assert list(fc.index) == [int(idx[-1]) + 2 * (i + 1) for i in range(5)]
+
+
+def test_fit_stochastic_unit_root_series_forecast_is_indexed():
+    """The unit-root branch (a different StochasticModel return path) also
+    remembers the index and emits a future-indexed Series forecast."""
+    pd = pytest.importorskip("pandas")
+    y = np.cumsum(np.random.default_rng(1).standard_normal(1500))
+    idx = pd.date_range("2010-01-01", periods=y.size, freq="D")
+    ms = fit_stochastic(pd.Series(y, index=idx))
+    ma = fit_stochastic(y)
+    assert ms.regime.startswith("random walk")
+    fc = ms.forecast(12)
+    assert isinstance(fc, pd.Series) and len(fc) == 12
+    assert fc.index.equals(
+        pd.date_range(idx[-1] + pd.Timedelta(days=1), periods=12, freq="D"))
+    assert np.array_equal(fc.to_numpy(), ma.forecast(12))
 
 
 def test_vendored_adf_matches_statsmodels():

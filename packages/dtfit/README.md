@@ -1,7 +1,7 @@
 # dtfit
 
-[![CI](https://github.com/ringavirda/science-pylab/actions/workflows/ci.yml/badge.svg)](https://github.com/ringavirda/science-pylab/actions/workflows/ci.yml)
-[![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://github.com/ringavirda/science-pylab)
+[![CI](https://github.com/ringavirda/science-nonline/actions/workflows/ci.yml/badge.svg)](https://github.com/ringavirda/science-nonline/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://github.com/ringavirda/science-nonline)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Typed](https://img.shields.io/badge/typed-yes-brightgreen)](https://peps.python.org/pep-0561/)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
@@ -10,6 +10,12 @@
 forecasting on time-series / Big Data, using methods built in the scheme of
 differential (non-Taylor) transformations. Developed as part of a PhD
 dissertation on mathematical models of nonlinear smoothing and prediction.
+
+Models can be a SymPy expression string **or** a plain Python callable
+`f(x, *params)`; batch fits accept per-point measurement `sigma` (or sklearn
+`sample_weight`); and every fit carries its own quality diagnostics (`R^2`,
+`AIC`/`BIC`). All are opt-in — left at their defaults, fits are numerically
+identical to before.
 
 ## Installation
 
@@ -106,8 +112,13 @@ JSON-friendly round-trip:
 r = dt.fit_lsi(x, y, "a*exp(b*x)", "x", p0=[1, 1])
 r.params                       # {'a': ..., 'b': ...}
 r.stderr(); r.confidence_intervals(0.95)
+r.rsquared, r.aic, r.bic       # fit-quality diagnostics
 y_hat, y_std = r.predict(x, return_std=True)   # prediction band
 dt.FittingResult.from_dict(r.to_dict())        # save / ship a fitted model
+
+# a Python callable model + per-point sigma both work (numerically opt-in):
+r2 = dt.fit_eac(x, y, lambda x, a, b: a * np.exp(b * x),
+                sigma=noise_std)               # signature-order params, weighted fit
 ```
 
 ### Diagnostics & visualization

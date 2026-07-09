@@ -6,6 +6,7 @@ to the random walk when nothing beats it."""
 
 from __future__ import annotations
 
+import warnings
 from typing import Any, Callable, cast
 
 import numpy as np
@@ -226,10 +227,24 @@ def _select_forecaster(
     unless it is clearly worse than RW): a per-fold backtest under-rates a
     phase-sensitive cyclical forecast that is actually RMSE-competitive over the
     full record, so a detected cycle should not be flattened to a line on its
-    account."""
+    account.
+
+    A series too short to backtest (``n <= 50``) cannot arbitrate between
+    multiple candidates: the first candidate (the random walk in every built-in
+    set) is returned with a :class:`UserWarning` and its name suffixed with
+    ``" (short-series fallback)"``, so the fallback is visible on the fitted
+    model rather than silently posing as a backtest choice. A candidate that
+    raises during the backtest is warned about (:class:`UserWarning`) and
+    scored ``inf`` RMSE for that fold, so it loses the selection."""
     n = y.size
-    if n <= 50 or len(candidates) == 1:
+    if len(candidates) == 1:
         return candidates[0]
+    if n <= 50:
+        name, fn = candidates[0]
+        warnings.warn(
+            f"series too short to backtest-select a forecaster (n={n} <= 50); "
+            f"falling back to {name}", UserWarning, stacklevel=2)
+        return f"{name} (short-series fallback)", fn
     hb = int(max(5, min(n // 6, max_h)))
     scores: dict[str, list[float]] = {name: [] for name, _ in candidates}
     for k in range(folds):
@@ -241,7 +256,10 @@ def _select_forecaster(
             try:
                 fc = np.asarray(fn(train, hb), dtype=float)
                 scores[name].append(float(np.sqrt(np.mean((fc - test) ** 2))))
-            except Exception:
+            except Exception as exc:
+                warnings.warn(
+                    f"forecaster candidate {name!r} failed during backtest: "
+                    f"{exc}", UserWarning, stacklevel=2)
                 scores[name].append(float("inf"))
     means = {name: (float(np.mean(s)) if s else float("inf"))
              for name, s in scores.items()}

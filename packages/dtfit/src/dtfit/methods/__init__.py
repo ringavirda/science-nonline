@@ -2,11 +2,19 @@
 
 The differential-transformation batch fitters (``fit_lsi``, ``fit_eac`` -- with
 uniform or curvature-adaptive window placement -- and ``fit_dsb``), the
-``find_degree`` polynomial support primitive the DSB scheme builds on, and the
-shared symbolic helpers (``model_params``, ``taylor_coeffs``).
+``find_degree`` polynomial support primitive the DSB scheme builds on, the
+shared symbolic helpers (``model_params``, ``taylor_coeffs``) and the
+user-input normalizers (``normalize_p0``, ``normalize_bounds``).
 """
 
-from ._common import model_params, taylor_coeffs, find_degree
+from ._common import (
+    model_params,
+    taylor_coeffs,
+    find_degree,
+    normalize_p0,
+    normalize_bounds,
+)
+from ._modelinput import resolve_model, ModelSpec, result_kwargs
 from ._dsb import fit_dsb
 from ._lsi import fit_lsi, fft_frequency_seed
 from ._eac import fit_eac
@@ -22,4 +30,9 @@ __all__ = [
     "find_degree",
     "model_params",
     "taylor_coeffs",
+    "normalize_p0",
+    "normalize_bounds",
+    "resolve_model",
+    "ModelSpec",
+    "result_kwargs",
 ]
