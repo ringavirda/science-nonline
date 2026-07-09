@@ -40,6 +40,11 @@ dependencies = [
 [project.optional-dependencies]
 viz = ["matplotlib>=3.7"]
 dev = ["pytest>=7", "pytest-cov>=4", "ruff>=0.4", "mypy>=1.8"]
+# Optional pandas interop ("pandas in -> pandas out"). NOT a runtime dependency:
+# dtfit imports and every ndarray path works without it (guarded in
+# dtfit._pandas). Install with `pip install -e ".[pandas]"` to enable Series /
+# DataFrame inputs, index-aligned predict, and date-indexed forecasts.
+pandas = ["pandas>=2.0"]
 # Documentation site (mkdocs-material + mkdocstrings autodoc). Not a runtime
 # dependency: install with `pip install -e ".[docs]"` and build from this
 # directory with `mkdocs build --strict`. See docs/ and mkdocs.yml.

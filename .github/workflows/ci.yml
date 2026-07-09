@@ -106,6 +106,20 @@ jobs:
           pytest --cov --cov-report=term-missing --cov-report=xml --cov-fail-under=70
         working-directory: packages/dtfit
 
+      # pandas is an OPTIONAL dependency: the run above installs dtfit WITHOUT it,
+      # so it proves the library imports and every ndarray path works pandas-free
+      # (the ~20 pandas-gated tests skip). This step then installs pandas and
+      # re-runs the pandas-bearing modules so the "pandas in -> pandas out"
+      # feature (Series/DataFrame inputs, index-aligned predict, date-indexed
+      # forecasts) is actually exercised in CI rather than silently skipped.
+      - name: Test with pandas (optional interop)
+        run: |
+          pip install "pandas>=2.0"
+          pytest -q tests/test_pandas_io.py tests/methods/test_auto.py \
+            tests/test_stochastic.py tests/estimators/test_regressor.py \
+            tests/test_result.py
+        working-directory: packages/dtfit
+
       # Publish the coverage report once (one OS/interpreter) as a build
       # artifact, so the number is visible/trendable without an external service.
       - name: Upload coverage report

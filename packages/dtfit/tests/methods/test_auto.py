@@ -450,11 +450,14 @@ def test_auto_forecast_integer_index_continues_by_step():
 
 def test_auto_forecast_ndarray_has_no_index_and_to_series_raises():
     # a plain ndarray x -> .index is None and to_series() raises a clear error.
+    # The message differs by environment (no future index when pandas IS present;
+    # "requires pandas" when it is not) -- both are valid, so match either so the
+    # test is correct with or without pandas installed.
     t = np.linspace(0, 12, 120)
     y = 1000.0 / (1 + np.exp(-0.8 * (t - 6)))
     fc = auto_forecast(t[:90], y[:90], horizon=30)
     assert fc.index is None
-    with pytest.raises(ValueError, match="index"):
+    with pytest.raises(ValueError, match="index|pandas"):
         fc.to_series()
 
 
