@@ -112,12 +112,13 @@ jobs:
       # re-runs the pandas-bearing modules so the "pandas in -> pandas out"
       # feature (Series/DataFrame inputs, index-aligned predict, date-indexed
       # forecasts) is actually exercised in CI rather than silently skipped.
+      # One command per line (no backslash continuation): the default `run:`
+      # shell is PowerShell on Windows, which does not honour bash's `\` line
+      # continuation, so a wrapped command would break there.
       - name: Test with pandas (optional interop)
         run: |
           pip install "pandas>=2.0"
-          pytest -q tests/test_pandas_io.py tests/methods/test_auto.py \
-            tests/test_stochastic.py tests/estimators/test_regressor.py \
-            tests/test_result.py
+          pytest -q tests/test_pandas_io.py tests/methods/test_auto.py tests/test_stochastic.py tests/estimators/test_regressor.py tests/test_result.py
         working-directory: packages/dtfit
 
       # Publish the coverage report once (one OS/interpreter) as a build
