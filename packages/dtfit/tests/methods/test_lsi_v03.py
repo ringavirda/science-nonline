@@ -164,9 +164,13 @@ def test_lsi_solver_options_max_nfev(exp_data):
     r_lim = fit_lsi(x, y, "a*exp(b*x)", "x", p0=[1.0, -0.5],
                     solver_options={"max_nfev": 1})
     assert r_full.nfev is not None and r_lim.nfev is not None
-    assert r_lim.nfev <= 3            # the max_nfev=1 cap bites
+    # The max_nfev=1 cap bites: far fewer evaluations than the full fit, and it
+    # cannot converge in one step. (The exact capped count is scipy-version
+    # dependent -- 1..4 -- so assert the invariant, not an absolute number.)
+    assert r_lim.nfev < r_full.nfev
     assert r_lim.converged is False   # a 1-eval fit cannot converge
     assert r_full.converged is True   # the uncapped full fit does
+    # All three fail if solver_options were ignored (r_lim would equal r_full).
 
 
 def test_lsi_solver_options_bounded_maps_maxfun(exp_data, monkeypatch):

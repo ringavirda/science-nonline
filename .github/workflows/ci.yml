@@ -154,9 +154,14 @@ jobs:
 
       # dtfit is a runtime dependency of both research packages; install it
       # (with the dev tools: ruff/mypy/pytest) first, then the two packages.
+      # ``viz`` pulls matplotlib, which the dtfit-experimental experiment modules
+      # import at load time (their test suite imports those modules); it lives in
+      # dtfit's viz extra, so the research job needs it just as the pre-split CI
+      # did. (statsmodels/torch stay in experimental's heavier ``bench`` extra
+      # and are importorskip-guarded in the tests, so they are not needed here.)
       - name: Install dtfit + research packages (with dev extras)
         run: |
-          pip install -e "packages/dtfit[dev]"
+          pip install -e "packages/dtfit[viz,dev]"
           pip install -e "packages/dtfit-experimental[dev]"
           pip install -e "packages/dtfit-hardware[dev]"
 
