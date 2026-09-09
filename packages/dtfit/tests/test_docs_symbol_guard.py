@@ -44,6 +44,7 @@ _CORE_NAMES = (
 GROUP2 = re.compile(
     r"\bdtfit\.(?:%s)\b" % _CORE_NAMES
     + r"|from\s+dtfit\s+import[^\n]*\b(?:%s|ensemble_fit)\b" % _CORE_NAMES
+    + r"|\bdtfit\.reference\b"
     + r"|Promoted to the stable|stable library primitive"
     + r"|re-exported from `?dtfit`?|PROMOTED as `?dtfit\."
 )

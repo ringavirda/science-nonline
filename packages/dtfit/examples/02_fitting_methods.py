@@ -8,8 +8,6 @@ Each differential-transformation fitter uses a different *measurement* of
                     recipe for cycles.
 - EAC (the block fit)  -- equal-areas integral matching over windows; robust to
                     sparse outliers (robust=True) and good on transients.
-- DSB (fit_dsb)  -- symbolic differential-spectra balance against a
-                    polynomial pre-fit; an analytical reference method.
 
 Run headless:   python examples/02_fitting_methods.py
 """
@@ -18,7 +16,6 @@ import numpy as np
 
 from dtfit import fit, Original
 from dtfit.image import fft_frequency_seed
-from dtfit.reference import find_degree, fit_dsb
 
 
 def lsi_basic(rng) -> None:
@@ -73,17 +70,6 @@ def eac_transient(rng) -> None:
     print("params:", {k: round(v, 3) for k, v in res.params.items()})
 
 
-def dsb(rng) -> None:
-    # DSB equates the model's Maclaurin spectrum to a polynomial pre-fit's,
-    # order by order. Build ascending polynomial coeffs (the data Taylor
-    # spectrum) with find_degree + np.polyfit, then balance.
-    x = np.linspace(0, 1.5, 200)
-    y = 1.5 * np.exp(1.1 * x) + rng.normal(0, 0.02, x.size)   # a=1.5, b=1.1
-    deg = find_degree(x, y)
-    pc = np.polyfit(x, y, deg)[::-1]
-    res = fit_dsb(pc, "a*exp(b*x)", "x")
-    print("\n== DSB (polynomial degree {}) ==".format(deg))
-    print("params:", {k: round(v, 3) for k, v in res.params.items()})
 
 
 def main() -> None:
@@ -92,7 +78,6 @@ def main() -> None:
     lsi_oscillatory(rng)
     eac_robust(rng)
     eac_transient(rng)
-    dsb(rng)
 
 
 if __name__ == "__main__":

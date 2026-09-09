@@ -37,7 +37,7 @@ signatures, arguments, return types, and behavior.
 | **sklearn estimator** | `NonlineRegressor` (in `dtfit.sklearn`) | [estimator.md](API-Estimator) |
 | **Forecasting** | `auto_forecast`, `ForecastResult` | [auto.md](API-Auto) |
 | **Model framework** | `models`, `suggest_models` (`Model`, `register`, `unregister` and the catalog families in `dtfit.models`) | [models.md](API-Models) |
-| **Reference method** | `fit_dsb`, `find_degree` (in `dtfit.reference`) | [dsb.md](Methods-DSB) |
+| **Reference method** | `fit_dsb`, `find_degree` (in `dtfit_legacy.dsb`) | [dsb.md](Methods-DSB) |
 | **Stochastic series** | `stochastic` (`fit_stochastic`, `StochasticModel`, `StochasticFilter`, `SecondOrderImage`, `SecondOrderStream` and the estimators in `dtfit.stochastic`; `Stochastic` in `dtfit.models`) | [stochastic.md](API-Stochastic) |
 | **Streaming / online** | `ImageFilter`, `ImageFilter(basis="legendre")`, `ImageFilter(basis="block")` (`DriftDetector` in `dtfit.streaming`) | [streaming.md](API-Streaming) |
 | **Streams and scale** | `ImageStream`, `fit_many` (`FittingProblem`, `assemble`, `legendre_transfer`, `block_transfer` in `dtfit.image`) | [scaling.md](API-Scaling) |
@@ -66,7 +66,7 @@ from dtfit import models, suggest_models
 from dtfit.models import Model, register, unregister, resolve_model
 
 # the reference method (the exact-balance ancestor, not part of fit)
-from dtfit.reference import fit_dsb, find_degree
+from dtfit_legacy.dsb import fit_dsb, find_degree
 
 # stochastic series (characterize / forecast / generate / track random data)
 from dtfit import stochastic

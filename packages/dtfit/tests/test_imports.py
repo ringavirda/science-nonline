@@ -75,8 +75,6 @@ def test_removed_modules_are_gone(mod):
     "name,module",
     [
         ("NonlineRegressor", "dtfit.sklearn"),
-        ("fit_dsb", "dtfit.reference"),
-        ("find_degree", "dtfit.reference"),
         ("Model", "dtfit.models"),
         ("Stochastic", "dtfit.models"),
         ("register", "dtfit.models"),

@@ -16,7 +16,6 @@ import numpy as np
 import pytest
 
 import dtfit as dt
-from dtfit.reference import find_degree, fit_dsb
 from dtfit.sklearn import NonlineRegressor
 from accuracy.scenarios import SCENARIOS
 from accuracy.harness import ordered_params, r2, param_err, predict
@@ -91,24 +90,6 @@ def test_bare_defaults_recover_a_cycle_through_the_auto_route():
     assert any(v > 0.98 for v in auto_r2), auto_r2
 
 
-def test_dsb_reference_additive():
-    """DSB on its intended additive form, from the polynomial pre-fit its
-    docstring prescribes."""
-    rng = np.random.default_rng(0)
-    x = np.linspace(0, 3, 150)
-    clean = 0.5 + 0.2 * x + 0.3 * np.exp(0.4 * x)
-    y = clean + rng.normal(0, 0.03, x.size)
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        degree = max(find_degree(x, y, method="bic"), 3)
-        coeffs_poly = np.polyfit(x, y, degree)[::-1]
-        res = fit_dsb(coeffs_poly, "a0 + a1*x + a2*exp(a3*x)", "x")
-    pred = predict(res, x)
-    assert np.all(np.isfinite(pred))
-    # under noise DSB matches the data's noisy high-order polynomial spectrum,
-    # behaving as a curve fit rather than an exact point estimator (see
-    # dsb.md). The threshold therefore asks for a usable curve, no more.
-    assert r2(clean, pred) > 0.90
 
 
 @pytest.mark.parametrize("scn", SCENARIOS, ids=[s.name for s in SCENARIOS])

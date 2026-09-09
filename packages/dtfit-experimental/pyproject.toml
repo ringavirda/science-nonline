@@ -30,7 +30,7 @@ dependencies = [
 # Experiment / benchmark suite (dtfit_experimental.experiments): plotting + the
 # baseline methods compared against (deep nets via torch, classical TS via
 # statsmodels). joblib (parallel fitting) ships with scikit-learn.
-bench = ["matplotlib>=3.7", "torch>=2.2", "statsmodels>=0.14", "pandas>=2.0"]
+bench = ["dtfit-legacy", "matplotlib>=3.7", "torch>=2.2", "statsmodels>=0.14", "pandas>=2.0"]
 # Optional GPU backend for the GEMM-batched projection (batched.py /
 # experiments .../cases/08_gpu_batched_projection). CuPy is a NumPy-API drop-in
 # on cuBLAS; pick the wheel matching your CUDA driver -- cupy-cuda13x for CUDA 13

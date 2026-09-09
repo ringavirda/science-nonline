@@ -30,7 +30,7 @@ import numpy as np
 from dtfit import fit_many
 from dtfit.image import FittingProblem
 from dtfit._core import _kernels
-from dtfit_experimental.scale import PartitionedLSI
+from dtfit_legacy.scale import PartitionedLSI
 
 __all__ = [
     "N_CORES", "PHYS",

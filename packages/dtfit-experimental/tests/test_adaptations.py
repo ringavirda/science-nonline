@@ -2,7 +2,7 @@
 
 The ``#n`` labels are the adaptation index from the ``dtfit_experimental``
 docstring. The map-reduce estimators PartitionedLSI and PartitionedEAC live
-in ``dtfit_experimental.scale``; covered in ``test_scale_partitioned.py``.
+in ``dtfit_legacy.scale``; covered in ``test_scale_partitioned.py``.
 """
 
 import numpy as np

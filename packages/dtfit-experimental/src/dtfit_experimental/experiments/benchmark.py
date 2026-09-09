@@ -39,9 +39,9 @@ import numpy as np
 from scipy.optimize import curve_fit
 
 import dtfit as dt
-from dtfit.reference import find_degree, fit_dsb
+from dtfit_legacy.dsb import find_degree, fit_dsb
 from dtfit.streaming import ImageFilter
-from dtfit_experimental.scale import PartitionedLSI, fit_lsi_batched
+from dtfit_legacy.scale import PartitionedLSI, fit_lsi_batched
 
 DATA_DIR = Path(__file__).resolve().parent / "data"
 

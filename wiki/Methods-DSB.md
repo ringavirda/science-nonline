@@ -2,7 +2,7 @@
 
 > Symbolic, analytical reference method. Source:
 > [`reference/dsb.py`](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit/src/dtfit/reference/dsb.py).
-> Invoke via `from dtfit.reference import fit_dsb, find_degree`, then
+> Invoke via `from dtfit_legacy.dsb import fit_dsb, find_degree`, then
 > `fit_dsb(coeffs_poly, expr, var, ...)`. It is not part of `fit`: it is the
 > exact-balance ancestor the image methods are derived against.
 
@@ -133,7 +133,7 @@ From samples the call is two lines, the pre-fit and the balance:
 
 ```python
 import numpy as np
-from dtfit.reference import find_degree, fit_dsb
+from dtfit_legacy.dsb import find_degree, fit_dsb
 
 expr, n_params = "a0 + a1*exp(a2*x)", 3
 deg = max(find_degree(x, y, method="bic"), n_params - 1, 1)

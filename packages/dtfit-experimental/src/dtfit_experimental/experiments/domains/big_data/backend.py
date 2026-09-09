@@ -53,7 +53,7 @@ import numpy as np
 
 from dtfit.streaming import ImageFilter
 
-from dtfit_experimental.scale import (
+from dtfit_legacy.scale import (
     fit_lsi_batched, PartitionedBatchLSI, project_spectra,
 )
 from dtfit_experimental.experiments.common import fmt, metrics

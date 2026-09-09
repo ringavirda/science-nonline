@@ -5,7 +5,7 @@ from typing import cast
 import numpy as np
 import pytest
 
-from dtfit.reference import find_degree, fit_dsb
+from dtfit_legacy.dsb import find_degree, fit_dsb
 from dtfit._symbolic import taylor_coeffs
 import sympy as sp
 

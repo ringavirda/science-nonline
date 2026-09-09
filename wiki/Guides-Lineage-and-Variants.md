@@ -163,7 +163,7 @@ the complete list across the stable API.
 | **Robust image** | `robust=True` on `fit`, `fit(basis="legendre")`, `fit(basis="block")` | Huber-reweights the image before any model is fit -- self-scaling, no scale to tune |
 | **EAC, bounded** | `fit(..., bounds=..., basis="block")` | constrained trust-region fit |
 | **Missing data** | `fit_lsi/fit(..., nan_policy="omit", basis="block")` | drop NaNs instead of raising |
-| **DSB** | `fit_dsb(...)` (in `dtfit.reference`) | symbolic exact balance (reference only) |
+| **DSB** | `fit_dsb(...)` (in `dtfit_legacy.dsb`) | symbolic exact balance (reference only) |
 | **EACFilter** | `ImageFilter(..., basis="block")` | streaming EAC (area measurement) |
 | **LSIFilter** | `ImageFilter(..., basis="legendre")` | streaming LSI (spectrum measurement) -- for oscillatory plants |
 | **Gap coasting** | `filter.coast(...)`, `coast_cov(...)` | dead-reckon a streaming fit through measurement dropouts (uncertainty grows with the gap) |

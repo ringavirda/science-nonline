@@ -20,7 +20,7 @@ import numpy as np
 
 from dtfit import fit, Original
 from dtfit.image import fft_frequency_seed
-from dtfit.reference import find_degree, fit_dsb
+from dtfit_legacy.dsb import find_degree, fit_dsb
 
 
 def lsi_basic(rng) -> None:

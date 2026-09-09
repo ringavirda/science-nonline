@@ -38,8 +38,8 @@ Every fit returns a FittingResult: named parameters, uncertainty, an
 optimizer ``converged`` flag, and extrapolation-aware ``predict``.
 dtfit.diagnostics (fit_report, residual tests, the ``*Display`` helpers) is
 imported explicitly, after the scikit-learn convention, as are
-dtfit.sklearn (the NonlineRegressor estimator), dtfit.reference (DSB, the
-exact-balance ancestor) and dtfit.log (opt-in library logging).
+dtfit.sklearn (the NonlineRegressor estimator) and dtfit.log (opt-in library
+logging).
 
 Core dependencies: numpy, scipy, sympy, scikit-learn (imported only by
 dtfit.sklearn). Optional extras: matplotlib for the plots, via

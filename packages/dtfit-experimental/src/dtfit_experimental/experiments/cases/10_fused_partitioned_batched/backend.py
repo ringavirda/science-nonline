@@ -9,7 +9,7 @@ flat ``O(order)`` memory and an exact one-pass reduce, but one channel at a
 time. ``project_spectra`` batches by channel: one matmul across all of
 them, GPU-pluggable, but the whole volume resident at ``O(N)``. Each covers
 the other's weakness, and the fused estimator is the claim that you can
-have both at once. Both live in :mod:`dtfit_experimental.scale`.
+have both at once. Both live in :mod:`dtfit_legacy.scale`.
 
 :func:`fused_project` folds each chunk's GEMM into a ``(B, n_coef)``
 accumulator; :func:`loop_project` runs the per-channel ``PartitionedLSI`` loop
@@ -28,7 +28,7 @@ import tracemalloc
 import numpy as np
 
 from dtfit_experimental import available_backends, resolve_backend
-from dtfit_experimental.scale import (
+from dtfit_legacy.scale import (
     PartitionedLSI, PartitionedBatchLSI, fit_lsi_batched, project_spectra,
 )
 

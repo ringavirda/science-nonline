@@ -139,7 +139,7 @@ FitDisplay.from_estimator(reg, x, y)  # data + fitted curve (needs the viz extra
   coefficients decay (`decay`), whether it matches another image
   (`test_equal`) or a model (`test_structure`), and draws synthetic records
   from itself (`simulate`).
-- **DSB** (`dtfit.reference.fit_dsb`) - symbolic differential spectra
+- **DSB** (`dtfit_legacy.dsb.fit_dsb`, in the `dtfit-legacy` package) - symbolic differential spectra
   balance; kept as the analytical reference, out of `fit` (it takes the
   coefficients of a polynomial pre-fit, not samples).
 - **Stochastic** (`fit_stochastic`) - second-order characterization of a

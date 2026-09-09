@@ -19,8 +19,8 @@ return a
 - [`order_for`](#order_for), [`coverage`](#coverage) -- picking and checking the order
 - [`fit(basis="legendre")`](#fit(basis="legendre")) -- `fit` in the Legendre basis
 - [`fit(basis="block")`](#fit(basis="block")) -- `fit` in the block basis
-- [`fit_dsb`](#fit_dsb) -- Differential Spectra Balance (the reference method, in `dtfit.reference`)
-- [`find_degree`](#find_degree) -- polynomial degree selection (DSB support, in `dtfit.reference`)
+- [`fit_dsb`](#fit_dsb) -- Differential Spectra Balance (the reference method, in `dtfit_legacy.dsb`)
+- [`find_degree`](#find_degree) -- polynomial degree selection (DSB support, in `dtfit_legacy.dsb`)
 - [`fft_frequency_seed`](#fft_frequency_seed) -- frequency seed for oscillatory fits
 
 ---
@@ -463,7 +463,7 @@ res = fit("a0 + a1*exp(a2*x)", Original(x, y), "x", basis="block", order=16, rob
 <a name="fit_dsb"></a>
 ## `fit_dsb`
 
-> Not part of [`fit`](#fit): the exact-balance ancestor, in `dtfit.reference`.
+> Not part of [`fit`](#fit): the exact-balance ancestor, in `dtfit_legacy.dsb`.
 > See [dsb.md](Methods-DSB).
 
 ```python
@@ -494,7 +494,7 @@ numeric refinement.
 **Example**
 
 ```python
-from dtfit.reference import fit_dsb, find_degree
+from dtfit_legacy.dsb import fit_dsb, find_degree
 import numpy as np
 
 deg = find_degree(x, y)              # BIC-selected degree
@@ -508,7 +508,7 @@ res = fit_dsb(pc, "a*exp(b*x)", "x")
 ## `find_degree`
 
 ```python
-from dtfit.reference import find_degree
+from dtfit_legacy.dsb import find_degree
 
 find_degree(data_x, data_y, method="bic", max_degree=12) -> int
 ```

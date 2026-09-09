@@ -27,7 +27,7 @@ import numpy as np
 
 import dtfit as dt
 from dtfit.streaming import ImageFilter
-from dtfit_experimental.scale import PartitionedLSI
+from dtfit_legacy.scale import PartitionedLSI
 
 __all__ = [
     "CHUNK", "DOMAIN",

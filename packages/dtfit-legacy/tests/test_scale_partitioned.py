@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from dtfit_experimental.scale import PartitionedLSI, PartitionedEAC
+from dtfit_legacy.scale import PartitionedLSI, PartitionedEAC
 
 
 def test_scale_exports_partitioned_lsi():

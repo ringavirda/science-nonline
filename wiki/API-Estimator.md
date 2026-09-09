@@ -48,7 +48,7 @@ search.fit(x.reshape(-1, 1), y)   # a 2-D column of the single feature
 ```
 
 DSB is not one of the routes: it is the exact-balance reference method and
-lives in [`dtfit.reference`](Methods-DSB), where the polynomial pre-fit is two
+lives in `dtfit_legacy.dsb` (the `dtfit-legacy` package, see [Lineage](Lineage)), where the polynomial pre-fit is two
 explicit lines.
 
 ## Fitted attributes (after `fit`)
