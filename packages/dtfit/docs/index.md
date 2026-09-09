@@ -201,3 +201,6 @@ print(fc.to_series().head(3))   # future dates -> forecast values
 | **Streaming** | track live parameters | `ImageFilter`, `ImageFilter(basis="legendre")`, `ImageFilter(basis="block")` |
 | **Scale** | run big / many | `ImageStream`, `fit_many` |
 | **Stochastic** | genuinely random series | `fit_stochastic`, `StochasticModel` |
+
+The historical stages the estimator grew out of, and where each of them
+lives in the `dtfit-legacy` package, are on the wiki's Lineage page.

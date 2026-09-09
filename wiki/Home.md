@@ -14,6 +14,7 @@ This folder is the documentation. Pick the door that matches what you need:
 |---|---|
 | **Understand the ideas** from scratch, no heavy math assumed | [guides/](Guides) -- plain-language explanations of every method, with the proofs built up gently |
 | **See the full map** -- every method, version, variant and adaptation | [guides/lineage-and-variants.md](Guides-Lineage-and-Variants) -- the complete atlas of where each approach came from and how it relates |
+| **How the method evolved** -- the stages from spectrum balance to the image, each one runnable | [Lineage](Lineage) -- where every historical stage lives in the `dtfit-legacy` package |
 | **Look up a function or class** -- signatures, arguments, return types | [api/](API) -- complete reference for the public `dtfit` API |
 | **See the rigorous math** -- the formal derivations and proofs | [methods/](Methods) -- the mathematical reference, one file per method |
 | **Learn by running code** -- copy-paste examples | [examples/](Examples) -- quickstart -> methods -> models -> sklearn -> streaming -> scaling -> diagnostics |
