@@ -34,7 +34,7 @@ reduces chunk by chunk.
 * distributed reduce (:func:`fit_distributed`, through
   ``PartitionedBatchLSI.merge``): per-partition accumulators combined by an
   associative, order-independent ``merge``.
-* the streaming filter (``EACFilter``), the online twin: an O(1)-per-sample
+* the streaming filter (the block filter), the online twin: an O(1)-per-sample
   recursive update tracking a model's parameters in bounded memory.
 
 The established baselines are per-channel SciPy NLLS
@@ -557,7 +557,7 @@ def robustness(panel):
 # 6. the online streaming filter against the established online estimators
 def online_filter(n):
     """Track a sinusoid through a mid-stream frequency jump one sample at a
-    time, comparing dtfit's ``EACFilter`` against the established online
+    time, comparing dtfit's the block filter against the established online
     toolkit (recursive least squares, plus an incremental SGD net where sklearn
     is present) on per-sample cost, memory, one-step prediction error and
     whether the physical frequency is recovered at all. Returns
@@ -572,7 +572,7 @@ def online_filter(n):
     phase = np.cumsum(w_seq * dt_)
     y = 3.0 * np.sin(phase) + rng.normal(0, 0.3, n)
 
-    # dtfit EACFilter, tracking the physical model A*sin(w*t)
+    # dtfit the block filter, tracking the physical model A*sin(w*t)
     flt = ImageFilter("A*sin(w*t)", "t", p0=[2.0, 1.0], window_size=50,
                     q_diag=[1e-3, 5e-4], order=2, basis="block")
     costs, w_hist, pred_eaf = [], [], np.full(n, np.nan)
@@ -608,7 +608,7 @@ def online_filter(n):
 
     w_err = abs(w_hist[-1] - 1.6) / 1.6 * 100
     rows = [
-        {"online method": "dtfit EACFilter", "us / sample": us_eaf,
+        {"online method": "dtfit the block filter", "us / sample": us_eaf,
          "memory": f"bounded ({peak_eaf:.1f} MB)",
          "one-step RMSE (post-jump)": osr(pred_eaf),
          "recovers physics": f"yes (w err {w_err:.1f}%)"},

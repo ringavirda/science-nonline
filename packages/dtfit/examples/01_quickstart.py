@@ -21,7 +21,7 @@ def main() -> None:
     # 1. A first fit. Everything in the expression except the variable "t" is a
     #    free parameter -- here a and b.
     res = fit("a*exp(b*t)", Original(x, y), "t", basis="legendre")
-    print("== fit_lsi: a*exp(b*t) ==")
+    print("== the Legendre fit: a*exp(b*t) ==")
     print(res.summary())
     print("params:", {k: round(v, 4) for k, v in res.params.items()})
     # The optimizer's verdict travels with the result: check it before

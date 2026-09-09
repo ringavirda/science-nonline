@@ -12,7 +12,7 @@ Four experiments:
     interface, scored in sample and by 4-fold cross-validation;
   * USD/UAH (2014-2015 hryvnia crisis): batch fit of the exponential
     depreciation trend with LSI and EAC;
-  * the same rate series through EACFilter, streaming one-step-ahead
+  * the same rate series through the block filter, streaming one-step-ahead
     forecasting against the naive "tomorrow = today" baseline.
 
 Real downloaded data throughout, no synthetic signals.
@@ -147,7 +147,7 @@ def experiment_currency_batch() -> None:
 
 
 def experiment_currency_streaming() -> None:
-    rule("USD/UAH 2014-2015 -- EACFilter online tracking (bounded cost)")
+    rule("USD/UAH 2014-2015 -- the block filter online tracking (bounded cost)")
     dates, rate = load_csv("usd_uah_2014_2015.csv")
     n = rate.size
     window = 30

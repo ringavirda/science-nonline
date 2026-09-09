@@ -895,7 +895,7 @@ def filter_break_demo(*, n_seg: int = 1500, seed: int = 0) -> dict:
 
 def filter_characteristics(lengths: tuple[int, ...] = (1000, 10000, 100000)) -> dict:
     """Memory and per-sample-cost profile of :class:`StochasticFilter` against
-    stream length, with a reference dtfit ``LSIFilter`` per-sample cost. This
+    stream length, with a reference dtfit the Legendre filter per-sample cost. This
     is the evidence that the filter has the flat-memory, bounded-cost
     characteristics of dtfit's own streaming filters: its state is independent
     of stream length and its cost per sample does not grow."""

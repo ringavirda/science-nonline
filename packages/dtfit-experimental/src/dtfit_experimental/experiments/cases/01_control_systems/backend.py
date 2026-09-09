@@ -11,7 +11,7 @@ recovers no physical parameters at all. That contrast is the point of the
 comparison.
 
 Two further benches exercise the adaptations rather than the base estimators.
-:func:`regime_change` runs an :class:`EACFilter` across a mid-run damping jump
+:func:`regime_change` runs an :class:`the block filter` across a mid-run damping jump
 to see whether the online filter re-adapts and flags the break;
 :func:`mimo_joint` identifies a three-output plant whose channels share one
 natural frequency, jointly and then per channel for contrast.

@@ -23,7 +23,7 @@ What lives here is the linear-Gaussian primitive: recursive least squares in
 information form with an optional forgetting factor, the on-MCU building block.
 It is the same update dtfit's nonlinear filters would take were they run in
 information form rather than covariance form, offered standalone and
-fusion-oriented. The covariance-form ``EACFilter`` / ``LSIFilter`` run the
+fusion-oriented. The covariance-form the block filter / the Legendre filter run the
 covariance update directly and do not touch it; it stays in
 ``dtfit-experimental`` until a domain study exercises it.
 """

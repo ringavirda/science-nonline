@@ -220,8 +220,8 @@ class FusedManeuverDetector:
 def _make_axis_filters(kind, fixes, off):
     """Build the 3 per-axis dtfit filters for the generic CA quadratic model.
 
-    ``kind="eac"`` gives EACFilter and its window-area measurement;
-    ``kind="lsi"`` gives the streaming sibling LSIFilter, projecting each
+    ``kind="eac"`` gives the block filter and its window-area measurement;
+    ``kind="lsi"`` gives the streaming sibling the Legendre filter, projecting each
     window onto the first ``order+1`` Legendre moments instead. Both share the
     same model, window and p0, so a difference between them is a difference in
     the measurement and not in the tuning.

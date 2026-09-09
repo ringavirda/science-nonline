@@ -3,10 +3,10 @@
 Each differential-transformation fitter uses a different *measurement* of
 "fit":
 
-- LSI (fit_lsi)  -- integral least-squares in a reconditioned Legendre
+- LSI (the Legendre fit)  -- integral least-squares in a reconditioned Legendre
                     spectrum; the general default, with an oscillatory
                     recipe for cycles.
-- EAC (fit_eac)  -- equal-areas integral matching over windows; robust to
+- EAC (the block fit)  -- equal-areas integral matching over windows; robust to
                     sparse outliers (robust=True) and good on transients.
 - DSB (fit_dsb)  -- symbolic differential-spectra balance against a
                     polynomial pre-fit; an analytical reference method.

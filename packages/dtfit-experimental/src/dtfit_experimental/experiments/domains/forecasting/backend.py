@@ -243,7 +243,7 @@ def _fit_bounds(spec, kind):
 
 def _stage(spec, kind):
     """A boosting stage spec, dropping bounds for the local-fit kinds so
-    ``boosted_fit``'s ``fit_lsi`` runs local optimization."""
+    ``boosted_fit``'s the Legendre fit runs local optimization."""
     if kind in LOCAL_FIT_KINDS:
         return {k: v for k, v in spec.items() if k != "bounds"}
     return spec
@@ -313,7 +313,7 @@ def _detect_chirp(y_tr, t_tr):
 def _spec_from(expr, pmap, *, method="lsi", **extra):
     """Build a fit spec from a ``{name: (p0, lo, hi)}`` map, with bounds and p0
     ordered to match SymPy's name-sorted parameter layout, the convention
-    ``fit_lsi`` uses. Going through the map removes any chance of getting
+    the Legendre fit uses. Going through the map removes any chance of getting
     that ordering wrong by hand."""
     import sympy as sp
     syms = sorted((s for s in sp.sympify(expr).free_symbols if str(s) != "x"),
@@ -1215,7 +1215,7 @@ BEST_MODEL_DOC = (
 
 
 METHODS_DOC = (
-    "- **LSI** (`fit_lsi`) -- integral least-squares in the reconditioned "
+    "- **LSI** (`the Legendre fit`) -- integral least-squares in the reconditioned "
     "Legendre differential-transformation scheme: projects the data onto an "
     "orthonormal Legendre basis (its *empirical spectrum*) and solves for the "
     "model parameters whose analytic spectrum matches. A smoothing spectral fit. "
@@ -1226,7 +1226,7 @@ METHODS_DOC = (
     "`(1+m*cos w_m x)*sin(w_c x+phi)` for the modulated carrier, and a **chirp** "
     "`A*sin(w0 x + k x^2 + phi)` for the sweep -- fitted at a Fourier-basis order "
     "high enough to resolve the highest harmonic.\n"
-    "- **EAC** (`fit_eac`) -- the equal-areas criterion: matches the model's "
+    "- **EAC** (`the block fit`) -- the equal-areas criterion: matches the model's "
     "*integrated area* to the data's over a set of windows (overdetermined -> "
     "noise-averaging). The batch twin of the streaming equal-areas filter.\n"
     "- **#2 Fourier-basis LSI** (`fit_lsi_basis`, `basis=\"fourier\"`) -- the LSI "

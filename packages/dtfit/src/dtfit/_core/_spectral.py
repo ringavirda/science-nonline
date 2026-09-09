@@ -3,7 +3,8 @@
 The LSI method (:func:`dtfit.fit_lsi`) fits a parameter-nonlinear model by
 matching the model's spectrum to the data's on an orthogonal basis, where the
 integral criterion ``∫(data-model)^2`` collapses to a diagonal sum of squared
-coefficient residuals. ``fit_lsi`` hard-codes the Legendre basis; this module
+coefficient residuals. The Legendre fit hard-codes the Legendre basis;
+this module
 generalizes it along two axes for the ``dtfit_experimental`` adaptations:
 
 * a pluggable basis: Legendre, Chebyshev, Fourier for periodic signals,
@@ -166,7 +167,7 @@ class Basis:
         raise NotImplementedError
 
 
-# The reference basis; mirrors what fit_lsi does directly.
+# The reference basis; mirrors what the Legendre fit does directly.
 class LegendreBasis(Basis):
     name = "legendre"
 

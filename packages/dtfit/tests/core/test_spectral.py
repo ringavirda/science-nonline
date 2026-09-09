@@ -68,7 +68,7 @@ def test_all_finite_bounds_still_use_global_stage_reproducibly():
 
 
 def test_fit_lsi_with_mixed_bounds_converges_and_respects_bound():
-    # End to end through fit_lsi: parameter a is bounded, b is not.
+    # End to end through the Legendre fit: parameter a is bounded, b is not.
     rng = np.random.default_rng(0)
     x = np.linspace(0.0, 2.0, 120)
     y = 2.5 * np.exp(-1.2 * x) + rng.normal(0, 0.02, x.size)

@@ -616,7 +616,7 @@ def cmd_stream_replay(args: argparse.Namespace) -> int:
 
 
 def cmd_stream_track(args: argparse.Namespace) -> int:
-    """The leg-5 tracker: run an ``LSIFilter`` over the replayed samples
+    """The leg-5 tracker: run an the Legendre filter over the replayed samples
     and send block images back. The filter is built here, so
     ``stream.py`` needs no import from ``filters.py``.
 

@@ -242,7 +242,7 @@ def _scipy_bounds(b):
 # coeffs come back in sympy name-sorted order, so each zips against
 # ``sorted(names)``.
 def est_lsi(m, t, y):
-    # Oscillatory families take the oscillatory recipe built into ``fit_lsi``:
+    # Oscillatory families take the oscillatory recipe built into the Legendre fit:
     # passing ``freq_param`` turns smoothing off, seeds the frequency from an
     # FFT and raises the spectral order. ``m["osc"]`` names the angular
     # frequency.

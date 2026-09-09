@@ -1,6 +1,6 @@
 """Adaptation #2: pluggable orthogonal basis for LSI.
 
-``fit_lsi`` matches spectra on the Legendre basis. A polynomial spectrum needs
+the Legendre fit matches spectra on the Legendre basis. A polynomial spectrum needs
 many high orders before it can express one oscillation; a Fourier basis
 captures the same cycle in a couple of harmonics, while a pure decay sits
 naturally on a Laguerre basis. :func:`fit_lsi_basis` leaves the LSI criterion

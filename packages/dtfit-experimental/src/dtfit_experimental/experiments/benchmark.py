@@ -365,7 +365,7 @@ def fig_filter() -> None:
     for j, di in enumerate(drift_idx):
         ax[0].axvline(di, color="tab:purple", ls="--", lw=1.2,
                       label="drift detected" if j == 0 else None)
-    ax[0].set_title("EACFilter — online tracking + drift detection")
+    ax[0].set_title("the block filter — online tracking + drift detection")
     ax[0].set_xlabel("sample (trading day)")
     ax[0].set_ylabel("UAH per USD")
     ax[0].legend(fontsize=8)
@@ -510,9 +510,9 @@ def fig_eac_adaptive() -> None:
 
 
 def fig_lsi_filter() -> None:
-    """LSIFilter's scenario: track a steady oscillation. The spectrum
-    measurement locks onto the cycle's frequency. The EACFilter's area
-    measurement nearly cancels over a cycle and cannot; the LSIFilter exists
+    """the Legendre filter's scenario: track a steady oscillation. The spectrum
+    measurement locks onto the cycle's frequency. The the block filter's area
+    measurement nearly cancels over a cycle and cannot; the the Legendre filter exists
     for that reason."""
     from dtfit.streaming import ImageFilter
 
@@ -544,9 +544,9 @@ def fig_lsi_filter() -> None:
 
     ax[1].axhline(w_t, color="k", ls="--", lw=1, label="true ω = 1.3")
     ax[1].plot(t, w_lsi, "tab:blue", lw=1.6,
-               label=f"LSIFilter ω → {w_lsi[-1]:.2f} (locks on)")
+               label=f"the Legendre filter ω → {w_lsi[-1]:.2f} (locks on)")
     ax[1].plot(t, w_eac, "tab:orange", lw=1.6,
-               label=f"EACFilter ω → {w_eac[-1]:.2f} (area cancels)")
+               label=f"the block filter ω → {w_eac[-1]:.2f} (area cancels)")
     ax[1].set_title("Spectrum measurement tracks the cycle; area does not")
     ax[1].set_xlabel("t"); ax[1].set_ylabel("ω estimate"); ax[1].legend(fontsize=8)
     fig.tight_layout(); fig.savefig(FIG_DIR / "lsi_filter.png"); plt.close(fig)
@@ -606,7 +606,7 @@ def fig_scaling() -> None:
 
     The exactness is in the reduce itself: accumulated spectra are additive, so
     chunking reproduces a single pass over the whole array. What is left over
-    against ``fit_lsi`` comes from a different empirical spectrum (a
+    against the Legendre fit comes from a different empirical spectrum (a
     least-squares Legendre fit there, trapezoid projection in the accumulator)
     taken at a different order; the two coefficient sets therefore land close
     together rather than on top of each other.

@@ -176,7 +176,7 @@ def streaming_point() -> str:
         f"- True amplitude drifts **1.0 -> 3.0** over {n} samples.\n"
         f"- A single `scipy.curve_fit` gives one value `A = {a_batch:.2f}` -- "
         f"RMSE **{batch_rmse:.2f}** against the drifting truth.\n"
-        f"- The streaming `EACFilter` tracks it online, "
+        f"- The streaming `the block filter` tracks it online, "
         f"RMSE **{track_rmse:.2f}** (final estimate `A = {a_track[-1]:.2f}`, "
         f"truth {A_true[-1]:.2f}).\n"
         "- `curve_fit` has no online/`partial_fit` mode: tracking drift means "

@@ -38,14 +38,14 @@ experimental and coexist (see ``bases.py``).
 These signatures may change until promotion. Each of the four is here for its
 own reason. ``fit_lsi_basis`` buys vocabulary, not accuracy: a Fourier or
 Laguerre basis makes periodic and decay models expressible, yet recovery did
-not improve and the LTSF benchmark went against it. ``fit_lsi`` still
+not improve and the LTSF benchmark went against it. the Legendre fit still
 hard-codes Legendre for that reason. ``boosted_fit`` is a genuine win, but on
 one domain only (additive trend plus season, CO2 and the like); a confirming
 second domain would clear the promotion gate. ``fit_joint`` is the substantial
 new solver, still under evaluation. ``InformationFilter``, the
 inverse-covariance primitive whose fusion is a plain addition, is coherent and
-tested but no domain study exercises it and the covariance-form ``EACFilter``
-/ ``LSIFilter`` do not use it; it waits here for a sensor-fusion or embedded
+tested but no domain study exercises it and the covariance-form the block filter
+/ the Legendre filter do not use it; it waits here for a sensor-fusion or embedded
 domain. Measured verdicts live in ``experiments/cases/analysis``.
 """
 

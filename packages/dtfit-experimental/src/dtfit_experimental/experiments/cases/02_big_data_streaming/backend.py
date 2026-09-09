@@ -12,8 +12,8 @@ Two tracks measure that. :func:`volume_track` streams a drifting signal through
 the map-reduce adaptation (:class:`PartitionedLSI`), generating and consuming
 it in fixed chunks so nothing beyond the O(order) accumulator is ever resident,
 and records throughput and peak memory as the volume grows.
-:func:`online_track` measures the per-sample budget of an :class:`EACFilter`
-and sets it against a ``fit_eac`` refit over a growing history, the naive way
+:func:`online_track` measures the per-sample budget of an :class:`the block filter`
+and sets it against a the block fit refit over a growing history, the naive way
 to track a stream. It also returns the tracked frequency and the drift flags
 for the notebook's figure.
 """
@@ -82,9 +82,9 @@ def online_track(n, *, seed=0, batch_sizes=(10_000, 50_000, 250_000)):
     """Per-sample cost and memory of the streaming filter vs a batch refit.
 
     Tracks a high-rate sine with a mid-stream frequency jump using an
-    :class:`EACFilter`, timing each ``partial_fit`` and recording the tracked
+    :class:`the block filter`, timing each ``partial_fit`` and recording the tracked
     frequency and any drift flags. The constant-cost streaming update is then
-    set against a batch ``fit_eac`` refit at increasing sizes, whose cost grows
+    set against a batch the block fit refit at increasing sizes, whose cost grows
     with the history. Returns a dict with the per-step cost, peak memory, the
     batch-refit costs and the tracking history for the figure.
     """
@@ -114,7 +114,7 @@ def online_track(n, *, seed=0, batch_sizes=(10_000, 50_000, 250_000)):
 
     # A batch re-fit costs O(N) in the history length. Tracking a stream by
     # re-fitting everything seen so far therefore costs O(N^2) overall, and
-    # timing fit_eac at increasing sizes shows that growth. The throwaway fit
+    # timing the block fit at increasing sizes shows that growth. The throwaway fit
     # first warms the SymPy lambdify and solver caches; without it the
     # smallest size absorbs the one-off compilation cost.
     dt.fit("A*sin(w*t)", dt.Original(np.linspace(0, 40, 500), np.sin(np.linspace(0, 40, 500))), "t", basis="block", p0=[2.0, 1.0])

@@ -1,8 +1,9 @@
 """The EAC block preset and the LSI oscillatory recipe.
 
-* ``fit_eac``, the uniform-window block preset, aimed at concentrated
+* the block fit, the uniform-window basis, aimed at concentrated
   transients;
-* the ``fit_lsi`` oscillatory recipe (``oscillatory=`` / ``freq_param=`` with
+* the Legendre fit's oscillatory recipe (``oscillatory=`` / ``freq_param=``
+  with
   ``fft_frequency_seed``), which recovers a sinusoid the default order at
   p0 does not resolve.
 """

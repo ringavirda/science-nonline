@@ -243,7 +243,7 @@ def dtfit_track(t, fixes, horizons=(10,), *, kind="lsi", model="poly", robust=Fa
     support, during a GPS gap and for the h-step forecast. ``False`` evaluates
     the fitted model directly through ``predict``, where a cubic diverges past
     the window; ``True`` dead-reckons from the last in-window sample via
-    :meth:`LSIFilter.coast`, constant-velocity at order 1 by default and
+    :meth:`the Legendre filter.coast`, constant-velocity at order 1 by default and
     constant-acceleration at order 2. Only the off-support branch changes,
     since in-window smoothing is identical either way, so this is a clean
     matched control for the dropout and forecast regime."""
@@ -488,7 +488,7 @@ def imu_lsi_track(t, fixes, gyro, accel, R0, horizons=(10,), *, window=28,
     """Full-IMU GPS fusion, run per axis entirely through dtfit's LSI filter.
 
     The strapdown basis ``S`` (gyro attitude plus accelerometer, washed out) is
-    fed to :class:`LSIFilter` as an external regressor, making the per-axis
+    fed to :class:`the Legendre filter` as an external regressor, making the per-axis
     model ``c0 + c1*t + (polynomial drift) + S``. The accelerometer supplies
     the sensed motion shape, the polynomial absorbs the residual INS drift and
     the GPS anchors the absolute trajectory, all fused by the integral

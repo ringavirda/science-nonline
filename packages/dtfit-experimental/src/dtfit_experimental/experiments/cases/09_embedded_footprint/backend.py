@@ -61,7 +61,7 @@ MCUS = [
 
 # Deployable state size: the C struct, the number that has to fit.
 def state_doubles_eac(n: int, w: int, n_sub: int = 2) -> int:
-    """Floating-point words a minimal C port of EACFilter keeps alive between
+    """Floating-point words a minimal C port of the block filter keeps alive between
     samples, as one fixed-size, no-malloc struct:
 
       * ring buffer  t[W], y[W]                        -> 2W
@@ -82,7 +82,7 @@ def state_bytes(n: int, w: int, dtype_bytes: int) -> int:
 
 
 def state_doubles_lsi_ram(n: int, w: int) -> int:
-    """Mutable per-sample RAM words for LSIFilter: the ring buffer (2W), the
+    """Mutable per-sample RAM words for the Legendre filter: the ring buffer (2W), the
     covariance P (n*n), one n-word parameter vector and about 9 scalars.
 
     The filter also precomputes projection and quadrature tables. Those are
@@ -112,7 +112,7 @@ def state_doubles_kalman(dim: int = 3) -> int:
 
 
 def approx_flops_per_update(n: int, w: int, n_sub: int = 2) -> int:
-    """Rough FLOP count for one EACFilter update with a degree-(n-1)
+    """Rough FLOP count for one the block filter update with a degree-(n-1)
     polynomial model.
 
     Evaluating the model and its n derivatives over the W-point window
