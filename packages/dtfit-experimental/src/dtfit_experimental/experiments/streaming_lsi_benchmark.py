@@ -1,6 +1,6 @@
 """Streaming LSI vs streaming EAC: head-to-head filter benchmark.
 
-Puts :class:`dtfit.streaming.LSIFilter` (online integral least squares, the
+Puts :class:`dtfit.streaming.ImageFilter` (online integral least squares, the
 streaming counterpart of the Legendre fit) against
 :class:`dtfit.streaming.EACFilter` (online equal areas) on two synthetic
 streams, each with a known ground truth and a mid-stream parameter drift:

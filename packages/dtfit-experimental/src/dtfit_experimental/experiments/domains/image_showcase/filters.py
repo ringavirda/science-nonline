@@ -251,7 +251,7 @@ def run_filter(
     """Run one filter over a series, recording its drift flags.
 
     ``p0`` defaults to zeros with the offset ``c`` at ``y[0]``:
-    :class:`~dtfit.streaming.LSIFilter` takes a positional sequence in
+    :class:`~dtfit.streaming.ImageFilter` takes a positional sequence in
     canonical parameter order, not a mapping.
 
     Returns:

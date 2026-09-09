@@ -339,7 +339,7 @@ def run_methods_realdata(t, meas, *, window=5, q_acc=20.0, kalman_q=5e-2, huber=
     md = G.MODELS["poly"]; n = len(t)
 
     def dtfit(robust):
-        fl = [G.LSIFilter(md["expr"], "t", p0=[float(meas[0, ax])] + list(md["rest"]),
+        fl = [G.ImageFilter(md["expr"], "t", p0=[float(meas[0, ax])] + list(md["rest"]),
                           window_size=window, order=md["order"], q_diag=[1e-2] * 4,
                           robust=robust, drift_reset="inflate")
               for ax in range(3)]

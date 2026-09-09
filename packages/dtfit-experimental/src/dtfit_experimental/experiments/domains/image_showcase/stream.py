@@ -738,7 +738,7 @@ def track(
     filter, sending block images back over the same socket.
 
     ``filt`` is any object with ``partial_fit(t, y)``, ``drift_flag_``
-    and ``params_`` -- an :class:`~dtfit.streaming.LSIFilter` in the run,
+    and ``params_`` -- an :class:`~dtfit.streaming.ImageFilter` in the run,
     built by the caller so that this module needs no filter import.
     ``block_stream`` is an :class:`~dtfit.image.ImageStream` in block
     mode; each block it finishes is sent back as an ``image`` frame when

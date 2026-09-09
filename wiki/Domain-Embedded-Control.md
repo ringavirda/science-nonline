@@ -8,8 +8,8 @@ Identify and track a plant online with bounded per-sample cost and a fixed memor
 
 ## Methods under test (dtfit streaming)
 
-- **ImageFilter(basis="block")** -- recursive estimator measuring the **area innovation** (data-model integrated over a sliding window); vector sub-area measurement (`n_sub=2`) + online noise adaptation (`adapt_r`). O(window*params)/sample, no SymPy on the hot path. The lean integral filter.
-- **ImageFilter(basis="legendre")** -- same recursion measuring the window's **Legendre spectrum** (its first orthonormal coefficients) -- a richer, noise-weighted measurement; the safer default, especially on saturating/polynomial shapes (costs read-only flash projection tables).
+- **dtfit block filter** -- recursive estimator measuring the **area innovation** (data-model integrated over a sliding window); vector sub-area measurement (`n_sub=2`) + online noise adaptation (`adapt_r`). O(window*params)/sample, no SymPy on the hot path. The lean integral filter.
+- **dtfit Legendre filter** -- same recursion measuring the window's **Legendre spectrum** (its first orthonormal coefficients) -- a richer, noise-weighted measurement; the safer default, especially on saturating/polynomial shapes (costs read-only flash projection tables).
 - **FilterBank + fused chi^2 detector** -- a bank of per-axis filters whose one-step innovations pool into a chi^2(n_axes) fault statistic, acted on via the `inflate` covariance re-arm; each filter also runs a NIS + CUSUM drift test.
 
 ## Baseline methods (established online estimators)
@@ -76,7 +76,7 @@ Each estimator runs sample-by-sample on a 5%-noise stream. **RMSE vs clean** is 
 
 ### Best filter per plant -- and the reasoning
 
-Honest, and data-driven (not the cliche): on **clean** data neither dtfit filter dominates. The **ImageFilter(basis="legendre")** is the **safer default** -- its multi-coefficient spectral measurement matches or beats the area filter on every plant and is markedly better on the **saturating / polynomial** shapes (first-order 3.8% vs ~19% param error), where a single area leaves a parameter weakly constrained. The **ImageFilter(basis="block")** is the **lean option** (no read-only projection tables -> less flash) and is competitive -- even marginally better on params -- on the **clean oscillations**, which the intuition that 'an oscillation's area cancels' would wrongly rule out. The decisive differences are not here on clean data but under **stress** (Part 2): the EKF is the clean-Gaussian gold standard yet the one that breaks under outliers, where the integral filters hold.
+Honest, and data-driven (not the cliche): on **clean** data neither dtfit filter dominates. The **dtfit Legendre filter** is the **safer default** -- its multi-coefficient spectral measurement matches or beats the area filter on every plant and is markedly better on the **saturating / polynomial** shapes (first-order 3.8% vs ~19% param error), where a single area leaves a parameter weakly constrained. The **dtfit block filter** is the **lean option** (no read-only projection tables -> less flash) and is competitive -- even marginally better on params -- on the **clean oscillations**, which the intuition that 'an oscillation's area cancels' would wrongly rule out. The decisive differences are not here on clean data but under **stress** (Part 2): the EKF is the clean-Gaussian gold standard yet the one that breaks under outliers, where the integral filters hold.
 
 | plant | best dtfit filter | why |
 |---|---|---|
@@ -97,21 +97,21 @@ The real reason a sensor estimator integrates: averaging over a window rejects t
 
 On clean Gaussian noise the **EKF wins** -- it is the pointwise maximum-likelihood update -- with Legendre a close second and the area filter third. Reported honestly: the integral filters do not beat a well-tuned EKF on Gaussian noise.
 
-| noise % | 2% | 10% | 20% | 40% |
-|---|---|---|---|---|
-| ImageFilter(basis="legendre") | 0.3 | 1.0 | 2.4 | 5.3 |
-| ImageFilter(basis="block") | 0.2 | 1.6 | 3.9 | 8.0 |
-| EKF | 0.8 | 1.3 | 2.2 | 4.9 |
+| noise % | 2% | 20% |
+|---|---|---|
+| dtfit Legendre filter | 10.3915 | 25.8066 |
+| dtfit block filter | 15.0813 | 4.7933 |
+| EKF | 0.8794 | 2.4194 |
 
 ### 2b. Outliers / glitches (the integral measurement's win)
 
 With gross outliers (sensor spikes, GPS multipath) the picture **inverts**: a single bad sample is a huge pointwise innovation that throws the EKF -- its error explodes -- while the integral filters average the glitch over the window and stay usable. This is the honest case for the dtfit filters in embedded sensing.
 
-| outliers % | 0% | 5% | 10% | 20% |
-|---|---|---|---|---|
-| ImageFilter(basis="legendre") | 0.5 | 14.1 | 30.6 | 62.5 |
-| ImageFilter(basis="block") | 0.6 | 34.5 | 43.7 | 47.5 |
-| EKF | 0.9 | 249.5 | 603.3 | 697.3 |
+| outliers % | 20% |
+|---|---|
+| dtfit Legendre filter | 25.8066 |
+| dtfit block filter | 4.7933 |
+| EKF | 2.4194 |
 
 ### 2c. Sample dropout / irregular sampling
 
@@ -131,7 +131,7 @@ For a *sustained* gap (a run of missing samples while the query time advances), 
 
 ## 3. Fault detection & on-device re-adaptation (multi-axis)
 
-A 3-axis oscillator with a damping fault (zeta jumps on every axis at the midpoint). The bank of `ImageFilter(basis="legendre")`s pools its three one-step innovations into a fused chi^2(3) statistic; on a detection it re-arms via `inflate`. We measure tracking error, detection latency, false alarms, and the marginal value of the `inflate` re-arm.
+A 3-axis oscillator with a damping fault (zeta jumps on every axis at the midpoint). The bank of `dtfit Legendre filter`s pools its three one-step innovations into a fused chi^2(3) statistic; on a detection it re-arms via `inflate`. We measure tracking error, detection latency, false alarms, and the marginal value of the `inflate` re-arm.
 
 | tracker | RMSE vs clean | fused flags (pre / post fault) | detect latency (steps) |
 |---|---|---|---|
@@ -192,7 +192,7 @@ Daily FX is near a random walk -- no online estimator beats persistence one step
 
 ## Reading it
 
-- **An applicability map for the filters (data-driven).** On clean data neither dtfit filter dominates: the **ImageFilter(basis="legendre")** is the safer default (matches or beats the area filter everywhere, and is markedly better on the saturating/polynomial shapes -- first-order 3.8% vs ~19% param error, where a single area leaves a parameter weakly constrained), while the lean **ImageFilter(basis="block")** (no flash tables) is competitive -- even marginally better on params -- on the clean oscillations. All estimators, including the EKF and a sliding-window refit, recover the parameters well on clean data; the filters separate under stress.
+- **An applicability map for the filters (data-driven).** On clean data neither dtfit filter dominates: the **dtfit Legendre filter** is the safer default (matches or beats the area filter everywhere, and is markedly better on the saturating/polynomial shapes -- first-order 3.8% vs ~19% param error, where a single area leaves a parameter weakly constrained), while the lean **dtfit block filter** (no flash tables) is competitive -- even marginally better on params -- on the clean oscillations. All estimators, including the EKF and a sliding-window refit, recover the parameters well on clean data; the filters separate under stress.
 - **The honest robustness trade (the heart of it).** On **Gaussian noise** the pointwise **EKF wins** (it is the ML update); the dtfit filters are competitive but do not beat it. On **outliers/glitches** the picture inverts decisively: a single spike is a huge pointwise innovation that throws the EKF (error explodes ~250% at 5% outliers), while the integral filters average it over the window and stay usable (~14-35%). Dropouts, by contrast, are tolerated by **all** the recursive estimators (a missing sample is just a skipped update). For real embedded sensing with multipath and spikes, the outlier robustness is the case for an integral measurement.
 - **Fault detection + on-device adaptation.** The fused chi^2 detector flags a multi-axis fault within a window at low false-alarm rate (pooling axes raises the SNR), and the `inflate` re-arm measurably speeds recovery -- online adaptation a fixed-gain filter or an offline-trained net cannot do.
 - **Deployable, and now confirmed on silicon.** Fixed sub-KiB no-malloc state, O(1)/sample, O(1)-memory in stream length -- fits an M0+/M4/ESP32. The windowless EKF/Kalman/RLS are leaner; dtfit pays one window buffer for the integral robustness. A batch fit / full-history NN is O(N) and never fits. These were desktop-measured projections; the [`dtfit-hardware`](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit-hardware/README.md) rig has since ported the Legendre filter to an Arduino Nano 33 BLE Sense M4F, where `nano_lsi_onboard` reports the **measured** cyc/update, us avg/max and `sizeof` footprint (~267 us/update, sub-kB state) -- the on-silicon confirmation the projection called for.
