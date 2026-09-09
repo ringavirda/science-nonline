@@ -101,6 +101,8 @@ On clean Gaussian noise the **EKF wins** -- it is the pointwise maximum-likeliho
 |---|---|---|
 | dtfit Legendre filter | 10.3915 | 25.8066 |
 | dtfit block filter | 15.0813 | 4.7933 |
+| dtfit Legendre filter | 10.3673 | 25.9206 |
+| dtfit block filter | 14.9460 | 4.7014 |
 | EKF | 0.8794 | 2.4194 |
 
 ### 2b. Outliers / glitches (the integral measurement's win)
@@ -111,6 +113,8 @@ With gross outliers (sensor spikes, GPS multipath) the picture **inverts**: a si
 |---|---|---|
 | dtfit Legendre filter | 18.4245 | 48.8573 |
 | dtfit block filter | 23.5921 | 21.9452 |
+| dtfit Legendre filter | 18.5885 | 0.5611 |
+| dtfit block filter | 24.0702 | 0.5495 |
 | EKF | 1.0285 | 730.6008 |
 
 ### 2c. Sample dropout / irregular sampling
