@@ -40,6 +40,7 @@ jobs:
               - 'packages/dtfit/**'
               - 'packages/dtfit-experimental/**'
               - 'packages/dtfit-hardware/**'
+              - 'packages/dtfit-legacy/**'
               - '.github/workflows/ci.yml'
             docs:
               # The wiki publishes verbatim on push and has no other filter,
@@ -177,9 +178,10 @@ jobs:
           pip install -e "packages/dtfit[viz,dev]"
           pip install -e "packages/dtfit-experimental[dev]"
           pip install -e "packages/dtfit-hardware[dev]"
+          pip install -e "packages/dtfit-legacy[dev]"
 
       - name: Lint (ruff)
-        run: ruff check packages/dtfit-experimental packages/dtfit-hardware
+        run: ruff check packages/dtfit-experimental packages/dtfit-hardware packages/dtfit-legacy
 
       - name: Type check + test — dtfit-experimental
         run: |
@@ -195,3 +197,7 @@ jobs:
           mypy --python-version ${{ matrix.python-version }}
           pytest
         working-directory: packages/dtfit-hardware
+
+      - name: Test - dtfit-legacy
+        run: pytest
+        working-directory: packages/dtfit-legacy

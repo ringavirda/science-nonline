@@ -11,8 +11,9 @@ This repository is a **monorepo of three distributions**:
 | **`dtfit`** | [`packages/dtfit`](packages/dtfit) | the stable, published library -- the public API (`fit`/`fit(basis="legendre")`/`fit(basis="block")`, `ImageFilter` (with `ImageFilter(basis="legendre")`/`ImageFilter(basis="block")` as basis aliases), `ImageStream`, the `models` framework + `suggest_models`, `auto_forecast`, `NonlineRegressor` in `dtfit.sklearn`, diagnostics). |
 | **`dtfit-experimental`** | [`packages/dtfit-experimental`](packages/dtfit-experimental) | experimental EAC/LSI adaptations + the full experiment / validation suite. Depends on `dtfit`; **never ships inside the `dtfit` wheel**. |
 | **`dtfit-hardware`** | [`packages/dtfit-hardware`](packages/dtfit-hardware) | the real-silicon rig: Arduino firmware, the USB/BLE host telemetry link, the real-log comparison harness, and a React Native phone app. Depends on `dtfit-experimental`. |
+| **`dtfit-legacy`** | [`packages/dtfit-legacy`](packages/dtfit-legacy) | the historical stages of the method (spectrum balance, the integral criteria, their recursive and map-reduce forms), runnable for the evolution matrix. Depends on `dtfit`. |
 
-The dependency is one-directional: `dtfit-hardware` -> `dtfit-experimental` -> `dtfit`.
+The dependency is one-directional: `dtfit-hardware` -> `dtfit-experimental` -> `dtfit`; `dtfit-legacy` -> `dtfit`.
 When an experimental adaptation proves itself across the experiment suite it is
 **promoted** -- physically moved into `dtfit` (as the LSI oscillatory recipe,
 `dtfit.fit_lsi(oscillatory=..., freq_param=...)`, was) and
@@ -33,6 +34,7 @@ pip install -e 'packages/dtfit-experimental[bench]'    # + suite baselines/plott
 
 # optional — the hardware rig (firmware, USB/BLE host link, phone app):
 pip install -e 'packages/dtfit-hardware[bench]'        # pulls dtfit-experimental
+pip install -e 'packages/dtfit-legacy[dev]'            # the historical stages
 ```
 
 ## Layout
@@ -43,6 +45,7 @@ packages/
   dtfit/examples/            # runnable, headless example scripts (the guides)
   dtfit-experimental/        # experimental package (pyproject, src/dtfit_experimental, tests)
   dtfit-hardware/            # real-silicon rig (src/dtfit_hardware: firmware + host link; mobile/ phone app)
+  dtfit-legacy/              # the historical stages, runnable for the evolution matrix
 ```
 
 See each package's README for details:
