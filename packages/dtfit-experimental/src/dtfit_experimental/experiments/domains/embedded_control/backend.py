@@ -144,6 +144,19 @@ class EAAd(_Ad):
         return dict(self.f.params_)
 
 
+class EARobAd(EAAd):
+    """The block filter on the robust window image (Huber reweighting of
+    the window's basis regression), the mechanism that replaced residual
+    truncation."""
+    name = "dtfit block filter (robust image)"
+
+    def __init__(self, plant, window=None):
+        self.f = ImageFilter(plant["expr"], "t", p0=list(plant["p0"]),
+                           window_size=window or plant["window"],
+                           order=len(plant["p0"]), q_diag=list(plant["q"]), basis="block",
+                           robust=True)
+
+
 class LegAd(_Ad):
     name = "dtfit Legendre filter"
 
@@ -305,12 +318,25 @@ def clean_accuracy(plant, seeds, *, noise=0.05):
     return dict(rows=rows, overlay=overlay)
 
 
+class LegRobAd(LegAd):
+    """The Legendre filter on the robust window image."""
+    name = "dtfit Legendre filter (robust image)"
+
+    def __init__(self, plant, window=None):
+        self.f = ImageFilter(plant["expr"], "t", p0=list(plant["p0"]),
+                           window_size=window or plant["window"],
+                           order=5, q_diag=list(plant["q"]), basis="legendre",
+                           robust=True)
+
+
 # the robustness sweeps: Gaussian noise, outliers, dropout
 def sweep_perr(plant, kind, levels, seeds):
     """Sweep ``kind``, "noise" or "outliers", over ``levels``, averaging the
-    mean parameter error over ``seeds`` for LSI, EAC and the EKF. Returns
+    mean parameter error over ``seeds`` for both image filters, their robust-image
+    variants and the EKF. Returns
     ``{method: [errs]}``."""
-    methods = ["dtfit Legendre filter", "dtfit block filter", "EKF (params-as-state)"]
+    methods = ["dtfit Legendre filter", "dtfit block filter", "dtfit Legendre filter (robust image)",
+               "dtfit block filter (robust image)", "EKF (params-as-state)"]
     out = {m: [] for m in methods}
     for lv in levels:
         acc = {m: [] for m in methods}
@@ -320,7 +346,7 @@ def sweep_perr(plant, kind, levels, seeds):
                 t, y, _ = gen_plant(plant, rng, noise=lv)
             else:
                 t, y, _ = gen_plant(plant, rng, noise=0.05, **{kind: lv})
-            for ad in (LegAd(plant), EAAd(plant), EKFAd(plant)):
+            for ad in (LegAd(plant), EAAd(plant), LegRobAd(plant), EARobAd(plant), EKFAd(plant)):
                 for i in range(t.size):
                     ad.step(float(t[i]), float(y[i]))
                 acc[ad.name].append(perr(ad.params(), plant["true"]))

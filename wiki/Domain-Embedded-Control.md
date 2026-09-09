@@ -38,41 +38,41 @@ Each estimator runs sample-by-sample on a 5%-noise stream. **RMSE vs clean** is 
 
 | estimator | RMSE vs clean | param err % | physical params? | latency (us) |
 |---|---|---|---|---|
-| dtfit block filter | 0.0062 | 23.59 +/- 7.80 | yes | 96.2300 |
-| dtfit Legendre filter | 0.0064 | 18.42 +/- 16.40 | yes | 95.2702 |
-| EKF (params-as-state) | 0.0044 | 1.03 +/- 0.28 | yes | 11.8302 |
-| RLS (AR predictor) | 0.0281 | NaN | no | 4.3930 |
-| sliding-window curve_fit | 0.0126 | 55.20 +/- 4.93 | yes | 0.2255 |
+| dtfit block filter | 0.0062 | 23.59 +/- 7.80 | yes | 103.9720 |
+| dtfit Legendre filter | 0.0064 | 18.42 +/- 16.40 | yes | 114.9480 |
+| EKF (params-as-state) | 0.0044 | 1.03 +/- 0.28 | yes | 20.8670 |
+| RLS (AR predictor) | 0.0281 | NaN | no | 6.1570 |
+| sliding-window curve_fit | 0.0126 | 55.20 +/- 4.93 | yes | 0.2355 |
 
 ### ac_sine (sustained cycle) -- AC / power monitoring
 
 | estimator | RMSE vs clean | param err % | physical params? | latency (us) |
 |---|---|---|---|---|
-| dtfit block filter | 0.0263 | 1.37 +/- 0.03 | yes | 75.8542 |
-| dtfit Legendre filter | 0.0232 | 1.85 +/- 0.22 | yes | 76.4425 |
-| EKF (params-as-state) | 0.0185 | 0.37 +/- 0.01 | yes | 8.9870 |
-| RLS (AR predictor) | 0.0786 | NaN | no | 4.4035 |
-| sliding-window curve_fit | 0.0400 | 2.53 +/- 0.20 | yes | 0.2300 |
+| dtfit block filter | 0.0263 | 1.37 +/- 0.03 | yes | 84.1397 |
+| dtfit Legendre filter | 0.0232 | 1.85 +/- 0.22 | yes | 80.7030 |
+| EKF (params-as-state) | 0.0185 | 0.37 +/- 0.01 | yes | 9.3425 |
+| RLS (AR predictor) | 0.0786 | NaN | no | 4.6140 |
+| sliding-window curve_fit | 0.0400 | 2.53 +/- 0.20 | yes | 0.2310 |
 
 ### first_order (monotone) -- RC / thermal / DC-motor
 
 | estimator | RMSE vs clean | param err % | physical params? | latency (us) |
 |---|---|---|---|---|
-| dtfit block filter | 0.0089 | 25.30 +/- 4.29 | yes | 72.0743 |
-| dtfit Legendre filter | 0.0083 | 26.42 +/- 3.69 | yes | 72.2845 |
-| EKF (params-as-state) | 0.0238 | 0.76 +/- 0.10 | yes | 8.5860 |
-| RLS (AR predictor) | 0.0230 | NaN | no | 4.4230 |
-| sliding-window curve_fit | 0.0110 | 43.97 +/- 4.28 | yes | 0.2210 |
+| dtfit block filter | 0.0089 | 25.30 +/- 4.29 | yes | 77.1740 |
+| dtfit Legendre filter | 0.0083 | 26.42 +/- 3.69 | yes | 78.1183 |
+| EKF (params-as-state) | 0.0238 | 0.76 +/- 0.10 | yes | 9.1425 |
+| RLS (AR predictor) | 0.0230 | NaN | no | 4.7742 |
+| sliding-window curve_fit | 0.0110 | 43.97 +/- 4.28 | yes | 0.3105 |
 
 ### ca_traj (polynomial) -- GPS / inertial trajectory
 
 | estimator | RMSE vs clean | param err % | physical params? | latency (us) |
 |---|---|---|---|---|
-| dtfit block filter | 0.1156 | 39.84 +/- 6.24 | yes | 71.5702 |
-| dtfit Legendre filter | 0.1134 | 38.50 +/- 0.82 | yes | 72.2545 |
-| EKF (params-as-state) | 0.1385 | 3.15 +/- 0.33 | yes | 8.6015 |
-| RLS (AR predictor) | 0.2219 | NaN | no | 4.4035 |
-| sliding-window curve_fit | 0.2741 | 409.27 +/- 79.17 | yes | 0.2300 |
+| dtfit block filter | 0.1156 | 39.84 +/- 6.24 | yes | 76.5022 |
+| dtfit Legendre filter | 0.1134 | 38.50 +/- 0.82 | yes | 78.2432 |
+| EKF (params-as-state) | 0.1385 | 3.15 +/- 0.33 | yes | 9.1730 |
+| RLS (AR predictor) | 0.2219 | NaN | no | 4.7690 |
+| sliding-window curve_fit | 0.2741 | 409.27 +/- 79.17 | yes | 0.2310 |
 
 ### Best filter per plant -- and the reasoning
 
@@ -152,10 +152,10 @@ Live, no-malloc state per estimator (does **not** grow with the stream). NumPy d
 
 | estimator | state words | float32 B | window buffer? | params? | latency us (n=3,W=60) |
 |---|---|---|---|---|---|
-| dtfit block filter | 143 | 572 | yes (W=60) | yes | 96.2300 |
-| dtfit Legendre filter | 143 | 572 +960B flash | yes (W=60) | yes | 95.2702 |
-| EKF (params-as-state) | 23 | 92 | no | yes | 11.8302 |
-| RLS (AR predictor) | 24 | 96 | no | no | 4.3930 |
+| dtfit block filter | 143 | 572 | yes (W=60) | yes | 103.9720 |
+| dtfit Legendre filter | 143 | 572 +960B flash | yes (W=60) | yes | 114.9480 |
+| EKF (params-as-state) | 23 | 92 | no | yes | 20.8670 |
+| RLS (AR predictor) | 24 | 96 | no | no | 6.1570 |
 | Kalman-CA (3-axis) | 44 | 176 | no | no | NaN |
 
 ### 4a. Fit on real microcontrollers (3-axis tracker)
