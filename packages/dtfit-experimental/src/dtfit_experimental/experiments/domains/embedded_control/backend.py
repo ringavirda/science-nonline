@@ -127,7 +127,7 @@ class _Ad:
 
 
 class EAAd(_Ad):
-    name = "dtfit the block filter"
+    name = "dtfit block filter"
 
     def __init__(self, plant, window=None):
         self.f = ImageFilter(plant["expr"], "t", p0=list(plant["p0"]),
@@ -145,7 +145,7 @@ class EAAd(_Ad):
 
 
 class LegAd(_Ad):
-    name = "dtfit the Legendre filter"
+    name = "dtfit Legendre filter"
 
     def __init__(self, plant, window=None):
         self.f = ImageFilter(plant["expr"], "t", p0=list(plant["p0"]),
@@ -286,7 +286,7 @@ def clean_accuracy(plant, seeds, *, noise=0.05):
             acc[ad.name]["perr"].append(perr(ad.params(), plant["true"]))
             tracks[ad.name] = track
         if s == 0:
-            dt_names = ["dtfit the block filter", "dtfit the Legendre filter"]
+            dt_names = ["dtfit block filter", "dtfit Legendre filter"]
             bestf = min(dt_names,
                         key=lambda nm: (np.inf if acc[nm]["perr"][0] is None
                                         else acc[nm]["perr"][0]))
@@ -310,7 +310,7 @@ def sweep_perr(plant, kind, levels, seeds):
     """Sweep ``kind``, "noise" or "outliers", over ``levels``, averaging the
     mean parameter error over ``seeds`` for LSI, EAC and the EKF. Returns
     ``{method: [errs]}``."""
-    methods = ["dtfit the Legendre filter", "dtfit the block filter", "EKF (params-as-state)"]
+    methods = ["dtfit Legendre filter", "dtfit block filter", "EKF (params-as-state)"]
     out = {m: [] for m in methods}
     for lv in levels:
         acc = {m: [] for m in methods}
@@ -342,7 +342,7 @@ def dropout_perr(plant, drops, seeds):
     """Mean parameter error against dropout fraction for LSI, EAC and the EKF.
     Returns a list of ``(method_label, [errs per drop])`` rows."""
     rows = []
-    for m_cls, mname in [(LegAd, "dtfit the Legendre filter"), (EAAd, "dtfit the block filter"),
+    for m_cls, mname in [(LegAd, "dtfit Legendre filter"), (EAAd, "dtfit block filter"),
                          (EKFAd, "EKF")]:
         cells = []
         for d in drops:
@@ -414,7 +414,7 @@ def exp_model_mismatch(seeds=5):
     for true_key, wrong_key in _MISMATCH_PAIRS:
         tp, wp = _plant_by_key(true_key), _plant_by_key(wrong_key)
         warm = max(tp["window"], wp["window"]) + 15
-        for cls, est in [(LegAd, "dtfit the Legendre filter"), (EKFAd, "EKF")]:
+        for cls, est in [(LegAd, "dtfit Legendre filter"), (EKFAd, "EKF")]:
             cc, cw, rc, rw, dv = [], [], [], [], []
             for s in range(seeds):
                 rng = np.random.default_rng(100 + s)
@@ -536,13 +536,13 @@ def footprint_rows(lat, *, n=3, W=60):
     rls_words = 4 * 4 + 4 + 4
     kf_words = 3 * (3 * 3 + 3) + 8
     state = [
-        dict(estimator="dtfit the block filter", state_words=ea["sram_words"],
+        dict(estimator="dtfit block filter", state_words=ea["sram_words"],
              float32_B=str(ea["sram_bytes_f32"]), window_buffer=f"yes (W={W})",
-             params="yes", latency_us=lat["dtfit the block filter"]),
-        dict(estimator="dtfit the Legendre filter", state_words=leg["sram_words"],
+             params="yes", latency_us=lat["dtfit block filter"]),
+        dict(estimator="dtfit Legendre filter", state_words=leg["sram_words"],
              float32_B=f"{leg['sram_bytes_f32']} +{leg['flash_bytes_f32']}B flash",
              window_buffer=f"yes (W={W})", params="yes",
-             latency_us=lat["dtfit the Legendre filter"]),
+             latency_us=lat["dtfit Legendre filter"]),
         dict(estimator="EKF (params-as-state)", state_words=ekf_words,
              float32_B=str(ekf_words * 4), window_buffer="no", params="yes",
              latency_us=lat["EKF (params-as-state)"]),
@@ -585,10 +585,10 @@ def fx_track(t, y):
                    q_diag=[1e-4, 1e-4], basis="block")
     ekf = EKFParam("a*exp(b*t)", "t", [1.0, 0.5], q=1e-5, r=0.1)
     rls = RLSPredictor(order=2, lam=1.0, delta=1e3)
-    preds = {"dtfit the block filter": [], "EKF": [], "RLS": [], "random walk": []}
+    preds = {"dtfit block filter": [], "EKF": [], "RLS": [], "random walk": []}
     actual = []
     for i in range(1, y.size):
-        preds["dtfit the block filter"].append(
+        preds["dtfit block filter"].append(
             float(ea.predict(np.array([t[i]]))[0]) if len(ea._t) >= ea.W else y[i - 1])
         preds["EKF"].append(float(ekf.predict(t[i])))
         preds["RLS"].append(rls.predict_next())

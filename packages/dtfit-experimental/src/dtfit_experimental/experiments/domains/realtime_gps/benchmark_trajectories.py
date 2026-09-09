@@ -16,9 +16,9 @@ Two kinds of well-known trajectory:
    :func:`load_external` so a real log drops straight in; the EXTERNAL DATASETS
    comment further down names them.
 
-Methods under test, the same family as the sim: dtfit LSI-cubic, dtfit LSI
+Methods under test, the same family as the sim: dtfit Legendre-cubic, dtfit Legendre
 coordinated-turn (``c0+c1*t+c2*sin(c3*t+c4)``, the nonlinear model a single
-Kalman cannot represent), and dtfit EAC, the honest negative, area being the
+Kalman cannot represent), and dtfit block, the honest negative, area being the
 wrong measurement for oscillatory motion.
 
 The baselines a maneuvering-target practitioner actually deploys, all
@@ -49,7 +49,7 @@ a symmetrically Huber-hardened Kalman without beating one: a tie on the
 coordinated turn (2.01 against 2.02) and a slight loss on the smooth figure-8
 (1.86 against 1.58). So this is the recursive filters' home turf, where they
 are optimal under Gaussian noise with known dynamics. dtfit's measured edge
-lives on real non-Gaussian, drifting GPS: ``realtime_gps_hw`` records dtfit LSI
+lives on real non-Gaussian, drifting GPS: ``realtime_gps_hw`` records dtfit Legendre
 beating the Kalman by about 2x on the actual rig.
 """
 from __future__ import annotations
@@ -319,9 +319,9 @@ def run_methods(t, meas, *, sigma=SIGMA):
     the glitch column can compare a hardened dtfit (``robust=True``) against a
     symmetrically hardened pointwise filter instead of a soft target."""
     return {
-        "dtfit LSI-cubic": G.dtfit_track(t, meas, (1,), kind="lsi", model="poly")[0],
-        "dtfit LSI-turn": G.dtfit_track(t, meas, (1,), kind="lsi", model="turn")[0],
-        "dtfit EAC (area)": G.dtfit_track(t, meas, (1,), kind="eac", model="poly")[0],
+        "dtfit Legendre-cubic": G.dtfit_track(t, meas, (1,), kind="lsi", model="poly")[0],
+        "dtfit Legendre-turn": G.dtfit_track(t, meas, (1,), kind="lsi", model="turn")[0],
+        "dtfit block (area)": G.dtfit_track(t, meas, (1,), kind="eac", model="poly")[0],
         "Kalman-CA": G.kalman_track(t, meas, (1,))[0],
         "Kalman-CA (Huber)": kalman_ca_track(t, meas, sigma=sigma, huber=3.0),
         "CT-EKF (pos-only)": ctekf_pos_track(t, meas, sigma=sigma),
@@ -353,8 +353,8 @@ def run_methods_realdata(t, meas, *, window=5, q_acc=20.0, kalman_q=5e-2, huber=
         return sm
 
     return {
-        "dtfit LSI-cubic": dtfit(False),
-        "dtfit LSI-cubic (robust)": dtfit(True),
+        "dtfit Legendre-cubic": dtfit(False),
+        "dtfit Legendre-cubic (robust)": dtfit(True),
         "Kalman-CA": G.kalman_track(t, meas, (1,), q=kalman_q)[0],
         "Kalman-CA (Huber)": kalman_ca_track(t, meas, q=kalman_q, huber=huber),
         "CT-EKF (pos-only)": ctekf_pos_track(t, meas, q_acc=q_acc),
@@ -439,7 +439,7 @@ def glitch_score(t, truth, meas, *, frac=0.06, mag=12.0, seed=0, sigma=SIGMA):
     gl[rng.choice(idx, size=int(frac * idx.size), replace=False)] = True
     mgl = meas.copy(); mgl[gl, :2] += rng.normal(0.0, mag, (int(gl.sum()), 2))
     res = run_methods(t, mgl, sigma=sigma)
-    res["dtfit LSI robust"] = G.dtfit_track(t, mgl, (1,), kind="lsi", model="poly",
+    res["dtfit Legendre robust"] = G.dtfit_track(t, mgl, (1,), kind="lsi", model="poly",
                                             robust=True)[0]
     return {nm: _pos_rmse(est, truth, gl) for nm, est in res.items()}
 

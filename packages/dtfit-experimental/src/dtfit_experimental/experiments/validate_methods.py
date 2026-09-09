@@ -140,7 +140,7 @@ def experiment_currency_batch() -> None:
     res_eac = dt.fit("a*exp(b*x)", dt.Original(t, rs), "x", basis="block", p0=[1.0, 1.0])
 
     print(f"\n{'method':18s} {'a':>10s} {'b':>10s}   {'fit over full window':^34s}")
-    for name, coeffs in [("LSI", res_lsi.coeffs), ("EAC", res_eac.coeffs)]:
+    for name, coeffs in [("Legendre", res_lsi.coeffs), ("block", res_eac.coeffs)]:
         a, b = coeffs
         pred = a * np.exp(b * t) * r0
         print(f"{name:18s} {a:10.4f} {b:10.4f}   {fmt(metrics(rate, pred)):^34s}")

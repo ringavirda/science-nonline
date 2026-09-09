@@ -9,7 +9,7 @@ standard, where a black-box learner recovers none. What it provides:
   parameters across mechanics, electronics, spectroscopy, kinetics, biology,
   reliability and signal processing, with their per-family closure functions;
 * the data generator :func:`gen`, driving the noise, outlier and sparse sweeps;
-* the dtfit estimators :func:`est_lsi`, :func:`est_eac`, :func:`est_adaptive`,
+* the dtfit estimators :func:`est_lsi`, :func:`est_eac`, 
   :func:`est_robust` and :func:`est_merged`, plus the joint multi-channel fit
   through :func:`dtfit_experimental.fit_joint`, each returning a
   ``{name: value}`` dict;
@@ -34,7 +34,6 @@ from __future__ import annotations
 import numpy as np
 
 import dtfit as dt
-from dtfit import fit, Original
 from dtfit_experimental import fit_joint
 
 from dtfit_experimental.experiments.common import EXPERIMENTS_DIR, metrics
@@ -47,7 +46,7 @@ from dtfit_experimental.experiments.common.baselines import (
 __all__ = [
     "MODELS", "FAMILY_REASON",
     "gen", "param_err", "safe", "metrics",
-    "est_lsi", "est_eac", "est_adaptive", "est_robust", "est_merged",
+    "est_lsi", "est_eac", "est_robust", "est_merged",
     "est_nlls", "est_robust_nlls", "est_moment", "mlp_curve", "gp_curve",
     "prony_fit", "matrix_pencil_fit", "varpro_fit", "moment_match_fit",
     "A_METHODS", "DT_LABELS", "DT_DIAGNOSTIC_LABELS", "applicability_verdict",
@@ -257,10 +256,6 @@ def est_eac(m, t, y, loss="linear"):
     return dict(zip(sorted(m["names"]), r.coeffs))
 
 
-def est_adaptive(m, t, y):
-    p0 = list(m["p0"]) if m.get("p0") else None
-    r = fit(m["expr"], Original(t, y), "t", basis="block", p0=p0)
-    return dict(zip(sorted(m["names"]), r.coeffs))
 
 
 def est_robust(m, t, y):
@@ -314,8 +309,7 @@ def safe(fn, m, t, y):
 
 
 # Part A, recovery across families: methods and applicability verdict
-A_METHODS = [("dtfit LSI", est_lsi), ("dtfit EAC", est_eac),
-             ("dtfit adaptive-EAC (#6)", est_adaptive),
+A_METHODS = [("dtfit Legendre", est_lsi), ("dtfit block", est_eac),
              ("dtfit merged", est_merged), ("SciPy NLLS (gold)", est_nlls),
              # The unconditioned integral-moment ancestor of LSI, in as the
              # honest foil for what the Legendre reconditioning buys. It is
@@ -328,7 +322,7 @@ A_METHODS = [("dtfit LSI", est_lsi), ("dtfit EAC", est_eac),
 # flatter the "best dtfit" number, a min-over-4 containing the min-over-2 of
 # two of the four. ``merged`` is reported separately instead, as the single
 # deployable answer; see :func:`family_recovery_row`.
-DT_DIAGNOSTIC_LABELS = ["dtfit LSI", "dtfit EAC", "dtfit adaptive-EAC (#6)"]
+DT_DIAGNOSTIC_LABELS = ["dtfit Legendre", "dtfit block"]
 # Back-compat alias: the min-pool for "best dtfit".
 DT_LABELS = DT_DIAGNOSTIC_LABELS
 
@@ -419,7 +413,7 @@ def outlier_sweep(model, fn, fracs, *, n=300, noise=0.05, seeds=3):
 
 def learner_curve_fit(model, rng, *, n=300, noise=0.30):
     """Compare curve accuracy, not parameter accuracy, at one heavy-noise
-    condition: dtfit EAC and SciPy NLLS, which recover parameters, against the
+    condition: dtfit block and SciPy NLLS, which recover parameters, against the
     black-box sklearn MLP and Gaussian process, which recover none. A missing
     sklearn skips the learner and leaves its row carrying NaN scores. Returns
     ``(t, y, clean, rows)``, each row being ``{"method", "R2", "RMSE"}``."""
@@ -437,7 +431,7 @@ def learner_curve_fit(model, rng, *, n=300, noise=0.30):
             return None
 
     for label, pred in [
-            ("dtfit EAC", _pred_params(est_eac)),
+            ("dtfit block", _pred_params(est_eac)),
             ("SciPy NLLS", _pred_params(est_nlls)),
             ("sklearn MLP (no params)", _pred_learner(mlp_curve)),
             ("Gaussian process (no params)", _pred_learner(gp_curve))]:
@@ -457,7 +451,7 @@ def _model(key):
 def regime_rows(rng):
     """The C1-C3 single-channel regimes: a concentrated transient, sparse
     sampling and a short record. Returns a list of
-    ``{"regime", "adaptive_EAC", "EAC", "NLLS", "note"}`` rows, the errors in
+    ``{"regime", "EAC", "NLLS", "note"}`` rows, the errors in
     percent."""
     rows = []
 
@@ -466,16 +460,14 @@ def regime_rows(rng):
     fo_t = dict(fo, t=(0, 8), true={"K": 3.0, "tau": 0.4})
     t, y, _ = gen(fo_t, rng, n=400, noise=0.04)
     rows.append({"regime": "concentrated transient (fast tau, long tail)",
-                 "adaptive_EAC": safe(est_adaptive, fo_t, t, y),
                  "EAC": safe(est_eac, fo_t, t, y),
                  "NLLS": safe(est_nlls, fo_t, t, y),
-                 "note": "adaptive-EAC (#6) -- curvature windows on the transient"})
+                 "note": "block basis on the transient"})
 
     # C2, sparse and irregular sampling
     dm = _model("damped")
     t, y, _ = gen(dm, rng, n=300, noise=0.05, sparse=True)
     rows.append({"regime": f"sparse sampling ({t.size} pts)",
-                 "adaptive_EAC": safe(est_adaptive, dm, t, y),
                  "EAC": safe(est_eac, dm, t, y),
                  "NLLS": safe(est_nlls, dm, t, y),
                  "note": "EAC -- area criterion tolerant of irregular spacing"})
@@ -484,7 +476,6 @@ def regime_rows(rng):
     gm = _model("gauss")
     t, y, _ = gen(gm, rng, n=18, noise=0.05)
     rows.append({"regime": "short record (18 pts, gaussian)",
-                 "adaptive_EAC": safe(est_adaptive, gm, t, y),
                  "EAC": safe(est_eac, gm, t, y),
                  "NLLS": safe(est_nlls, gm, t, y),
                  "note": "all comparable -- few points, no clear edge"})
@@ -542,7 +533,7 @@ def subspace_rate_recovery(rng, *, n=400, noise=0.03):
     """dtfit against the Western signal-parameter lineage on the tasks the
     subspace methods were built for.
 
-    Compares dtfit LSI, gold-standard SciPy NLLS, classical Prony and the
+    Compares dtfit Legendre, gold-standard SciPy NLLS, classical Prony and the
     SVD-robust Matrix Pencil / ESPRIT on recovering:
 
     * a single exponential's growth rate ``b`` (``expgrow``);
@@ -564,7 +555,7 @@ def subspace_rate_recovery(rng, *, n=400, noise=0.03):
     b_true = eg["true"]["b"]
     rows.append({
         "task": "exp growth rate (a*exp(b*t))", "quantity": "b", "true": b_true,
-        "dtfit LSI": err(est_lsi(eg, t, y)["b"], b_true),
+        "dtfit Legendre": err(est_lsi(eg, t, y)["b"], b_true),
         "SciPy NLLS": err(est_nlls(eg, t, y)["b"], b_true),
         "Prony": err(_dominant_mode_rate(prony_fit(t, y, 1)), b_true),
         "Matrix Pencil/ESPRIT":
@@ -578,7 +569,7 @@ def subspace_rate_recovery(rng, *, n=400, noise=0.03):
     rows.append({
         "task": "sinusoid frequency (A*sin(w*t+p))", "quantity": "w",
         "true": w_true,
-        "dtfit LSI": err(est_lsi(si, t, y)["w"], w_true),
+        "dtfit Legendre": err(est_lsi(si, t, y)["w"], w_true),
         "SciPy NLLS": err(est_nlls(si, t, y)["w"], w_true),
         "Prony": err(_dominant_mode_frequency(prony_fit(t, yc, 2)), w_true),
         "Matrix Pencil/ESPRIT":
@@ -615,7 +606,7 @@ def load_puromycin():
 
 def real_puromycin():
     """Fit the Michaelis-Menten law ``Vmax*t/(Km+t)`` (the ``mm`` family) to the
-    real Puromycin data with dtfit LSI, dtfit EAC and SciPy NLLS.
+    real Puromycin data with dtfit Legendre, dtfit block and SciPy NLLS.
 
     Real data carries no ground-truth parameter vector, so validity has to show
     up as the methods agreeing on ``{Vmax, Km}`` and fitting well. The reported
@@ -632,7 +623,7 @@ def real_puromycin():
                true={"Km": 0.1, "Vmax": 210.0}, t=(conc.min(), conc.max()),
                p0=[0.1, 200.0], bounds=[(1e-3, 5.0), (50.0, 500.0)])
     rows = []
-    for label, fn in [("dtfit LSI", est_lsi), ("dtfit EAC", est_eac),
+    for label, fn in [("dtfit Legendre", est_lsi), ("dtfit block", est_eac),
                       ("SciPy NLLS", est_nlls)]:
         try:
             est = fn(mmr, conc, velocity)
@@ -778,7 +769,7 @@ FAMILY_REASON = {
                   "KWW relaxation; LSI recovers it moderately -- the stretch "
                   "exponent beta trades off with tau for every method, so error is "
                   "larger than a plain exponential."),
-    "gauss": ("EAC / adaptive-EAC (#6)",
+    "gauss": ("block",
               "A single peak -- the area / curvature criteria concentrate on the "
               "bend where mu and sigma are determined; ties NLLS."),
     "lorentz": ("EAC",
@@ -786,7 +777,7 @@ FAMILY_REASON = {
                 "slight edge: the tails dominate any global integral, so the width "
                 "gamma is a touch harder for the area criterion. Even so dtfit is "
                 "within ~0.1% of NLLS (both well under 0.5%)."),
-    "double_gauss": ("EAC / adaptive-EAC (#6)",
+    "double_gauss": ("block",
                      "Two overlapping peaks: the **area / curvature** criteria "
                      "separate the components and tie NLLS, but the **LSI "
                      "spectrum** struggles (overlapping peaks blur the spectral "
@@ -801,14 +792,14 @@ FAMILY_REASON = {
                 "Reliability CDF (sigmoid); ties NLLS (slightly looser than the "
                 "logistic -- the shape exponent k and scale lambda partly trade "
                 "off)."),
-    "mm": ("EAC / adaptive-EAC (#6)",
+    "mm": ("block",
            "Rational saturation. **The old report's 151% 'Michaelis-Menten "
            "exception' was a parameter-ordering bug** (the spectral coefficients "
            "were zipped to the names in the wrong order); with the order fixed the "
-           "rational saturation is recovered to ~0.3% -- adaptive/curvature windows "
+           "rational saturation is recovered to ~0.3% -- the block basis "
            "put resolution on the early rise where Km is set. It is *not* a "
            "boundary family."),
-    "hill": ("adaptive-EAC (#6) / LSI",
+    "hill": ("block / Legendre",
              "Rational saturation with a cooperativity exponent; the curvature "
              "windows concentrate on the rise that sets K and nh -- ties NLLS "
              "(~0.3%), not a failure."),

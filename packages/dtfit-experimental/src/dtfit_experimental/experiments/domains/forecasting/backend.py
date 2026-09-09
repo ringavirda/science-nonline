@@ -738,8 +738,8 @@ def merged_forecaster(cfg, t_tr, y_tr, t_all):
 # not the label. ``win_summary`` and ``reading`` therefore report merged as the
 # headline and label the explicit columns "structure given".
 ORACLE_METHODS = {
-    "dtfit LSI [structure given]": dtfit_lsi,
-    "dtfit EAC [structure given]": dtfit_eac,
+    "dtfit Legendre [structure given]": dtfit_lsi,
+    "dtfit block [structure given]": dtfit_eac,
     "dtfit Fourier-LSI (#2) [structure given]": dtfit_fourier,
     "dtfit boosted (#5) [structure given]": dtfit_boosted,
 }
@@ -790,7 +790,7 @@ def collapse_oracle_scores(scores):
 
 def oracle_variant_note(label):
     """A short human tag for which oracle fitter won:
-    ``"dtfit LSI [structure given]"`` becomes ``"LSI"``, and ``None`` becomes
+    ``"dtfit Legendre [structure given]"`` becomes ``"LSI"``, and ``None`` becomes
     ``"--"``."""
     if not label:
         return "--"

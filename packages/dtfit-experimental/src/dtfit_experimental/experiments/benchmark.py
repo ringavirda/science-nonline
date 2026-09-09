@@ -136,10 +136,10 @@ def table_model_exponential() -> str:
                      f"{m['MAPE']:.2f}", f"{dt_ms:.1f}"])
 
     res, ms = timed(lambda: dt.fit(expr, dt.Original(x, y), var, basis="legendre", bounds=bounds))
-    add("LSI", res.coeffs, np.asarray(res.model(x)), ms)
+    add("Legendre", res.coeffs, np.asarray(res.model(x)), ms)
 
     res, ms = timed(lambda: dt.fit(expr, dt.Original(x, y), var, basis="block", p0=[1.0, 1.0]))
-    add("EAC", res.coeffs, np.asarray(res.model(x)), ms)
+    add("block", res.coeffs, np.asarray(res.model(x)), ms)
 
     def sci():
         p, _ = curve_fit(lambda xx, a, b: a * np.exp(b * xx), x, y,
@@ -214,8 +214,8 @@ def table_real_data() -> str:
 
     cov_rows = []
     for name, coeffs in [
-        ("LSI", dt.fit("a*exp(b*x)", dt.Original(t, ys), "x", basis="legendre", bounds=bounds).coeffs),
-        ("EAC", dt.fit("a*exp(b*x)", dt.Original(t, ys), "x", basis="block", p0=[ys[0], 1.0]).coeffs),
+        ("Legendre", dt.fit("a*exp(b*x)", dt.Original(t, ys), "x", basis="legendre", bounds=bounds).coeffs),
+        ("block", dt.fit("a*exp(b*x)", dt.Original(t, ys), "x", basis="block", p0=[ys[0], 1.0]).coeffs),
     ]:
         a, b = coeffs
         m = metrics(y, a * np.exp(b * t) * y[0])
