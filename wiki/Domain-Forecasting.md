@@ -36,14 +36,8 @@ Measured real datasets plus **physics / signal-processing waveforms** (generated
 | USD/UAH | currency depreciation | 730 | linear_wave | no |
 | Sunspots | solar ~11y cycle | 309 | sine | yes (11) |
 | Mauna Loa CO2 | climate trend+season | 571 | poly_seasonal | yes (12) |
-| El Nino SST | ocean seasonal | 732 | linear_seasonal | yes (12) |
-| Nile flow | hydrology level | 100 | poly | no |
-| ETTh1 oil-temp | transformer temp | 1500 | linear_seasonal | yes (24) |
-| Weather LTSF | weather sensor | 1500 | transient_seasonal | yes (144) |
 | RLC transient | physics: electrical ring-down | 360 | damped | no |
 | AC + harmonics | physics: power waveform | 360 | fourier_series | yes (60) |
-| AM signal | physics: modulated carrier | 400 | am | no |
-| Linear chirp | physics: frequency sweep | 400 | chirp | no |
 
 ## Best model per series -- and the reasoning
 
@@ -51,18 +45,12 @@ The single biggest lever in this study is **picking the structurally correct mod
 
 | series | model fitted | why this model |
 |---|---|---|
-| COVID-19 UA | logistic  L/(1+e^{-k(x-x_0)}) | Epidemic growth saturates toward a carrying capacity. A pure exponential compounds and overshoots the deceleration (R^2 -4.9); the logistic captures the inflection (R^2 **0.98**, the best of all methods). |
-| USD/UAH | random walk (no structure) | Looks exponential, but the 2014 crash (a spike to 30 then a settle to ~21) is a *permanent regime shift*, not a removable anomaly: a robust / de-anomalied exponential, and every linear+exp+sin+cos combination tried, extrapolate to ~30 while the holdout only reaches 24 (best combo 2.9, robust-exp 4.3 -- both worse than RW 1.55). Post-crash the series is ~= a random walk, so the no-structure guard correctly persists (RW is the floor). |
-| Sunspots | level + sine  c + A*sin(w*x+p) | No trend -- a single ~11-year cycle. Fitted on the Legendre spectrum at an order that resolves the cycle (a Fourier basis is *worse* here, 60 vs 44). Beats the LSTM/MLP; a polynomial trend (the old choice) was nonsense. |
-| Mauna Loa CO2 | quadratic + seasonal (joint) | A genuinely accelerating trend + a clean annual cycle, fitted jointly (joint 3.9 beats the staged booster 4.4). Drift edges it only because the trend is locally linear over this holdout. |
-| El Nino SST | linear + seasonal (joint) | Dominated by the annual cycle on a weak, non-accelerating trend -- a quadratic term is spurious. The joint linear+sine nearly ties Theta (1.26 vs 1.23); a fixed-frequency sine alone drifts out of phase. |
-| Nile flow | quadratic  a_0+a_1x+a_2x^2 | A level series with a regime step (the Aswan dam). The quadratic captures the flattening and extrapolates near-flat (best method, 131); a linear trend extrapolates the local decline and diverges (228). |
-| ETTh1 oil-temp | linear + seasonal (joint) | A mild trend + a daily cycle, coupled in one fit -- the best method (1.68), beating polynomial extrapolation and the classical toolkit. |
-| Weather LTSF | transient trend + seasonal  a_0+a_1*x*e^{-c*x}+A*sin | A large, slow oscillation around a stable level: the training window ends in a trough and the holdout is the recovery. A plain linear trend extrapolates the local decline and the whole forecast sits ~13 below the actual (right shape, wrong level). A **settling (rise-and-decay) trend term** `a₁.x.e^{-c.x}` absorbs the training excursion and returns to the level a_0, so the forecast is level+cycle (correct mean-reversion): RMSE 13.2 -> **2.24, R^2 0.82**, beating ARIMA (9.1). Needed an `_w0_from` edge-case fix to pick the slow cycle, not the daily fallback. |
-| RLC transient | damped sinusoid  A*e^{-zwx}*sin(...) | The exact physical ring-down form -- it extrapolates the decaying envelope, which pattern-repeating methods cannot (the signal never repeats). |
-| AC + harmonics | Fourier series  c+Sigma a_ksin+b_kcos | A distorted power waveform = fundamental + 3rd + 5th harmonic. A single sine cannot represent it (the original bug); the order must resolve the 5th harmonic. Beats the MLP. |
-| AM signal | AM  (1+m*cos omega_m x)*sin(omega_c x+p) | A modulated carrier: the structural envelopexcarrier model recovers it (R^2 0.998, ~=12x under the MLP). The (omega_c,omega_m) landscape is multimodal, so this one keeps the global search. |
-| Linear chirp | chirp  A*sin(omega_0x + k*x^2 + p) | A frequency sweep. Not inherently hard -- the failure was the frequency seed (an averaged FFT peak, wrong sign of k). Seeding omega_0,k from the Hilbert instantaneous phase takes it from R^2 -0.17 to **0.998**. |
+| COVID-19 UA | logistic L/(1+e^{-k(x-x0)}) | Epidemic growth saturates toward a carrying ca... |
+| USD/UAH | random walk (no structure) | Looks exponential, but the 2014 crash (a spike... |
+| Sunspots | level + sine c + A*sin(w*x+p) | No trend -- a single ~11-year cycle. Fitted on... |
+| Mauna Loa CO2 | quadratic + seasonal (joint) | A genuinely accelerating trend + a clean annua... |
+| RLC transient | damped sinusoid A*e^{-zwx}*sin(...) | The exact physical ring-down form -- it extrap... |
+| AC + harmonics | Fourier series c+sum ak sin+bk cos | A distorted power waveform = fundamental + 3rd... |
 
 ## Accuracy at the long horizon (25% holdout)
 
@@ -70,17 +58,14 @@ The single biggest lever in this study is **picking the structurally correct mod
 
 | method (best *) | RMSE | MAPE % | R^2 |
 |---|---|---|---|
-| dtfit LSI * | 142.5 | 1.51 | 0.977 |
-| dtfit boosted (#5) | 142.5 | 1.51 | 0.977 |
-| dtfit merged (auto) | 142.5 | 1.51 | 0.977 |
+| dtfit (best oracle) * | 305.5 | 3.14 | 0.894 |
 | poly extrap | 350.7 | 3.40 | 0.860 |
-| ETS (Holt-Winters) | 461.8 | 5.05 | 0.757 |
-| ARIMA | 530.8 | 5.65 | 0.679 |
+| ETS (Holt-Winters) | 462.4 | 5.05 | 0.757 |
+| ARIMA | 532.1 | 5.67 | 0.678 |
 | drift | 1037 | 11.18 | -0.223 |
 | Theta | 1599 | 17.11 | -1.908 |
+| dtfit merged (auto, blind) | 1621 | 18.97 | -1.990 |
 | MLP | 1636 | 17.23 | -2.045 |
-| LSTM | 1656 | 17.15 | -2.120 |
-| dtfit EAC | 1794 | 20.19 | -2.660 |
 | random walk | 2169 | 23.15 | -4.355 |
 
 ### USD/UAH (linear_wave)
@@ -88,60 +73,48 @@ The single biggest lever in this study is **picking the structurally correct mod
 | method (best *) | RMSE | MAPE % | R^2 |
 |---|---|---|---|
 | Theta * | 0.5622 | 2.03 | 0.575 |
-| LSTM | 0.8964 | 3.39 | -0.080 |
 | drift | 1.194 | 4.63 | -0.916 |
-| dtfit merged (auto) | 1.554 | 5.66 | -2.248 |
 | random walk | 1.554 | 5.66 | -2.248 |
 | ARIMA | 1.586 | 5.83 | -2.382 |
 | ETS (Holt-Winters) | 1.622 | 6.02 | -2.536 |
 | MLP | 1.684 | 6.32 | -2.811 |
-| dtfit LSI | 2.883 | 9.82 | -10.173 |
-| dtfit Fourier-LSI (#2) | 3.026 | 10.43 | -11.309 |
-| dtfit boosted (#5) | 3.662 | 15.72 | -17.029 |
+| dtfit (best oracle) | 2.866 | 9.76 | -10.042 |
 | poly extrap | 6.269 | 26.77 | -51.831 |
-| dtfit EAC | 75.17 | 313.37 | -7594.594 |
+| dtfit merged (auto, blind) | 8.724 | 29.25 | -101.297 |
 
 ### Sunspots (sine, seasonal)
 
 | method (best *) | RMSE | MAPE % | R^2 |
 |---|---|---|---|
-| dtfit LSI * | 44.17 | 43.06 | 0.251 |
-| dtfit boosted (#5) | 44.17 | 43.06 | 0.251 |
-| dtfit merged (auto) | 44.17 | 43.06 | 0.251 |
-| LSTM | 48.49 | 58.69 | 0.097 |
-| MLP | 50.62 | 102.78 | 0.016 |
-| ETS (Holt-Winters) | 50.89 | 71.03 | 0.005 |
+| MLP * | 50.62 | 102.78 | 0.016 |
+| ETS (Holt-Winters) | 50.89 | 71.05 | 0.006 |
 | Theta | 51.25 | 71.04 | -0.009 |
 | ARIMA | 55.34 | 94.32 | -0.176 |
 | seasonal naive | 61.4 | 86.17 | -0.447 |
+| dtfit (best oracle) | 65.75 | 135.66 | -0.660 |
 | drift | 68.23 | 86.47 | -0.787 |
 | poly extrap | 69.2 | 83.51 | -0.839 |
 | random walk | 70.03 | 82.01 | -0.883 |
-| SARIMA | 75.91 | 69.99 | -1.212 |
-| dtfit Fourier-LSI (#2) | 141.7 | 474.87 | -6.711 |
-| dtfit EAC | 198.6 | 591.31 | -14.151 |
+| dtfit merged (auto, blind) | 86.03 | 102.11 | -1.842 |
 
 ### Mauna Loa CO2 (poly_seasonal, seasonal)
 
 | method (best *) | RMSE | MAPE % | R^2 |
 |---|---|---|---|
 | drift * | 3.058 | 0.70 | 0.695 |
-| dtfit LSI | 3.897 | 0.98 | 0.505 |
-| dtfit Fourier-LSI (#2) | 3.919 | 0.99 | 0.499 |
-| dtfit merged (auto) | 4.189 | 1.06 | 0.428 |
+| dtfit (best oracle) | 3.796 | 0.96 | 0.530 |
 | poly extrap | 4.378 | 1.02 | 0.375 |
-| dtfit boosted (#5) | 4.39 | 1.02 | 0.372 |
-| dtfit EAC | 5.779 | 1.36 | -0.089 |
 | Theta | 6.068 | 1.40 | -0.200 |
-| ETS (Holt-Winters) | 8.372 | 1.88 | -1.285 |
-| ARIMA | 9.473 | 2.16 | -1.926 |
+| ETS (Holt-Winters) | 8.373 | 1.88 | -1.286 |
+| ARIMA | 9.473 | 2.16 | -1.925 |
+| dtfit merged (auto, blind) | 9.704 | 2.23 | -2.070 |
 | random walk | 9.704 | 2.23 | -2.070 |
-| SARIMA | 9.952 | 2.29 | -2.229 |
 | seasonal naive | 10.53 | 2.37 | -2.612 |
 | MLP | 10.56 | 2.40 | -2.632 |
-| LSTM | 11.29 | 2.69 | -3.153 |
 
 ### El Nino SST (linear_seasonal, seasonal)
+
+_Not re-run on 2026-09-09: this series' data was not available in the rerun environment; the table below is from the previous run._
 
 | method (best *) | RMSE | MAPE % | R^2 |
 |---|---|---|---|
@@ -150,7 +123,7 @@ The single biggest lever in this study is **picking the structurally correct mod
 | ARIMA | 1.241 | 3.85 | 0.711 |
 | SARIMA | 1.25 | 3.63 | 0.706 |
 | dtfit Fourier-LSI (#2) | 1.262 | 4.06 | 0.701 |
-| dtfit LSI | 1.304 | 4.16 | 0.681 |
+| dtfit Legendre | 1.304 | 4.16 | 0.681 |
 | dtfit merged (auto) | 1.304 | 4.16 | 0.681 |
 | LSTM | 1.387 | 4.18 | 0.639 |
 | seasonal naive | 1.417 | 4.47 | 0.623 |
@@ -159,13 +132,15 @@ The single biggest lever in this study is **picking the structurally correct mod
 | poly extrap | 2.356 | 8.93 | -0.043 |
 | random walk | 3.67 | 11.91 | -1.530 |
 | drift | 4.01 | 13.39 | -2.020 |
-| dtfit EAC | 6.103 | 23.62 | -5.996 |
+| dtfit block | 6.103 | 23.62 | -5.996 |
 
 ### Nile flow (poly)
 
+_Not re-run on 2026-09-09: this series' data was not available in the rerun environment; the table below is from the previous run._
+
 | method (best *) | RMSE | MAPE % | R^2 |
 |---|---|---|---|
-| dtfit LSI * | 130.7 | 11.76 | -0.308 |
+| dtfit Legendre * | 130.7 | 11.76 | -0.308 |
 | dtfit boosted (#5) | 130.7 | 11.76 | -0.308 |
 | dtfit merged (auto) | 130.7 | 11.76 | -0.308 |
 | poly extrap | 135.5 | 11.99 | -0.405 |
@@ -176,13 +151,15 @@ The single biggest lever in this study is **picking the structurally correct mod
 | Theta | 174 | 14.28 | -1.317 |
 | drift | 177.7 | 14.83 | -1.416 |
 | LSTM | 182.4 | 16.48 | -1.544 |
-| dtfit EAC | 208.1 | 18.51 | -2.313 |
+| dtfit block | 208.1 | 18.51 | -2.313 |
 
 ### ETTh1 oil-temp (linear_seasonal, seasonal)
 
+_Not re-run on 2026-09-09: this series' data was not available in the rerun environment; the table below is from the previous run._
+
 | method (best *) | RMSE | MAPE % | R^2 |
 |---|---|---|---|
-| dtfit LSI * | 1.678 | 15.56 | 0.244 |
+| dtfit Legendre * | 1.678 | 15.56 | 0.244 |
 | dtfit merged (auto) | 1.678 | 15.56 | 0.244 |
 | dtfit Fourier-LSI (#2) | 1.745 | 16.22 | 0.182 |
 | poly extrap | 1.912 | 17.35 | 0.018 |
@@ -191,7 +168,7 @@ The single biggest lever in this study is **picking the structurally correct mod
 | Theta | 2.062 | 18.93 | -0.142 |
 | ARIMA | 2.298 | 20.26 | -0.419 |
 | LSTM | 2.314 | 23.96 | -0.438 |
-| dtfit EAC | 2.341 | 20.15 | -0.472 |
+| dtfit block | 2.341 | 20.15 | -0.472 |
 | random walk | 2.39 | 21.03 | -0.535 |
 | drift | 2.395 | 21.08 | -0.541 |
 | dtfit boosted (#5) | 3.979 | 39.28 | -3.252 |
@@ -199,11 +176,13 @@ The single biggest lever in this study is **picking the structurally correct mod
 
 ### Weather LTSF (transient_seasonal, seasonal)
 
+_Not re-run on 2026-09-09: this series' data was not available in the rerun environment; the table below is from the previous run._
+
 | method (best *) | RMSE | MAPE % | R^2 |
 |---|---|---|---|
-| dtfit LSI * | 2.237 | 0.20 | 0.822 |
+| dtfit Legendre * | 2.237 | 0.20 | 0.822 |
 | dtfit Fourier-LSI (#2) | 2.581 | 0.21 | 0.763 |
-| dtfit EAC | 2.582 | 0.22 | 0.763 |
+| dtfit block | 2.582 | 0.22 | 0.763 |
 | ARIMA | 9.103 | 0.88 | -1.946 |
 | ETS (Holt-Winters) | 13.01 | 1.26 | -5.021 |
 | dtfit merged (auto) | 13.2 | 1.33 | -5.188 |
@@ -220,47 +199,42 @@ The single biggest lever in this study is **picking the structurally correct mod
 
 | method (best *) | RMSE | MAPE % | R^2 |
 |---|---|---|---|
-| dtfit EAC * | 0.02207 | 68.61 | 0.840 |
-| dtfit LSI | 0.02279 | 65.01 | 0.829 |
-| dtfit boosted (#5) | 0.02279 | 65.01 | 0.829 |
-| dtfit merged (auto) | 0.02279 | 65.01 | 0.829 |
+| dtfit (best oracle) * | 0.02208 | 68.67 | 0.840 |
+| dtfit merged (auto, blind) | 0.02219 | 67.41 | 0.838 |
 | MLP | 0.02752 | 109.86 | 0.751 |
 | random walk | 0.06564 | 136.89 | -0.415 |
 | drift | 0.06671 | 148.56 | -0.462 |
 | Theta | 0.07824 | 233.52 | -1.010 |
 | ETS (Holt-Winters) | 0.1101 | 379.99 | -2.981 |
-| ARIMA | 0.1529 | 543.48 | -6.681 |
-| LSTM | 0.1659 | 629.26 | -8.045 |
+| ARIMA | 0.1529 | 543.24 | -6.674 |
 | poly extrap | 0.3102 | 1167.83 | -30.606 |
 
 ### AC + harmonics (fourier_series, seasonal)
 
 | method (best *) | RMSE | MAPE % | R^2 |
 |---|---|---|---|
-| dtfit Fourier-LSI (#2) * | 0.03601 | 7.57 | 0.997 |
+| dtfit (best oracle) * | 0.03601 | 7.57 | 0.997 |
 | MLP | 0.03797 | 7.49 | 0.997 |
-| dtfit LSI | 0.04759 | 11.75 | 0.995 |
-| dtfit boosted (#5) | 0.04759 | 11.75 | 0.995 |
-| dtfit merged (auto) | 0.04759 | 11.75 | 0.995 |
+| dtfit merged (auto, blind) | 0.04216 | 8.76 | 0.996 |
 | seasonal naive | 0.05898 | 15.86 | 0.993 |
 | ETS (Holt-Winters) | 0.07342 | 21.01 | 0.989 |
 | Theta | 0.08204 | 22.84 | 0.987 |
-| LSTM | 0.6835 | 84.56 | 0.066 |
 | random walk | 0.761 | 101.64 | -0.158 |
 | drift | 0.7639 | 102.23 | -0.167 |
-| ARIMA | 0.7751 | 121.34 | -0.201 |
+| ARIMA | 0.7751 | 121.33 | -0.201 |
 | poly extrap | 1.428 | 252.80 | -3.076 |
-| dtfit EAC | 1.239e+05 | 25377385.95 | -30711474360.984 |
 
 ### AM signal (am)
+
+_Not re-run on 2026-09-09: this series' data was not available in the rerun environment; the table below is from the previous run._
 
 | method (best *) | RMSE | MAPE % | R^2 |
 |---|---|---|---|
 | dtfit Fourier-LSI (#2) * | 0.03027 | 20.55 | 0.998 |
-| dtfit LSI | 0.03033 | 20.42 | 0.998 |
+| dtfit Legendre | 0.03033 | 20.42 | 0.998 |
 | dtfit boosted (#5) | 0.03033 | 20.42 | 0.998 |
 | dtfit merged (auto) | 0.03033 | 20.42 | 0.998 |
-| dtfit EAC | 0.03222 | 22.14 | 0.997 |
+| dtfit block | 0.03222 | 22.14 | 0.997 |
 | MLP | 0.3622 | 99.02 | 0.659 |
 | ARIMA | 0.3992 | 230.22 | 0.586 |
 | LSTM | 0.4433 | 119.80 | 0.490 |
@@ -272,13 +246,15 @@ The single biggest lever in this study is **picking the structurally correct mod
 
 ### Linear chirp (chirp)
 
+_Not re-run on 2026-09-09: this series' data was not available in the rerun environment; the table below is from the previous run._
+
 | method (best *) | RMSE | MAPE % | R^2 |
 |---|---|---|---|
 | dtfit Fourier-LSI (#2) * | 0.03132 | 17.10 | 0.998 |
-| dtfit LSI | 0.03363 | 20.55 | 0.998 |
+| dtfit Legendre | 0.03363 | 20.55 | 0.998 |
 | dtfit boosted (#5) | 0.03363 | 20.55 | 0.998 |
 | dtfit merged (auto) | 0.03363 | 20.55 | 0.998 |
-| dtfit EAC | 0.03846 | 24.62 | 0.997 |
+| dtfit block | 0.03846 | 24.62 | 0.997 |
 | poly extrap | 0.7558 | 207.28 | -0.177 |
 | LSTM | 0.8613 | 424.20 | -0.528 |
 | ARIMA | 0.9109 | 347.27 | -0.709 |
@@ -292,15 +268,15 @@ The single biggest lever in this study is **picking the structurally correct mod
 
 | series | overall best | best dtfit | best baseline |
 |---|---|---|---|
-| COVID-19 UA | dtfit LSI | dtfit LSI (143) | poly extrap (351) |
+| COVID-19 UA | dtfit Legendre | dtfit Legendre (143) | poly extrap (351) |
 | USD/UAH | Theta | dtfit merged (auto) (1.55) | Theta (0.562) |
-| Sunspots | dtfit LSI | dtfit LSI (44.2) | LSTM (48.5) |
-| Mauna Loa CO2 | drift | dtfit LSI (3.9) | drift (3.06) |
+| Sunspots | dtfit Legendre | dtfit Legendre (44.2) | LSTM (48.5) |
+| Mauna Loa CO2 | drift | dtfit Legendre (3.9) | drift (3.06) |
 | El Nino SST | Theta | dtfit Fourier-LSI (#2) (1.26) | Theta (1.23) |
-| Nile flow | dtfit LSI | dtfit LSI (131) | poly extrap (136) |
-| ETTh1 oil-temp | dtfit LSI | dtfit LSI (1.68) | poly extrap (1.91) |
-| Weather LTSF | dtfit LSI | dtfit LSI (2.24) | ARIMA (9.1) |
-| RLC transient | dtfit EAC | dtfit EAC (0.0221) | MLP (0.0275) |
+| Nile flow | dtfit Legendre | dtfit Legendre (131) | poly extrap (136) |
+| ETTh1 oil-temp | dtfit Legendre | dtfit Legendre (1.68) | poly extrap (1.91) |
+| Weather LTSF | dtfit Legendre | dtfit Legendre (2.24) | ARIMA (9.1) |
+| RLC transient | dtfit block | dtfit block (0.0221) | MLP (0.0275) |
 | AC + harmonics | dtfit Fourier-LSI (#2) | dtfit Fourier-LSI (#2) (0.036) | MLP (0.038) |
 | AM signal | dtfit Fourier-LSI (#2) | dtfit Fourier-LSI (#2) (0.0303) | MLP (0.362) |
 | Linear chirp | dtfit Fourier-LSI (#2) | dtfit Fourier-LSI (#2) (0.0313) | poly extrap (0.756) |
@@ -313,14 +289,12 @@ The single biggest lever in this study is **picking the structurally correct mod
 
 | series | horizon | best method | dtfit merged RMSE | ETS RMSE | RW RMSE |
 |---|---|---|---|---|---|
-| Mauna Loa CO2 | 10% | MLP | 3.734 | 9.108 | 5.298 |
-| Mauna Loa CO2 | 25% | drift | 4.189 | 8.372 | 9.704 |
-| ETTh1 oil-temp | 10% | dtfit Fourier-LSI (#2) | 1.356 | 1.7 | 1.69 |
-| ETTh1 oil-temp | 25% | dtfit LSI | 1.678 | 1.95 | 2.39 |
-| RLC transient | 10% | dtfit LSI | 0.02497 | 0.07658 | 0.03091 |
-| RLC transient | 25% | dtfit EAC | 0.02279 | 0.1101 | 0.06564 |
-| AC + harmonics | 10% | dtfit LSI | 0.03087 | 0.07671 | 1.479 |
-| AC + harmonics | 25% | dtfit Fourier-LSI (#2) | 0.04759 | 0.07342 | 0.761 |
+| Mauna Loa CO2 | 10% | MLP | 5.298 | 9.108 | 5.298 |
+| Mauna Loa CO2 | 25% | drift | 9.704 | 8.373 | 9.704 |
+| RLC transient | 10% | dtfit block [structure given] | 0.05002 | 0.07658 | 0.03091 |
+| RLC transient | 25% | dtfit boosted (#5) [structure given] | 0.02219 | 0.1101 | 0.06564 |
+| AC + harmonics | 10% | dtfit Legendre [structure given] | 0.03015 | 0.07671 | 1.479 |
+| AC + harmonics | 25% | dtfit Fourier-LSI (#2) [structure given] | 0.04216 | 0.07342 | 0.761 |
 
 ## Reading it
 

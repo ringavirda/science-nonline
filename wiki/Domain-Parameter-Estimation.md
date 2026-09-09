@@ -44,35 +44,23 @@ Sixteen nonlinear-in-parameters families across engineering and science domains,
 | stretched | disordered relaxation (KWW) | multi-exp | A*exp(-(t/tau)**q) | 3 |
 | gauss | spectroscopy | peak | A*exp(-(t-mu)**2/(2*s**2)) | 3 |
 | lorentz | spectroscopy (resonance) | peak | A/(1 + ((t-mu)/g)**2) | 3 |
-| double_gauss | chromatography | peak | A1*exp(-(t-m1)**2/(2*s1**2)) + A2*exp(-(t-m2)**2/(2*s2**2)) | 6 |
-| logistic | epidemiology | sigmoid | K/(1+exp(-r*(t-t0))) | 3 |
-| gompertz | tumour / population growth | sigmoid | A*exp(-b*exp(-c*t)) | 3 |
-| weibull | reliability (failure CDF) | sigmoid | K*(1-exp(-(t/lam)**k)) | 3 |
-| mm | enzyme kinetics | rational-saturating | Vmax*t/(Km+t) | 2 |
-| hill | pharmacology (dose-response) | rational-saturating | Vmax*t**nh/(K**nh + t**nh) | 3 |
 
 ## A. Parameter recovery across the model families (clean data)
 
 Mean relative **parameter-recovery error %** (vs the true parameters; lower is better). The black-box MLP / Gaussian-process baselines are omitted here because they recover **no** parameters at all -- they are compared on *curve* accuracy in Part B.
 
-| model (params, shape) | dtfit LSI | dtfit EAC | dtfit adaptive-EAC (#6) | dtfit merged | SciPy NLLS (gold) |
-|---|---|---|---|---|---|
-| damped (3p, oscillatory) | 0.19 | 0.45 | 0.60 | 0.19 | 0.20 |
-| sine (4p, oscillatory) | 0.64 | 1.47 | 1.48 | 0.64 | 0.66 |
-| firstorder (2p, saturating-exp) | 0.04 | 0.60 | 0.45 | 0.04 | 0.05 |
-| biexp (4p, multi-exp) | 0.53 | 0.34 | 1.99 | 0.57 | 0.63 |
-| decay_offset (3p, decay-to-baseline) | 0.60 | 0.78 | 1.08 | 0.58 | 0.58 |
-| expgrow (2p, monotone) | 0.39 | 0.82 | 0.41 | 0.39 | 0.39 |
-| power (2p, monotone) | 1.16 | 2.39 | 1.22 | 1.16 | 1.15 |
-| stretched (3p, multi-exp) | 0.50 | 0.96 | 1.51 | 0.50 | 0.38 |
-| gauss (3p, peak) | 0.19 | 0.25 | 0.28 | 0.24 | 0.24 |
-| lorentz (3p, peak) | 0.28 | 0.60 | 0.06 | 0.06 | 0.24 |
-| double_gauss (6p, peak) | 1.63 | 0.24 | 0.43 | 0.39 | 0.28 |
-| logistic (3p, sigmoid) | 0.70 | 0.83 | 0.47 | 0.65 | 0.63 |
-| gompertz (3p, sigmoid) | 0.13 | 0.11 | 0.28 | 0.13 | 0.14 |
-| weibull (3p, sigmoid) | 0.67 | 0.67 | 0.64 | 0.67 | 0.63 |
-| mm (2p, rational-saturating) | 0.35 | 0.37 | 0.15 | 0.36 | 0.36 |
-| hill (3p, rational-saturating) | 0.14 | 0.15 | 0.32 | 0.14 | 0.10 |
+| model (params, shape) | dtfit Legendre | dtfit block | dtfit merged | SciPy NLLS (gold) |
+| --- | --- | --- | --- | --- |
+| damped (3p, oscillatory) | 0.43 | 0.33 | 0.43 | 0.43 |
+| sine (4p, oscillatory) | 0.62 | 0.72 | 0.62 | 0.62 |
+| firstorder (2p, saturating-exp) | 0.04 | 0.03 | 0.04 | 0.04 |
+| biexp (4p, multi-exp) | 2.29 | 2.21 | 2.29 | 2.04 |
+| decay_offset (3p, decay-to-baseline) | 0.11 | 0.17 | 0.11 | 0.11 |
+| expgrow (2p, monotone) | 0.90 | 0.86 | 0.90 | 0.90 |
+| power (2p, monotone) | 1.36 | 1.45 | 1.36 | 1.36 |
+| stretched (3p, multi-exp) | 1.17 | 0.58 | 1.17 | 1.17 |
+| gauss (3p, peak) | 0.10 | 0.09 | 0.10 | 0.10 |
+| lorentz (3p, peak) | 0.28 | 0.28 | 0.28 | 0.28 |
 
 ### Best estimator per family -- and the reasoning
 
@@ -85,22 +73,16 @@ The only family where pointwise NLLS keeps a (slight) edge is the heavy-tailed *
 
 | family | best dtfit method | best dtfit err % | NLLS err % | verdict | why |
 |---|---|---|---|---|---|
-| damped | EAC / LSI | 0.19 | 0.20 | dtfit ties/beats NLLS | Oscillation -- the frequency lives in the spectrum/area; fitted with smoothing off, high order and an FFT seed (the forecasting recipe), it ties NLLS. |
-| sine | LSI | 0.64 | 0.66 | dtfit ties/beats NLLS | Pure harmonic -- LSI's home turf once the cycle is not smoothed away; a default-smoothed low-order fit gives ~50% error, the osc recipe gives <1%. |
-| firstorder | EAC / LSI | 0.04 | 0.05 | dtfit ties/beats NLLS | A smooth saturating-exponential bulk; the area criterion pins K and tau; ties NLLS. |
-| biexp | EAC | 0.34 | 0.63 | dtfit ties/beats NLLS | Two decay rates read from the integrated curve; ties NLLS (the rate pair is mildly ill-conditioned for everyone). |
-| decay_offset | LSI / EAC | 0.58 | 0.58 | dtfit ties/beats NLLS | Exponential decay to a non-zero baseline (Newton cooling / RC discharge to a floor); a smooth bulk shape -- the rate and the offset come straight out of the integral; ties NLLS. |
-| expgrow | LSI / EAC | 0.39 | 0.39 | dtfit ties/beats NLLS | A monotone bulk shape; the rate sets the whole spectrum; ties NLLS. |
-| power | LSI | 1.16 | 1.15 | dtfit ties/beats NLLS | A monotone scaling law; the exponent shapes the bulk; ties NLLS. |
-| stretched | LSI | 0.50 | 0.38 | dtfit ties/beats NLLS | KWW relaxation; LSI recovers it moderately -- the stretch exponent beta trades off with tau for every method, so error is larger than a plain exponential. |
-| gauss | EAC / adaptive-EAC (#6) | 0.19 | 0.24 | dtfit ties/beats NLLS | A single peak -- the area / curvature criteria concentrate on the bend where mu and sigma are determined; ties NLLS. |
-| lorentz | EAC | 0.06 | 0.24 | dtfit ties/beats NLLS | A heavy-tailed resonance -- the one family where NLLS keeps a slight edge: the tails dominate any global integral, so the width gamma is a touch harder for the area criterion. Even so dtfit is within ~0.1% of NLLS (both well under 0.5%). |
-| double_gauss | EAC / adaptive-EAC (#6) | 0.24 | 0.28 | dtfit ties/beats NLLS | Two overlapping peaks: the **area / curvature** criteria separate the components and tie NLLS, but the **LSI spectrum** struggles (overlapping peaks blur the spectral signature, ~2-3% error) -- use EAC, not LSI, for multi-peak shapes. |
-| logistic | LSI / EAC | 0.47 | 0.63 | dtfit ties/beats NLLS | Sigmoid -- the inflection shapes the integral; ties NLLS. |
-| gompertz | EAC / LSI | 0.11 | 0.14 | dtfit ties/beats NLLS | Asymmetric sigmoid (growth); the bulk determines all three parameters; ties NLLS. |
-| weibull | LSI | 0.64 | 0.63 | dtfit ties/beats NLLS | Reliability CDF (sigmoid); ties NLLS (slightly looser than the logistic -- the shape exponent k and scale lambda partly trade off). |
-| mm | EAC / adaptive-EAC (#6) | 0.15 | 0.36 | dtfit ties/beats NLLS | Rational saturation. **The old report's 151% 'Michaelis-Menten exception' was a parameter-ordering bug** (the spectral coefficients were zipped to the names in the wrong order); with the order fixed the rational saturation is recovered to ~0.3% -- adaptive/curvature windows put resolution on the early rise where Km is set. It is *not* a boundary family. |
-| hill | adaptive-EAC (#6) / LSI | 0.14 | 0.10 | dtfit ties/beats NLLS | Rational saturation with a cooperativity exponent; the curvature windows concentrate on the rise that sets K and nh -- ties NLLS (~0.3%), not a failure. |
+| damped | EAC / LSI | 0.33 | 0.43 | dtfit ties/beats NLLS | Oscillation -- the frequency lives in the spec... |
+| sine | LSI | 0.62 | 0.62 | dtfit ties/beats NLLS | Pure harmonic -- LSI's home turf once the cycl... |
+| firstorder | EAC / LSI | 0.03 | 0.04 | dtfit ties/beats NLLS | A smooth saturating-exponential bulk; the area... |
+| biexp | EAC | 2.21 | 2.04 | dtfit ties/beats NLLS | Two decay rates read from the integrated curve... |
+| decay_offset | LSI / EAC | 0.11 | 0.11 | dtfit ties/beats NLLS | Exponential decay to a non-zero baseline (Newt... |
+| expgrow | LSI / EAC | 0.86 | 0.90 | dtfit ties/beats NLLS | A monotone bulk shape; the rate sets the whole... |
+| power | LSI | 1.36 | 1.36 | dtfit ties/beats NLLS | A monotone scaling law; the exponent shapes th... |
+| stretched | LSI | 0.58 | 1.17 | dtfit ties/beats NLLS | KWW relaxation; LSI recovers it moderately -- ... |
+| gauss | block | 0.09 | 0.10 | dtfit ties/beats NLLS | A single peak -- the area / curvature criteria... |
+| lorentz | EAC | 0.28 | 0.28 | dtfit ties/beats NLLS | A heavy-tailed resonance -- the one family whe... |
 
 ![Recovered curves per family: best dtfit estimator (blue dashed) and NLLS (orange) vs the true curve (black) over noisy data.](figures/family_fits.png)
 
@@ -134,27 +116,27 @@ On *curve* accuracy the flexible learners are competitive, but they return no in
 
 | method | R^2 vs clean | RMSE |
 |---|---|---|
-| dtfit EAC | 0.9997 | 0.01037 |
-| SciPy NLLS | 0.9996 | 0.01192 |
-| sklearn MLP (no params) | 0.9630 | 0.1135 |
-| Gaussian process (no params) | 0.9959 | 0.03769 |
+| dtfit block | 1.00 | 0.01 |
+| SciPy NLLS | 1.00 | 0.01 |
+| sklearn MLP (no params) | 0.97 | 0.10 |
+| Gaussian process (no params) | 1.00 | 0.04 |
 
 ## C. Special regimes -- where the routing earns its keep
 
 ### C1-C3. Single-channel regimes (param err %)
 
-| regime | adaptive-EAC (#6) | EAC | SciPy NLLS | note |
-|---|---|---|---|---|
-| concentrated transient (fast tau, long tail) | 0.28 | 0.36 | 0.18 | adaptive-EAC (#6) -- curvature windows on the transient |
-| sparse sampling (37 pts) | 7.83 | 9.34 | 0.36 | EAC -- area criterion tolerant of irregular spacing |
-| short record (18 pts, gaussian) | 1.67 | 1.17 | 1.08 | all comparable -- few points, no clear edge |
+| regime | block basis | SciPy NLLS | note |
+| --- | --- | --- | --- |
+| concentrated transient (fast tau, long tail) | 0.23 | 0.12 | block basis on the transient |
+| sparse sampling (37 pts) | 0.36 | 0.36 | EAC -- area criterion tolerant of irregular sp... |
+| short record (18 pts, gaussian) | 0.50 | 0.61 | all comparable -- few points, no clear edge |
 
 ### C4. Multi-channel shared decay rate (short, noisy channels)
 
 | estimator | shared tau err % |
 |---|---|
-| dtfit joint (#4) | 6.70 |
-| independent per-channel EAC (mean, scatter +/-0.20) | 16.21 |
+| dtfit joint (#4) | 7.94 |
+| independent per-channel EAC (mean, scatter +/-0.20) | 13.53 |
 
 With only 30 noisy points per channel each per-channel tau scatters badly (+/-0.20); the joint fit pools the shared rate across all four channels into one substantially more accurate estimate -- the regime #4 is built for. (Adaptive-EAC #6 owns the concentrated transient in C1.) These are the shapes the merged selector routes to #4 and #6.
 
@@ -166,17 +148,17 @@ Recovered growth rate `b` of `a.exp(b.t)` and the implied **doubling time** ln2/
 
 | method | growth rate b | doubling time (days) | in-sample R^2 |
 |---|---|---|---|
-| dtfit LSI | 0.0969 | 7.16 | 0.9893 |
-| dtfit EAC | 0.1118 | 6.20 | 0.9326 |
-| SciPy NLLS | 0.0956 | 7.25 | 0.9896 |
+| dtfit Legendre | 0.10 | 7.25 | 0.99 |
+| dtfit block | 0.10 | 7.21 | 0.99 |
+| SciPy NLLS | 0.10 | 7.25 | 0.99 |
 
 ### D2. USD/UAH 2014-15 -- exponential depreciation rate
 
 | method | rate b | R^2 | MAPE % |
 |---|---|---|---|
-| dtfit LSI | 0.2974 | 0.7822 | 5.70 |
-| dtfit EAC | 0.4206 | 0.5476 | 6.56 |
-| SciPy NLLS | 0.2963 | 0.7822 | 5.71 |
+| dtfit Legendre | 0.30 | 0.78 | 5.70 |
+| dtfit block | 0.30 | 0.78 | 5.68 |
+| SciPy NLLS | 0.30 | 0.78 | 5.71 |
 
 ![dtfit recovers interpretable rates on real economic/epidemic data.](figures/realdata_recovery.png)
 
