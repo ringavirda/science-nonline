@@ -17,6 +17,8 @@ its parameters; the balance is the one that can be solved symbolically.
 
 from __future__ import annotations
 
+import functools
+
 import numpy as np
 import sympy as sp
 from numpy.polynomial import polynomial as P
@@ -60,7 +62,11 @@ def monomial_weight_matrix(h: float, order: int) -> np.ndarray:
     return float(h) ** s / s
 
 
+@functools.lru_cache(maxsize=64)
 def _spectrum(expr: str, var: str, order: int):
+    """The model's parameter list and its truncated Maclaurin spectrum as a
+    vectorized function of the parameters; the symbolic work is cached per
+    ``(expr, var, order)``."""
     t = sp.Symbol(var)
     f = sp.sympify(expr)
     params = model_params(f, t)

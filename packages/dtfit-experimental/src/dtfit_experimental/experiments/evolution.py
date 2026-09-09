@@ -177,6 +177,19 @@ def batch_matrix(out: pathlib.Path, seeds: int, families) -> None:
                                              n, seed)
                                 for name, needs, run in stages:
                                     tic = time.perf_counter()
+                                    # the symbolic balance stages cost
+                                    # seconds per fit on three or more
+                                    # parameters; their verdict does not
+                                    # change with seeds or size, so they run
+                                    # on ten seeds at the middle size only
+                                    if name.startswith(("S1_", "S2_")) and (
+                                            seed >= 10 or n != 200):
+                                        w.writerow([name, needs, fam, noise,
+                                                    grid, outl, n, seed,
+                                                    float("nan"),
+                                                    float("nan"), "", False,
+                                                    0.0, "skipped"])
+                                        continue
                                     try:
                                         c, cov = run(x, y, expr, p0)
                                         c = np.asarray(c, dtype=float)
@@ -409,6 +422,10 @@ def main() -> None:
     ap.add_argument("--report", action="store_true")
     ap.add_argument("--fig", default=None)
     ap.add_argument("--ode", action="store_true", help="the ODE matrix only")
+    ap.add_argument("--families", default=None,
+                    help="comma-separated subset of the families to run")
+    ap.add_argument("--no-ode", action="store_true",
+                    help="skip the ODE matrix after the batch")
     a = ap.parse_args()
     out = pathlib.Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -427,12 +444,16 @@ def main() -> None:
     if a.full:
         OUTLIERS, SIZES = (0.0, 0.05, 0.10, 0.20), (50, 200, 1000)
         seeds = a.seeds or 30
-        batch_matrix(out, seeds, list(FAMILIES))
-        ode_matrix(out, min(seeds * 2, 60))
+        fams = a.families.split(",") if a.families else list(FAMILIES)
+        batch_matrix(out, seeds, fams)
+        if not a.no_ode:
+            ode_matrix(out, min(seeds * 2, 60))
         return
     seeds = a.seeds or 10
-    batch_matrix(out, seeds, list(FIRST_CUT))
-    ode_matrix(out, min(seeds * 3, 30))
+    fams = a.families.split(",") if a.families else list(FIRST_CUT)
+    batch_matrix(out, seeds, fams)
+    if not a.no_ode:
+        ode_matrix(out, min(seeds * 3, 30))
 
 
 if __name__ == "__main__":
