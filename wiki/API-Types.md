@@ -97,7 +97,7 @@ Per-parameter confidence intervals (normal approximation) at the given level.
 
 <a name="fit-quality-diagnostics-v03"></a>
 ### Fit-quality diagnostics (`rsquared`, `aic`, `bic`, `residuals`)
-The iterative fitters ([`fit_lsi`](API-Fitting#fit_lsi), [`fit_eac`](API-Fitting#fit_eac))
+The iterative fitters ([`fit(basis="legendre")`](API-Fitting#fit(basis="legendre")), [`fit(basis="block")`](API-Fitting#fit(basis="block")))
 record the raw fit statistics (`n_obs`, `rss`, `tss`, plus the optimizer's `nfev`
 and `cost`) on the result, and three read-only properties derive the usual
 model-comparison numbers from them:
@@ -112,7 +112,7 @@ model-comparison numbers from them:
   samples.
 
 ```python
-r = fit_lsi(x, y, "a*exp(b*x)", "x")
+r = fit("a*exp(b*x)", Original(x, y), "x", basis="legendre")
 r.rsquared, r.aic, r.bic          # fit-quality numbers straight off the result
 resid = r.residuals(x, y)         # y - r.predict(x)
 ```
@@ -134,13 +134,13 @@ print(res.summary())
 ```
 
 ### Checking convergence
-The iterative fitters ([`fit_lsi`](API-Fitting#fit_lsi),
-[`fit_eac`](API-Fitting#fit_eac)) record whether the solver settled. A fit can
+The iterative fitters ([`fit(basis="legendre")`](API-Fitting#fit(basis="legendre")),
+[`fit(basis="block")`](API-Fitting#fit(basis="block"))) record whether the solver settled. A fit can
 return *successfully* yet not have converged -- on a misspecified model, a bad
 seed, or degenerate data -- so check the flag before trusting the parameters:
 
 ```python
-res = fit_lsi(x, y, "a*exp(b*x)", "x")
+res = fit("a*exp(b*x)", Original(x, y), "x", basis="legendre")
 if res.converged is False:        # note: `is False`, not falsy (None = not reported)
     print("optimizer did not converge:", res.message)
 ```

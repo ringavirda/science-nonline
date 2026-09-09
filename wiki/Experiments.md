@@ -42,7 +42,7 @@ python -m dtfit_experimental.experiments.download_data   # fetch datasets into d
 python -m dtfit_experimental.experiments.benchmark       # method docs: wiki/figures + comparison tables
 python -m dtfit_experimental.experiments.accuracy_explore # recovery-accuracy sweep over the test SCENARIOS
 python -m dtfit_experimental.experiments.validate_methods # quick real-data smoke test (COVID/FX)
-python -m dtfit_experimental.experiments.streaming_lsi_benchmark  # LSIFilter vs EACFilter micro-benchmark
+python -m dtfit_experimental.experiments.streaming_lsi_benchmark  # ImageFilter(basis="legendre") vs ImageFilter(basis="block") micro-benchmark
 ```
 
 - **`benchmark.py`** renders the per-method figures into the repo's `wiki/figures/`

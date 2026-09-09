@@ -7,7 +7,7 @@ Concept: [../guides/methods-explained.md#streaming](Guides-Methods-Explained#str
 math: [../methods/legendre-filter.md](Methods-Legendre-Filter).
 
 - [`ImageFilter`](#imagefilter) -- recursive estimation on the window image
-- [`LSIFilter`, `EACFilter`](#aliases) -- the Legendre and block basis aliases
+- [`ImageFilter(basis="legendre")`, `ImageFilter(basis="block")`](#aliases) -- the Legendre and block basis aliases
 - [`DriftDetector`](#driftdetector) -- the shared change-detection logic
 - [Several streams](#several-streams) -- pooling `nis_` across filters
 
@@ -162,26 +162,26 @@ print(res.stderr())
 ---
 
 <a name="aliases"></a>
-## `LSIFilter`, `EACFilter`
+## `ImageFilter(basis="legendre")`, `ImageFilter(basis="block")`
 
 ```python
-LSIFilter(model, var, **kwargs) -> None
-EACFilter(model, var, **kwargs) -> None
+ImageFilter(model, var, **kwargs, basis="legendre") -> None
+ImageFilter(model, var, **kwargs, basis="block") -> None
 ```
 
 `ImageFilter` with `basis` fixed to `"legendre"` and `"block"`
-respectively -- the streaming twins of `fit_lsi` and `fit_eac`. Each takes
+respectively -- the streaming twins of `fit(basis="legendre")` and `fit(basis="block")`. Each takes
 every `ImageFilter` keyword except `basis`, which raises `TypeError`.
-`LSIFilter`'s window image resolves the shape and frequency of an
-oscillatory plant; `EACFilter`'s block image is the cheaper statistic,
+`ImageFilter(basis="legendre")`'s window image resolves the shape and frequency of an
+oscillatory plant; `ImageFilter(basis="block")`'s block image is the cheaper statistic,
 the one an embedded target runs.
 
 ```python
-from dtfit import LSIFilter
+from dtfit import ImageFilter
 
 t = np.linspace(0, 20, 400)
 y = 2.0 * np.sin(1.3 * t) + rng.normal(0, 0.05, t.size)
-flt = LSIFilter.tracking("A*sin(w*x)", "x", p0=[1.0, 1.0])
+flt = ImageFilter(basis="legendre").tracking("A*sin(w*x)", "x", p0=[1.0, 1.0])
 for ti, yi in zip(t, y):
     flt.partial_fit(ti, yi)
 print(flt.params_)
@@ -254,9 +254,9 @@ the realised per-run false-alarm rate is not exactly the nominal
 from scipy.stats import chi2
 
 K = 3
-flts = [LSIFilter("A*sin(1.2*t + p)", "t", p0=[1.0, 0.0], window_size=40,
+flts = [ImageFilter("A*sin(1.2*t + p)", "t", p0=[1.0, 0.0], window_size=40,
                   order=4, adaptive_window=False, alpha=1e-15,
-                  cusum_k=float("inf"))
+                  cusum_k=float("inf"), basis="legendre")
         for p in (0.7 * k for k in range(K))]
 dof = sum(f.basis.n_coef for f in flts)
 threshold = chi2.ppf(1 - 1e-4, dof)

@@ -156,8 +156,8 @@ y_hat = bm.predict(x)
 <a name="informationfilter"></a>
 ## `InformationFilter` -- inverse-covariance fusion primitive
 
-**What it is.** The covariance-form Kalman update the stable `EACFilter` /
-`LSIFilter` run maintains `P` and inverts an `m x m` innovation covariance each
+**What it is.** The covariance-form Kalman update the stable `ImageFilter(basis="block")` /
+`ImageFilter(basis="legendre")` run maintains `P` and inverts an `m x m` innovation covariance each
 step. The **information form** maintains the inverse `Y = P^-1` (the *information
 matrix*) and `yv = P^-1 p` (the *information vector*) instead, which flips two
 properties that matter for sensor fusion: the measurement update is **purely

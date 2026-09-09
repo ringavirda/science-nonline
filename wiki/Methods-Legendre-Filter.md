@@ -9,7 +9,7 @@
 ImageFilter tracks the parameters of `f(t; theta)` online by treating each
 sliding window of the stream as [an image](Methods-Image) `(S_w, G_w)` in a
 chosen basis -- the same statistic a batch fit builds -- and updating it
-one sample at a time in information form. `LSIFilter` and `EACFilter` fix
+one sample at a time in information form. `ImageFilter(basis="legendre")` and `ImageFilter(basis="block")` fix
 its basis to Legendre and block, the streaming twins of
 [LSI](Methods-LSI) and [EAC](Methods-EAC).
 
@@ -91,9 +91,9 @@ shift still passes through unclipped and reaches the drift test.
 
 ## The two bases
 
-`basis="legendre"` (`LSIFilter`) resolves an oscillatory plant's shape
+`basis="legendre"` (`ImageFilter(basis="legendre")`) resolves an oscillatory plant's shape
 and frequency: the window's Legendre spectrum carries the amplitude,
-frequency and phase directly. `basis="block"` (`EACFilter`) is the
+frequency and phase directly. `basis="block"` (`ImageFilter(basis="block")`) is the
 cheapest statistic -- window sums, a diagonal `G_w` -- and the one an
 embedded target runs; see [the embedded tool](Domain-Embedded-Control).
 Both are the same recursion on the same image type, differing only in
@@ -144,8 +144,8 @@ extrapolable and nuisance parts.
 
 **Use `ImageFilter` for:** real-time tracking of a stream where the
 parameters drift, at bounded per-sample cost, with regime-change
-detection. Pick `basis="legendre"` (`LSIFilter`) for oscillatory or
-sustained-cycle plants; `basis="block"` (`EACFilter`) for monotone or
+detection. Pick `basis="legendre"` (`ImageFilter(basis="legendre")`) for oscillatory or
+sustained-cycle plants; `basis="block"` (`ImageFilter(basis="block")`) for monotone or
 saturating ones, or where the per-sample cost must be the smallest
 possible. `result()` is the calibrated uncertainty, not `P` directly.
 For a static batch fit use [LSI](Methods-LSI) or [EAC](Methods-EAC); for

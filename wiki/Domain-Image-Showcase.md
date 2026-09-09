@@ -24,7 +24,7 @@ moves to the weak machine.
   (`max(16, ceil(8 * span) + 16)`, capped at `n - 2` and `n / 4`);
   `dtfit.image.coverage` is recorded per station beside it and marks the
   rows where that order cannot represent the model.
-- **`LSIFilter`** -- the streaming tracker and its `DriftDetector`, in a
+- **`ImageFilter(basis="legendre")`** -- the streaming tracker and its `DriftDetector`, in a
   detection configuration and a tracking configuration.
 - **the image and the samples on the wire** -- a length-prefixed JSON
   header and a float64 payload: block images from the Pi to the PC, raw
@@ -343,7 +343,7 @@ is regenerated in the documentation pass.
 ### The other direction: the PC replays, the Pi tracks
 
 From `leg5_replay.csv` and `leg5_track_*.csv`: raw samples at a requested
-rate, the Pi filtering them one at a time with `LSIFilter` and sending its
+rate, the Pi filtering them one at a time with `ImageFilter(basis="legendre")` and sending its
 block images back over the same socket. The sustained rate is the largest
 requested rate at which neither side drops a chunk, and `flags_match` says
 whether the flags the Pi raised over the wire are the flags the same

@@ -22,7 +22,7 @@ def test_readme_batch_and_estimator(series):
     import dtfit as dt
 
     x, y = series
-    result = dt.fit_eac(x, y, "a*atan(w*x)", "x")
+    result = dt.fit("a*atan(w*x)", dt.Original(x, y), "x", basis="block")
     assert set(result.params) == {"a", "w"}
 
     from dtfit.sklearn import NonlineRegressor
@@ -36,7 +36,8 @@ def test_readme_streaming():
     import dtfit as dt
 
     t = np.linspace(0, 20, 600)
-    flt = dt.EACFilter("A*sin(w*t)", "t", p0=[1.0, 1.0], window_size=50)
+    flt = dt.ImageFilter("A*sin(w*t)", "t", p0=[1.0, 1.0], window_size=50,
+        basis="block")
     for ti, yi in zip(t, 2.0 * np.sin(1.5 * t)):
         flt.partial_fit(ti, yi)
     assert set(flt.params_) == {"A", "w"}
@@ -78,7 +79,8 @@ def test_readme_uncertainty_and_serialization():
     rng = np.random.default_rng(1)
     x = np.linspace(0.1, 3, 200)
     y = 2.0 * np.exp(0.5 * x) + rng.normal(0, 0.05, x.size)
-    r = dt.fit_lsi(x, y, "a*exp(b*x)", "x", p0=[1, 1])
+    r = dt.fit("a*exp(b*x)", dt.Original(x, y), "x",
+        basis="legendre", p0=[1, 1])
     assert set(r.params) == {"a", "b"}
     r.stderr()
     r.confidence_intervals(0.95)
@@ -89,13 +91,13 @@ def test_readme_uncertainty_and_serialization():
 
 
 def test_readme_diagnostics():
-    from dtfit import fit_lsi
+    from dtfit import fit, Original
     from dtfit.diagnostics import fit_report, residual_diagnostics
 
     rng = np.random.default_rng(2)
     x = np.linspace(0.1, 3, 200)
     y = 2.0 * np.exp(0.5 * x) + rng.normal(0, 0.05, x.size)
-    r = fit_lsi(x, y, "a*exp(b*x)", "x", p0=[1, 1])
+    r = fit("a*exp(b*x)", Original(x, y), "x", basis="legendre", p0=[1, 1])
     rep = fit_report(r, x, y)
     assert {"rmse", "r2", "aic", "bic"} <= set(rep)
     residual_diagnostics(r, x, y)

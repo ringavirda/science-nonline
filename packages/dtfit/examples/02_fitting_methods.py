@@ -16,7 +16,7 @@ Run headless:   python examples/02_fitting_methods.py
 
 import numpy as np
 
-from dtfit import fit_lsi, fit_eac
+from dtfit import fit, Original
 from dtfit.image import fft_frequency_seed
 from dtfit.reference import find_degree, fit_dsb
 
@@ -25,7 +25,8 @@ def lsi_basic(rng) -> None:
     x = np.linspace(0, 4, 300)
     y = 0.5 + 2.0 * np.exp(0.5 * x) + rng.normal(0, 0.2, x.size)
     # k_star sets the Legendre spectral order matched against the data.
-    res = fit_lsi(x, y, "a0 + a1*exp(a2*x)", "x", k_star=6)
+    res = fit("a0 + a1*exp(a2*x)", Original(x, y), "x",
+        basis="legendre", order=6)
     print("== LSI: offset + exponential ==")
     print("params:", {k: round(v, 4) for k, v in res.params.items()})
 
@@ -38,7 +39,13 @@ def lsi_oscillatory(rng) -> None:
     y = 2.0 * np.sin(1.7 * x + 0.5) + rng.normal(0, 0.10, x.size)
     print("\n== LSI oscillatory recipe: A*sin(w*x + p) ==")
     print("FFT frequency seed:", round(fft_frequency_seed(x, y), 4))
-    res = fit_lsi(x, y, "A*sin(w*x + p)", "x", freq_param="w")
+    res = fit(
+        "A*sin(w*x + p)",
+        Original(x, y),
+        "x",
+        basis="legendre",
+        freq_param="w",
+    )
     print("params:", {k: round(v, 3) for k, v in res.params.items()})
 
 
@@ -50,7 +57,7 @@ def eac_robust(rng) -> None:
     y = 3.0 * np.arctan(1.5 * x) + rng.normal(0, 0.1, x.size)  # a=3, w=1.5
     idx = rng.choice(x.size, 12, replace=False)
     y[idx] += rng.normal(0, 3.0, 12)                     # scattered outliers
-    res = fit_eac(x, y, "a*atan(w*x)", "x", robust=True)
+    res = fit("a*atan(w*x)", Original(x, y), "x", basis="block", robust=True)
     print("\n== EAC robust (robust=True) ==")
     print("truth a=3.0 w=1.5 ->",
           {k: round(v, 3) for k, v in res.params.items()})
@@ -61,7 +68,7 @@ def eac_transient(rng) -> None:
     # well without any window-placement tuning.
     x = np.linspace(0, 6, 300)
     y = 5.0 * x * np.exp(-1.2 * x) + rng.normal(0, 0.03, x.size)
-    res = fit_eac(x, y, "a*x*exp(-b*x)", "x")
+    res = fit("a*x*exp(-b*x)", Original(x, y), "x", basis="block")
     print("\n== EAC block preset on a transient peak ==")
     print("params:", {k: round(v, 3) for k, v in res.params.items()})
 

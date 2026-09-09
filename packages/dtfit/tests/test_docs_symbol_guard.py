@@ -38,7 +38,8 @@ GROUP1 = re.compile(
 # (the char before the name there is not "dtfit.").
 _CORE_NAMES = (
     "PartitionedLSI|PartitionedEAC|PartitionedBatchLSI|fit_lsi_batched|"
-    "project_spectra|FilterBank|FusedChiSquareDetector|fit_dsb"
+    "project_spectra|FilterBank|FusedChiSquareDetector|fit_dsb|"
+    "fit_lsi|fit_eac|LSIFilter|EACFilter"
 )
 GROUP2 = re.compile(
     r"\bdtfit\.(?:%s)\b" % _CORE_NAMES

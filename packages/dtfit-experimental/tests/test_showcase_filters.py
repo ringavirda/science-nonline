@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from dtfit.streaming import LSIFilter
+from dtfit.streaming import ImageFilter
 from dtfit_experimental.experiments.domains.image_showcase import (
     filters, isd, ngl,
 )
@@ -148,9 +148,9 @@ def test_reachable_events_matches_the_detectors_real_test_schedule():
     number, so a schedule change in the detector or in WARMUP is caught
     here rather than only in the recall numbers downstream."""
     cfg = filters.NGL_CONFIGS["detection"]
-    filt = LSIFilter(cfg.expr, "t", order=cfg.order,
+    filt = ImageFilter(cfg.expr, "t", order=cfg.order,
                       window_size=cfg.window, adaptive_window=cfg.adaptive,
-                      p0=[4781.83, 0.0])
+                      p0=[4781.83, 0.0], basis="legendre")
     calls: list[int] = []
     real_update = filt.detector.update
     k = [0]
@@ -178,9 +178,9 @@ def test_reachable_events_matches_the_detectors_real_test_schedule():
 
 def test_reachable_events_matches_the_post_flag_test_schedule():
     cfg = filters.NGL_CONFIGS["detection"]
-    filt = LSIFilter(cfg.expr, "t", order=cfg.order,
+    filt = ImageFilter(cfg.expr, "t", order=cfg.order,
                       window_size=cfg.window, adaptive_window=cfg.adaptive,
-                      p0=[4781.83, 0.0])
+                      p0=[4781.83, 0.0], basis="legendre")
     calls: list[int] = []
     real_update = filt.detector.update
     k = [0]

@@ -70,14 +70,14 @@ other sample sets).
 ### Online drift tracking
 
 When the parameters *change over time*, a single batch fit can only report one
-compromised value. dtfit's streaming filters (`EACFilter` / `LSIFilter`) update
+compromised value. dtfit's streaming filters (`ImageFilter(basis="block")` / `ImageFilter(basis="legendre")`) update
 recursively with `partial_fit`, tracking the drift sample-by-sample at O(1) cost
 per step.
 
 - True amplitude drifts **1.0 -> 3.0** over 600 samples of `A(t)*sin(t)`.
 - A single `scipy.curve_fit` gives one value `A = 1.99` (the average) --
   RMSE **0.52** against the drifting truth.
-- The streaming `EACFilter` tracks it online, RMSE **0.11** (final estimate
+- The streaming `ImageFilter(basis="block")` tracks it online, RMSE **0.11** (final estimate
   `A = 2.93`, truth 3.00).
 - `curve_fit` has no online / `partial_fit` mode: tracking drift means re-fitting
   the whole growing window every step.

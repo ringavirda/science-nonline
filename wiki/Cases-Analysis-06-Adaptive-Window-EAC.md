@@ -1,7 +1,7 @@
 # #6 -- Adaptive / multi-resolution EAC windows
 
 > **Status (2026-09):** retired. Window placement by curvature left with
-> the image core: `fit_eac` places `n_windows` equal windows and the
+> the image core: `fit(basis="block")` places `n_windows` equal windows and the
 > estimate is the projection on them. Equal windows at the same count
 > matched it in the image-core measurements, and it was retired.
 
@@ -15,7 +15,7 @@ curvature-weighted placement -- so resolution concentrates where the signal
 actually changes, instead of being spread uniformly.
 
 ```
-fit_eac(t, y, "K*(1-exp(-a*x))", "x", p0=[1.0, 1.0])
+fit("K*(1-exp(-a*x))", Original(t, y), "x", basis="block", p0=[1.0, 1.0])
 ```
 
 ## Measured result

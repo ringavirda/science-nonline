@@ -40,21 +40,21 @@ re-export shim, so the dependency only ever points one way.
 
 | adaptation | in `dtfit` as |
 |---|---|
-| the LSI oscillatory recipe | `fit_lsi(oscillatory=..., freq_param=...)`, `fft_frequency_seed` |
+| the LSI oscillatory recipe | `fit(oscillatory=..., freq_param=..., basis="legendre")`, `fft_frequency_seed` |
 | fused multi-axis fault detection | `FusedChiSquareDetector` |
-| #3 overlapping-window ensemble | retired -- the robust image (`fit_eac(robust=True)`) |
+| #3 overlapping-window ensemble | retired -- the robust image (`fit(robust=True, basis="block")`) |
 
 The map-reduce estimators (`PartitionedLSI`, `PartitionedEAC`) and the
 GEMM-batched projection (`fit_lsi_batched`, `project_spectra`,
 `PartitionedBatchLSI`) live in `dtfit_experimental.scale`, covered by
 `ImageStream` and its channel axis; the curvature-adaptive windows are
-retired, `fit_eac` places equal windows.
+retired, `fit(basis="block")` places equal windows.
 
 **Still experimental** (the three adaptations below): `fit_lsi_basis`,
 `fit_joint`, `boosted_fit`. The inverse-covariance **`InformationFilter`** (an
 information-form fusion primitive) also lives in this tier -- it was **moved out of
 stable `dtfit`** because it is exercised by no domain study and shares no code with
-the covariance-form `EACFilter` / `LSIFilter`, so it has not cleared the
+the covariance-form `ImageFilter(basis="block")` / `ImageFilter(basis="legendre")`, so it has not cleared the
 >=2-domain promotion gate (`from dtfit_experimental import InformationFilter`).
 
 ---
@@ -84,7 +84,7 @@ family and the same diagonal least-squares match holds.
 
 ### #3 -- Overlapping-window ensemble -- **retired**
 
-Retired: the robust image (`fit_eac(robust=True)`) covers the same
+Retired: the robust image (`fit(robust=True, basis="block")`) covers the same
 contamination at a twelfth of the cost and a pooled median recovery error of
 0.008 against the ensemble's 0.065 (five families, 4 percent of samples
 replaced by 8-sigma spikes, six draws).
@@ -155,7 +155,7 @@ adaptation earns promotion. The six domains and their honest headline results:
 | **Forecasting** | LSI, EAC, Fourier-LSI, boosting, the auto-merged pipeline -- on 12 series x 2 horizons -- vs random walk, seasonal-naive, drift, poly-extrap, Holt-Winters, Theta, (S)ARIMA, MLP, LSTM | dtfit wins where the series has real *extrapolable nonlinear structure*; trails the general learners on near-random-walk / irregular series (and says so) |
 | **Parameter estimation** | LSI, EAC, adaptive-EAC, ensemble, joint, the merged selector -- across 15+ nonlinear model families, noise/outlier/sparse/short/multi-channel regimes, real recovery -- vs NLLS, robust NLLS, MLP, Gaussian process | with the **shape-matched variant**, dtfit's integral estimators **tie the NLLS gold standard** across the families; pointwise NLLS keeps a slight edge only on the heavy-tailed Lorentzian |
 | **Big-data processing** | GEMM batch, fused streaming, distributed merge, streaming filter -- multi-channel panels + a real 321-channel set -- exactness, memory/throughput scaling, numerical stability, mergeability, online cost -- vs per-channel NLLS, vectorized poly lstsq, SGD `partial_fit`, RLS | the additive projection is exact across batch/streaming/distributed routes and scales with bounded memory; trades peak throughput for that bounded memory |
-| **Embedded control** | EACFilter, LSIFilter, FilterBank + fused chi^2 detector -- 4 plant shapes, robustness profile, multi-axis fault detection, sub-KiB footprint, real streaming -- vs EKF, RLS, constant-accel Kalman, sliding-window refit | the *integral* measurement wins under outliers/dropouts at fixed O(1)/sample cost; online fault detection is SNR-limited (and reported as such) |
+| **Embedded control** | ImageFilter(basis="block"), ImageFilter(basis="legendre"), FilterBank + fused chi^2 detector -- 4 plant shapes, robustness profile, multi-axis fault detection, sub-KiB footprint, real streaming -- vs EKF, RLS, constant-accel Kalman, sliding-window refit | the *integral* measurement wins under outliers/dropouts at fixed O(1)/sample cost; online fault detection is SNR-limited (and reported as such) |
 | **Real-time GPS/inertial** | streaming LSI/EAC with external regressors + a full-IMU strapdown fused *inside* the LSI filter + fused NIS/CUSUM maneuver detector -- 9-DOF maneuvering-target rig, dropouts/multipath, plus well-known-trajectory benchmarks and a hardware rig (`dtfit-hardware`) -- vs constant-accel Kalman and the gyro-aided coordinated-turn EKF | the integral trackers match/beat the constant-accel Kalman and hold up in benign (static/pedestrian) regimes, but structurally **trail the CT-EKF on aggressive maneuvers**; the coast/glitch/on-MCU results de-risk the embedded paper |
 | **Stochastic series** | the stochastic tier (`fit_stochastic` / `StochasticModel` / `StochasticFilter`) recovering long-memory Hurst, AR(1) reversion, GARCH persistence, stochastic-cycle period and trend+cycle from a process's *functionals* -- vs the standard estimator for each (aggregated-variance/GPH, ACF-exp, GARCH-QMLE, ...) | dtfit recovers the **regime and its parameters** with a single coherent estimator->forecast->generator API; it cannot out-forecast a martingale and a dedicated MLE (GARCH-QMLE) stays a touch sharper on the raw parameter (reported per possibility as VIABLE / MARGINAL / NOT VIABLE) |
 

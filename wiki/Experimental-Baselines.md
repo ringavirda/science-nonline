@@ -183,8 +183,8 @@ numbers in `experiments/06_benchmark_ltsf`, which is the fair way to cite them.)
 
 ## 3. Online / streaming baselines (the real-time foils)
 
-These ingest one sample at a time -- the fair competitors for `EACFilter` /
-`LSIFilter`, which also run online.
+These ingest one sample at a time -- the fair competitors for `ImageFilter(basis="block")` /
+`ImageFilter(basis="legendre")`, which also run online.
 
 ### Extended Kalman Filter for parameters (`EKFParam`)
 **What:** the textbook method for **online nonlinear parameter estimation**.

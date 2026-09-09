@@ -11,8 +11,7 @@ from .analytics import (
 from .transfer import assemble, legendre_transfer, block_transfer
 from .stream import ImageStream
 from .fit import (
-    fit, order_for, coverage, osc_order, fft_frequency_seed, fit_lsi,
-    fit_eac,
+    fit, order_for, coverage, osc_order, fft_frequency_seed,
 )
 from .parallel import FittingProblem, fit_many
 
@@ -43,8 +42,6 @@ __all__ = [
     "coverage",
     "osc_order",
     "fft_frequency_seed",
-    "fit_lsi",
-    "fit_eac",
     "FittingProblem",
     "fit_many",
 ]

@@ -16,7 +16,7 @@ import warnings
 import numpy as np
 import pytest
 
-from dtfit import fit_lsi, fit_eac
+from dtfit import fit, Original
 from accuracy.scenarios import SCENARIOS, NOISE_LEVELS
 from accuracy.harness import (
     ordered_params,
@@ -71,8 +71,10 @@ def test_recovery_matrix(scn, noise):
 
 
 _METHODS = {
-    "lsi": lambda x, y, e, v, p0: fit_lsi(x, y, e, v, p0=p0),
-    "eac": lambda x, y, e, v, p0: fit_eac(x, y, e, v, p0=p0),
+    "lsi": lambda x, y, e, v, p0: fit(e, Original(x, y), v,
+        basis="legendre", p0=p0),
+    "eac": lambda x, y, e, v, p0: fit(e, Original(x, y), v,
+        basis="block", p0=p0),
 }
 _RUN_CASES = [(s, m) for s in SCENARIOS for m in _METHODS]
 _RUN_IDS = [f"{s.name}-{m}" for s, m in _RUN_CASES]

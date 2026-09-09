@@ -40,7 +40,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from dtfit.streaming import EACFilter, LSIFilter
+from dtfit.streaming import ImageFilter
 
 
 @dataclass
@@ -184,18 +184,18 @@ def evaluate(res: dict, sc: Scenario) -> dict:
     }
 
 
-def make_eac(sc: Scenario) -> EACFilter:
+def make_eac(sc: Scenario) -> ImageFilter:
     # order=2 gives the block image two windows, its fairest config.
-    return EACFilter(
+    return ImageFilter(
         sc.expr, sc.var, p0=sc.p0, window_size=50,
-        q_diag=sc.q_diag, order=2,
+        q_diag=sc.q_diag, order=2, basis="block",
     )
 
 
-def make_lsi(sc: Scenario) -> LSIFilter:
-    return LSIFilter(
+def make_lsi(sc: Scenario) -> ImageFilter:
+    return ImageFilter(
         sc.expr, sc.var, p0=sc.p0, window_size=50, order=5,
-        q_diag=sc.q_diag,
+        q_diag=sc.q_diag, basis="legendre",
     )
 
 

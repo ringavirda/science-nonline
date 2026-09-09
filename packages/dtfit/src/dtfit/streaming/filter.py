@@ -601,31 +601,3 @@ class ImageFilter:
                    param_names=list(self.model.names), **options)
 
 
-class LSIFilter(ImageFilter):
-    """:class:`ImageFilter` in the Legendre basis: the streaming twin of
-    :func:`dtfit.fit_lsi`. Takes every ``ImageFilter`` keyword except
-    ``basis``."""
-
-    _fixed_basis = "legendre"
-
-    def __init__(self, model: Any, var: str, **kwargs: Any) -> None:
-        if "basis" in kwargs:
-            raise TypeError(
-                "LSIFilter fixes basis='legendre'; use ImageFilter to choose"
-            )
-        super().__init__(model, var, **kwargs)
-
-
-class EACFilter(ImageFilter):
-    """:class:`ImageFilter` in the block basis: the streaming twin of
-    :func:`dtfit.fit_eac`; ``order`` is the window count. Takes every
-    ``ImageFilter`` keyword except ``basis``."""
-
-    _fixed_basis = "block"
-
-    def __init__(self, model: Any, var: str, **kwargs: Any) -> None:
-        if "basis" in kwargs:
-            raise TypeError(
-                "EACFilter fixes basis='block'; use ImageFilter to choose"
-            )
-        super().__init__(model, var, **kwargs)

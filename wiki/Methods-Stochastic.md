@@ -153,7 +153,7 @@ in closed form using dtfit's own principles in streaming form:
   equal-areas criterion** -- for an exp-decaying ACF the ratio of two consecutive
   equal-width area windows is `exp(-g h)`, which pins the decay rate `g` (hence the
   persistence `exp(-g)`) amplitude-free; the streaming form of
-  `fit_eac("exp(-g*k)")`. Only lags above the white-noise band `~2/sqrt(n_eff)` count
+  `fit("exp(-g*k)", basis="block")`. Only lags above the white-noise band `~2/sqrt(n_eff)` count
   as signal, so a fast-decay ACF's noisy tail does not trigger the integration;
 - the **cycle** from the AR(2) characteristic roots of the running autocovariances.
 
@@ -167,9 +167,9 @@ volatility, normalized by a frozen in-control gap variance) flags a structural b
 once per change, at a low false-alarm rate -- the streaming counterpart of the
 [`FusedChiSquareDetector`](API-Streaming#fused). Memory and per-sample cost are flat
 (independent of the stream length), matching the characteristics of
-[`EACFilter` / `LSIFilter`](Methods-Equal-Areas-Filter).
+[`ImageFilter(basis="block")` / `ImageFilter(basis="legendre")`](Methods-Equal-Areas-Filter).
 
 One API note: `StochasticFilter.partial_fit(xs)` ingests a **batch** of samples (a
 house-style alias for a loop over `update`), unlike the single-sample
-`partial_fit(t, y)` of [`EACFilter` / `LSIFilter`](Methods-Equal-Areas-Filter). Use
+`partial_fit(t, y)` of [`ImageFilter(basis="block")` / `ImageFilter(basis="legendre")`](Methods-Equal-Areas-Filter). Use
 `update(x)` for the true one-at-a-time path.

@@ -14,7 +14,7 @@ Source: [`packages/dtfit/examples/01_quickstart.py`](https://github.com/ringavir
 ```python
 import numpy as np
 
-from dtfit import Original, fit, fit_lsi
+from dtfit import Original, fit
 
 
 def main() -> None:
@@ -24,8 +24,8 @@ def main() -> None:
 
     # 1. A first fit. Everything in the expression except the variable "t" is a
     #    free parameter -- here a and b.
-    res = fit_lsi(x, y, "a*exp(b*t)", "t")
-    print("== fit_lsi: a*exp(b*t) ==")
+    res = fit("a*exp(b*t)", Original(x, y), "t", basis="legendre")
+    print("== fit(basis="legendre"): a*exp(b*t) ==")
     print(res.summary())
     print("params:", {k: round(v, 4) for k, v in res.params.items()})
     # The optimizer's verdict travels with the result: check it before trusting a
@@ -65,7 +65,7 @@ if __name__ == "__main__":
 ## Output (`python examples/01_quickstart.py`)
 
 ```text
-== fit_lsi: a*exp(b*t) ==
+== fit(basis="legendre"): a*exp(b*t) ==
 FittingResult: a*exp(b*t)
   a = 1.40773 +/- 0.00896
   b = 0.797487 +/- 0.00258

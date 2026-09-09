@@ -6,7 +6,7 @@
 > [`image/fit.py`](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit/src/dtfit/image/fit.py); the basis
 > machinery is in
 > [`image/bases.py`](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit/src/dtfit/image/bases.py).
-> Invoke via `fit_lsi(x, y, expr, var, ...)`, `fit(model, data,
+> Invoke via `fit(expr, Original(x, y), var, basis="legendre", ...)`, `fit(model, data,
 > basis="legendre")`, or `NonlineRegressor(..., basis="legendre")`.
 
 LSI is [`fit`](image.md#the-projected-estimator) in the Legendre image:
@@ -59,7 +59,7 @@ conditioned instead of amplifying noise the way a monomial fit would.
    direction of the Jacobian is unidentified and gets `inf` on its diagonal,
    `nan` off it.
 8. **Coverage**: `coverage(model, p0, image)` measures the truncation error
-   left at the chosen order; `fit`/`fit_lsi` raise a `UserWarning` above 2 %,
+   left at the chosen order; `fit`/`fit(basis="legendre")` raise a `UserWarning` above 2 %,
    meaning the image is too coarse to identify the model.
 
 ## The oscillatory recipe
@@ -149,7 +149,7 @@ signal-processing audience:
 - **Hermitian pseudo-inverse**, singular values below `1e-15` of the
   largest dropped, behind the basis coefficients `beta = G^+ S` and the
   image RSS identity.
-- **Coverage warning** -- `fit`/`fit_lsi` warn when the image's order leaves
+- **Coverage warning** -- `fit`/`fit(basis="legendre")` warn when the image's order leaves
   more than 2 % relative L2 truncation error in a parameter's sensitivity,
   rather than silently returning an unidentifiable fit.
 - **Non-finite guard** -- a model not finite at the (bounds-clipped) `p0`
@@ -217,7 +217,7 @@ image is built on the sample grid mapped to `[-1, 1]`, LSI carries no
 dynamic-range caveat: a wide or narrow domain is rescaled to `[-1, 1]`
 before any projection happens.
 
-For real-time/streaming use the [LSIFilter](https://github.com/ringavirda/science-nonline/wiki/Methods-Legendre-Filter) /
-[EACFilter](https://github.com/ringavirda/science-nonline/wiki/Methods-Equal-Areas-Filter); for a jump or regime change aligned
+For real-time/streaming use the [ImageFilter(basis="legendre")](https://github.com/ringavirda/science-nonline/wiki/Methods-Legendre-Filter) /
+[ImageFilter(basis="block")](https://github.com/ringavirda/science-nonline/wiki/Methods-Equal-Areas-Filter); for a jump or regime change aligned
 to a window edge, or at very high order, [EAC](eac.md); at scale
 (streams, blocks, many channels), [ImageStream](https://github.com/ringavirda/science-nonline/wiki/Methods-Scaling).

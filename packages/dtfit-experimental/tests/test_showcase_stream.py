@@ -40,7 +40,7 @@ def blocks(n_blocks=3, order=12):
 
 
 class CountingFilter:
-    """A stand-in for ``LSIFilter``: :func:`stream.track` needs only
+    """A stand-in for ``ImageFilter``: :func:`stream.track` needs only
     ``partial_fit``, ``drift_flag_`` and ``params_``, so the protocol test
     never depends on the filter lane."""
 

@@ -10,7 +10,7 @@ Run headless:   python examples/01_quickstart.py
 
 import numpy as np
 
-from dtfit import Original, fit, fit_lsi
+from dtfit import Original, fit
 
 
 def main() -> None:
@@ -20,7 +20,7 @@ def main() -> None:
 
     # 1. A first fit. Everything in the expression except the variable "t" is a
     #    free parameter -- here a and b.
-    res = fit_lsi(x, y, "a*exp(b*t)", "t")
+    res = fit("a*exp(b*t)", Original(x, y), "t", basis="legendre")
     print("== fit_lsi: a*exp(b*t) ==")
     print(res.summary())
     print("params:", {k: round(v, 4) for k, v in res.params.items()})

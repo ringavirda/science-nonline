@@ -29,7 +29,7 @@ Each novel EAC/LSI adaptation, scored across the experiments that exercised it (
 | #3 overlapping-window ensemble | noise/outliers: partial, gps: n/a | Not part of `dtfit` -- a study finding that whole-window rejection helps a contiguous burst; the shipped robustness tool for that case is the robust image (`robust=True`), best on the Legendre basis for a burst. |
 | #4 joint multi-channel fit (fit_joint) | control: loss, gps: n/a | Keep experimental -- on cleanly-identifiable channels the dedicated solver already wins; value is parameter parsimony / consistency, not accuracy. |
 | #5 stage-wise boosting (boosted_fit) | forecasting: win, ltsf: n/a | Keep experimental -- a clear win on CO2 (trend+season) but only one domain demonstrated; promote if a second domain confirms. |
-| #6 adaptive-window EAC | transient fit: win | Retired -- `fit_eac` places equal windows. |
+| #6 adaptive-window EAC | transient fit: win | Retired -- `fit(basis="block")` places equal windows. |
 
 ## Promotion outcome
 
@@ -41,7 +41,7 @@ Each novel EAC/LSI adaptation, scored across the experiments that exercised it (
   `FusedChiSquareDetector`) live in `dtfit_experimental.streaming`. The
   overlapping-window ensemble (#3) was a study finding and did not ship --
   the robust image (`robust=True`) is the shipped robustness tool.
-  Adaptive-window EAC (#6) is not a core keyword; `fit_eac` places equal
+  Adaptive-window EAC (#6) is not a core keyword; `fit(basis="block")` places equal
   windows.
 
 - **Kept experimental in `dtfit_experimental`:** #2 (`fit_lsi_basis`), #4 (`fit_joint`) and #5 (`boosted_fit`), with the honest per-experiment findings above -- they have not (yet) cleared the >=2-domain promotion gate.

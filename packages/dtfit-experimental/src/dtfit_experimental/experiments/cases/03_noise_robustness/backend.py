@@ -91,12 +91,12 @@ def noise_sweep(fam, noises, n=120, seeds=4):
             x, y, clean = _noisy(fam, n, noise, s)
             try:
                 acc["EAC"].append(r2_clean(clean, np.asarray(
-                    dt.fit_eac(x, y, fam["expr"], fam["var"], p0=fam["p0"]).model(x))))
+                    dt.fit(fam["expr"], dt.Original(x, y), fam["var"], basis="block", p0=fam["p0"]).model(x))))
             except Exception:
                 acc["EAC"].append(np.nan)
             try:
                 acc["LSI"].append(r2_clean(clean, np.asarray(
-                    dt.fit_lsi(x, y, fam["expr"], fam["var"], p0=fam["p0"]).model(x))))
+                    dt.fit(fam["expr"], dt.Original(x, y), fam["var"], basis="legendre", p0=fam["p0"]).model(x))))
             except Exception:
                 acc["LSI"].append(np.nan)
             try:
@@ -127,12 +127,12 @@ def outlier_sweep(fam, fracs, n=120, seeds=5):
             x, y, clean = _noisy(fam, n, 0.05, s, outlier_frac=fr)
             try:
                 acc["EAC"].append(r2_clean(clean, np.asarray(
-                    dt.fit_eac(x, y, fam["expr"], fam["var"], p0=fam["p0"]).model(x))))
+                    dt.fit(fam["expr"], dt.Original(x, y), fam["var"], basis="block", p0=fam["p0"]).model(x))))
             except Exception:
                 acc["EAC"].append(np.nan)
             try:
                 acc["LSI"].append(r2_clean(clean, np.asarray(
-                    dt.fit_lsi(x, y, fam["expr"], fam["var"], p0=fam["p0"]).model(x))))
+                    dt.fit(fam["expr"], dt.Original(x, y), fam["var"], basis="legendre", p0=fam["p0"]).model(x))))
             except Exception:
                 acc["LSI"].append(np.nan)
             try:
@@ -141,9 +141,7 @@ def outlier_sweep(fam, fracs, n=120, seeds=5):
             except Exception:
                 acc["curve_fit"].append(np.nan)
             try:
-                r = dt.fit_eac(x, y, fam["expr"], fam["var"], p0=fam["p0"],
-                               robust=True,
-                               bounds=[(-10, 10)] * len(fam["p0"]))
+                r = dt.fit(fam["expr"], dt.Original(x, y), fam["var"], basis="block", p0=fam["p0"], robust=True, bounds=[(-10, 10)] * len(fam["p0"]))
                 acc["EAC-robust"].append(r2_clean(clean, np.asarray(r.model(x))))
             except Exception:
                 acc["EAC-robust"].append(np.nan)

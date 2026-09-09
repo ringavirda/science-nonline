@@ -44,21 +44,21 @@ Core dependencies are NumPy, SciPy, SymPy and scikit-learn. pandas is an
 
 ## Quickstart
 
-### A batch fit with `fit_lsi`
+### A batch fit with `fit(basis="legendre")`
 
 Fit an exponential `y = a * exp(b * x)` to noisy data and read the recovered
 parameters, their standard errors and the fit quality straight off the result:
 
 ```python
 import numpy as np
-from dtfit import fit_lsi
+from dtfit import fit, Original
 
 rng = np.random.default_rng(0)
 x = np.linspace(0.0, 2.0, 80)
 y_true = 1.5 * np.exp(0.8 * x)
 y = y_true + rng.normal(0.0, 0.05 * y_true.std(), x.size)
 
-fit = fit_lsi(x, y, "a*exp(b*x)", "x")
+fit = fit("a*exp(b*x)", Original(x, y), "x", basis="legendre")
 
 print(fit.params)      # {'a': 1.4991, 'b': 0.8027}
 print(fit.stderr())    # {'a': 0.0112, 'b': 0.0048}
@@ -86,12 +86,12 @@ The model can be a SymPy string, a `sympy.Expr`, or a plain Python callable
 
 ```python
 import numpy as np
-from dtfit import fit_lsi
+from dtfit import fit, Original
 
 def model(x, a, b):
     return a * np.exp(b * x)
 
-fit = fit_lsi(x, y, model, "x")
+fit = fit(model, Original(x, y), "x", basis="legendre")
 print(fit.params)      # {'a': 1.4991, 'b': 0.8027}
 ```
 
@@ -100,7 +100,7 @@ but `predict` (including error bands) still works via the numeric evaluator.
 
 ### One image, several models
 
-`fit_lsi` and `fit_eac` build the image for you; imaging the data once with
+`fit(basis="legendre")` and `fit(basis="block")` build the image for you; imaging the data once with
 `Original.image` and calling `.fit()` on it directly reuses that same
 projection for as many candidate models as you like:
 
@@ -120,7 +120,7 @@ exactly like `scipy.optimize.curve_fit`. Here we down-weight a noisier tail:
 
 ```python
 sigma = np.where(x > 1.0, 1.0, 0.1)   # trust the first half 10x more
-fit = fit_lsi(x, y, "a*exp(b*x)", "x", sigma=sigma)
+fit = fit("a*exp(b*x)", Original(x, y, sigma=sigma), "x", basis="legendre")
 print(fit.params)      # {'a': 1.4855, 'b': 0.8131}
 ```
 
@@ -154,12 +154,12 @@ and predictions come back aligned to the input index:
 
 ```python
 import pandas as pd
-from dtfit import fit_lsi
+from dtfit import fit, Original
 
 idx = pd.date_range("2021-01-01", periods=x.size, freq="D")
 xs, ys = pd.Series(x, index=idx), pd.Series(y, index=idx)
 
-fit = fit_lsi(xs, ys, "a*exp(b*x)", "x")
+fit = fit("a*exp(b*x)", Original(xs, ys), "x", basis="legendre")
 pred = fit.predict(xs)          # -> pandas Series, indexed by idx
 print(type(pred).__name__)      # 'Series'
 print(pred.head(3))
@@ -194,10 +194,10 @@ print(fc.to_series().head(3))   # future dates -> forecast values
 
 | Tier | You do this | Entry points |
 |---|---|---|
-| **Methods** | choose the engine | `fit`, `fit_lsi`, `fit_eac` |
+| **Methods** | choose the engine | `fit`, `fit(basis="legendre")`, `fit(basis="block")` |
 | **Estimator** | plug into scikit-learn | `NonlineRegressor` |
 | **Models** | pick a shape, not a formula | `models`, `Model`, `suggest_models`, `register` |
 | **High-level** | let dtfit choose | `fit(..., basis="auto")`, `auto_forecast` |
-| **Streaming** | track live parameters | `ImageFilter`, `LSIFilter`, `EACFilter` |
+| **Streaming** | track live parameters | `ImageFilter`, `ImageFilter(basis="legendre")`, `ImageFilter(basis="block")` |
 | **Scale** | run big / many | `ImageStream`, `fit_many` |
 | **Stochastic** | genuinely random series | `fit_stochastic`, `StochasticModel` |

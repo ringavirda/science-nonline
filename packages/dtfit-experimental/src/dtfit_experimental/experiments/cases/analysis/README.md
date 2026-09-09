@@ -19,7 +19,7 @@ each one across all the experiments that exercised it.
 | [03_overlapping_ensemble.md](03_overlapping_ensemble.md) | #3 overlapping-window ensemble | Study finding, not shipped -- the robust image (`robust=True`) is the shipped robustness tool |
 | [04_joint_multichannel.md](04_joint_multichannel.md) | #4 joint shared-parameter fit | Experimental -- loss where tested |
 | [05_stagewise_boosting.md](05_stagewise_boosting.md) | #5 stage-wise boosting | Experimental -- win, 1 domain |
-| [06_adaptive_window_eac.md](06_adaptive_window_eac.md) | #6 adaptive-window EAC | Study finding, not shipped -- `fit_eac` places equal windows |
+| [06_adaptive_window_eac.md](06_adaptive_window_eac.md) | #6 adaptive-window EAC | Study finding, not shipped -- `fit(basis="block")` places equal windows |
 
 ## Performance & parallelization optimizations
 

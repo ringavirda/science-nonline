@@ -282,8 +282,8 @@ one sample at a time instead of re-fitting the window from scratch.
 
 The "surprise" is **not** a single-point error (which would be noisy). It's the
 mismatch between the data's and the model's projection over the whole sliding
-window -- an area sum (`EACFilter`, the block basis) or a Legendre spectrum
-(`LSIFilter`) -- so the streaming filter inherits EAC/LSI's
+window -- an area sum (`ImageFilter(basis="block")`, the block basis) or a Legendre spectrum
+(`ImageFilter(basis="legendre")`) -- so the streaming filter inherits EAC/LSI's
 integrate-don't-differentiate robustness.
 
 ### How it works (per sample)
@@ -323,10 +323,10 @@ it re-adapts to the new regime instead of stubbornly averaging across the break.
 - `noise_var` -- how much you trust each measurement; left alone it is
   estimated online from the window residual.
 - `cusum_k` / `cusum_h` -- drift-detector sensitivity vs false-alarm rate.
-- **`LSIFilter` vs `EACFilter`:** `ImageFilter` with `basis="legendre"` or
-  `basis="block"` fixed. Use `LSIFilter` (spectrum measurement) for
+- **`ImageFilter(basis="legendre")` vs `ImageFilter(basis="block")`:** `ImageFilter` with `basis="legendre"` or
+  `basis="block"` fixed. Use `ImageFilter(basis="legendre")` (spectrum measurement) for
   **oscillatory** plants, where the shape and frequency come straight out
-  of the spectrum; use the cheaper `EACFilter` for monotone/saturating
+  of the spectrum; use the cheaper `ImageFilter(basis="block")` for monotone/saturating
   signals, or for the smallest embedded footprint.
 - `result()` -- the current window as a batch fit, with a calibrated
   covariance; `P` itself is a gain state, not a confidence measure.
@@ -368,7 +368,7 @@ low-frequency spectrum that follows a power law, a damped cosine. So you fit the
    `ar1_reversion` the autocovariance, `garch_persistence` the autocovariance
    of the squares, `cycle_period` the same autocovariance for a damped-cosine
    fit, `decompose_trend_cycle` the trend and the seasonal DFT.
-3. Fit that functional with `fit_lsi` / `fit_eac` -- the same machinery as any
+3. Fit that functional with `fit(basis="legendre")` / `fit(basis="block")` -- the same machinery as any
    curve, because its shape is a decaying exponential / power law / damped cosine.
 4. Read the stochastic parameter off the fitted shape: the AR(1) mean-reversion
    `phi` from the ACF decay, the long-memory **Hurst** exponent from the
@@ -414,7 +414,7 @@ to forecast to generator.
 
 ## Side-by-side summary
 
-| | DSB | LSI | EAC | EACFilter / LSIFilter |
+| | DSB | LSI | EAC | ImageFilter(basis="block") / ImageFilter(basis="legendre") |
 |---|---|---|---|---|
 | **Matches** | exact fingerprint | image (least-squares, Legendre) | image (block, window sums) | area / spectrum, one sample at a time |
 | **Mode** | symbolic, offline | batch, offline | batch, offline | streaming, online |

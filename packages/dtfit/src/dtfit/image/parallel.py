@@ -1,6 +1,6 @@
 """Parallel batch fitting: fan many independent fits across CPU cores.
 
-The batch methods (:func:`dtfit.fit_lsi`, :func:`dtfit.fit_eac`) are pure per
+The batch fits (:func:`dtfit.fit` in either basis) are pure per
 problem, since fitting one signal never touches another. Real workloads
 already arrive in that shape (the channels of a multivariate series, the
 cells of a noise/size sweep, the chunks of a large stream, the axes of a
@@ -29,14 +29,42 @@ from typing import Any, Callable, Sequence, cast
 import numpy as np
 from joblib import Parallel, delayed
 
-from dtfit.image.fit import fit_eac, fit_lsi
+from dtfit.image.fit import fit, Original
 from dtfit.types import FittingResult
 
 __all__ = ["FittingProblem", "fit_many"]
 
+def _fit_in(basis: str, x: np.ndarray, y: np.ndarray, expr: str,
+            var: str, **kw: Any) -> FittingResult:
+    """One projected fit from a problem's arrays, with the pre-image
+    keyword names (``k_star``, ``n_windows``, ``sigma``, ``nan_policy``)
+    still accepted so stored problems keep working."""
+    order = kw.pop("order", None)
+    if "k_star" in kw:
+        v = kw.pop("k_star")
+        order = None if v in (None, "auto") else v
+    if "n_windows" in kw:
+        order = kw.pop("n_windows")
+    original = Original(
+        x, y, sigma=kw.pop("sigma", None),
+        nan_policy=kw.pop("nan_policy", "raise"),
+    )
+    return fit(expr, original, var, basis=basis, order=order, **kw)
+
+
+def _fit_legendre(x, y, expr, var, **kw):
+    return _fit_in("legendre", x, y, expr, var, **kw)
+
+
+def _fit_block(x, y, expr, var, **kw):
+    return _fit_in("block", x, y, expr, var, **kw)
+
+
 _FITTERS: dict[str, Callable[..., FittingResult]] = {
-    "lsi": fit_lsi,
-    "eac": fit_eac,
+    "lsi": _fit_legendre,
+    "legendre": _fit_legendre,
+    "eac": _fit_block,
+    "block": _fit_block,
 }
 
 
@@ -48,7 +76,8 @@ class FittingProblem:
         x, y: Observed samples for this problem.
         expr: Model expression string, e.g. ``"a*exp(b*t)"``.
         var: Main variable name in ``expr``.
-        method: ``"lsi"`` or ``"eac"``.
+        method: ``"legendre"`` or ``"block"`` (``"lsi"`` and ``"eac"``
+            are accepted as the older spellings).
         kwargs: Method-specific keyword arguments (e.g. ``p0``, ``bounds``).
         label: Optional tag carried through to the result (channel name, etc.).
     """

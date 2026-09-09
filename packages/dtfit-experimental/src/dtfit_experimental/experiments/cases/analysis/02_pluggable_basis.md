@@ -11,7 +11,7 @@ Tested in: [Forecasting (4)](../04_realworld_forecasting/04_realworld_forecastin
 
 ## What it is
 
-Stock `fit_lsi` hard-codes the Legendre basis. This adaptation generalises the
+Stock `fit(basis="legendre")` hard-codes the Legendre basis. This adaptation generalises the
 spectral match to any orthogonal basis `∈ {legendre, chebyshev, fourier,
 laguerre}`. The motivation is sound on paper:
 

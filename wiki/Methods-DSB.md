@@ -148,7 +148,7 @@ path: `sympy.nonlinsolve` has unbounded, input-dependent latency, and the
 symbolic solve is sensitive to the polynomial pre-fit's high-order coefficients
 (which are ill-conditioned under noise). The numeric successors --
 [LSI](Methods-LSI) (batch accuracy) and [EAC](Methods-EAC) / the
-[EACFilter](Methods-Equal-Areas-Filter) (robust / real-time) -- are the
+[ImageFilter(basis="block")](Methods-Equal-Areas-Filter) (robust / real-time) -- are the
 deployable methods.
 
 ### Generic-model support and limitations

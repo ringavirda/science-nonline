@@ -8,7 +8,7 @@ from typing import Any
 
 import numpy as np
 
-from dtfit.image import fit_lsi, fit_eac
+from dtfit.image import fit
 from dtfit.image.original import Original
 from .image import SecondOrderImage
 
@@ -90,7 +90,7 @@ def _loglog_slope(lx: np.ndarray, ly: np.ndarray, *, method: str) -> float:
     the Legendre preset, ``"ols"`` with ``numpy.polyfit``."""
     if method == "ols":
         return float(np.polyfit(lx, ly, 1)[0])
-    r = fit_lsi(lx, ly, "a + b*m", "m", k_star=1)
+    r = fit("a + b*m", Original(lx, ly), "m", basis="legendre", order=1)
     return float(r.coeffs[1])
 
 
@@ -121,8 +121,14 @@ def hurst_aggvar(data: Any, *, method: str = "lsi") -> dict[str, float]:
     if method == "eac":
         b0 = float(np.clip(
             np.polyfit(np.log(ms), np.log(vs), 1)[0], -1.999, -1e-9))
-        r = fit_eac(ms, vs, "c*m**b", "m", p0=[b0, float(vs[0])],
-                    bounds=([-2.0, 1e-12], [0.0, 1e6]))
+        r = fit(
+            "c*m**b",
+            Original(ms, vs),
+            "m",
+            basis="block",
+            p0=[b0, float(vs[0])],
+            bounds=([-2.0, 1e-12], [0.0, 1e6]),
+        )
         slope = float(r.coeffs[0])
     else:
         slope = _loglog_slope(np.log(ms), np.log(vs), method=method)
@@ -202,8 +208,9 @@ def ar1_reversion(
         nlags = int(min(nlags, img.lag))
         keff = _decay_lags(rho[: nlags + 1], img.n, 5)
         k = np.arange(1, keff + 1, dtype=float)
-        fitter = fit_eac if method == "eac" else fit_lsi
-        r = fitter(k, rho[1: keff + 1], "exp(-g*k)", "k", p0=[0.1])
+        basis = "block" if method == "eac" else "legendre"
+        r = fit("exp(-g*k)", Original(k, rho[1: keff + 1]), "k",
+                basis=basis, p0=[0.1])
         phi = float(np.exp(-abs(float(r.coeffs[0]))))
     tau = -1.0 / np.log(phi) if 0.0 < phi < 1.0 else np.inf
     half = float(tau * np.log(2.0)) if np.isfinite(tau) else np.inf
@@ -349,9 +356,9 @@ def _persistence(
     nlags = int(min(nlags, rho.size - 1))
     keff = _decay_lags(rho[: nlags + 1], n, 3)
     k = np.arange(1, keff + 1, dtype=float)
-    fitter = fit_eac if method == "eac" else fit_lsi
-    r = fitter(k, rho[1: keff + 1], "A*exp(-g*k)", "k",
-               p0=[float(rho[1]) or 0.2, 0.1])
+    basis = "block" if method == "eac" else "legendre"
+    r = fit("A*exp(-g*k)", Original(k, rho[1: keff + 1]), "k",
+            basis=basis, p0=[float(rho[1]) or 0.2, 0.1])
     p = float(np.clip(np.exp(-abs(float(r.coeffs[1]))), 0.0, 0.9999))
     return {"persistence": p,
             "tau": float(-1.0 / np.log(p)) if 0.0 < p < 1.0 else float("inf")}
@@ -380,8 +387,14 @@ def cycle_period(data: Any, *, nlags: int | None = None) -> dict[str, float]:
     g = img.acov()
     rho = g[: nlags + 1] / g[0] if g[0] > 0 else g[: nlags + 1]
     k = np.arange(nlags + 1, dtype=float)
-    r = fit_lsi(k, rho, "A*exp(-g*k)*cos(w*k + p)", "k",
-                freq_param="w", p0=[1.0, 0.05, 0.0, np.pi / 2.0])
+    r = fit(
+        "A*exp(-g*k)*cos(w*k + p)",
+        Original(k, rho),
+        "k",
+        basis="legendre",
+        freq_param="w",
+        p0=[1.0, 0.05, 0.0, np.pi / 2.0],
+    )
     gg, w = float(r.coeffs[1]), abs(float(r.coeffs[3]))
     period = (2.0 * np.pi / w if w > (2.0 * np.pi / (2.0 * nlags))
               else float("inf"))

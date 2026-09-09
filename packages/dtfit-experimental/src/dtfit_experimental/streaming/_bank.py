@@ -23,7 +23,7 @@ from typing import Any, Sequence
 import numpy as np
 from scipy.stats import chi2
 
-from dtfit.streaming import EACFilter
+from dtfit.streaming import ImageFilter
 
 __all__ = ["FilterBank", "FusedChiSquareDetector"]
 
@@ -94,7 +94,7 @@ class FilterBank:
         var: str,
         n_streams: int,
         *,
-        filter_cls: type = EACFilter,
+        filter_cls: type = ImageFilter,
         **kwargs: Any,
     ) -> "FilterBank":
         """Build ``n_streams`` identically-configured filters for one model.
@@ -102,8 +102,7 @@ class FilterBank:
         Args:
             expr, var: Model expression and main variable (per stream).
             n_streams: Number of parallel streams (filters) in the bank.
-            filter_cls: ``EACFilter`` (default) or
-                ``LSIFilter``.
+            filter_cls: ``ImageFilter``; pass ``basis=`` in ``kwargs``.
             **kwargs: Forwarded to each filter's constructor.
         """
         bank = cls([filter_cls(expr, var, **kwargs) for _ in range(n_streams)])
@@ -307,12 +306,12 @@ class FusedChiSquareDetector:
     model) into one fused ``chi2(sum n_coef)`` statistic. Passing the
     ``alpha``-level threshold flags a synchronized multi-axis fault that
     any single stream's innovation would miss, and optionally re-arms
-    each filter via :meth:`~dtfit.EACFilter.inflate`.
+    each filter via :meth:`~dtfit.ImageFilter.inflate`.
 
     Usage::
 
         bank = FilterBank.from_model(model, "t", n_axes,
-                                     filter_cls=LSIFilter, ...)
+                                     basis="legendre", ...)
         det = bank.fused_detector(alpha=1e-4, inflate=4.0)
         for i, (t, y) in enumerate(stream):     # y is length-K
             if det.update(t, y):

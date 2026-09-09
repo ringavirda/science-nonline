@@ -10,7 +10,7 @@
 import numpy as np
 import pytest
 
-from dtfit import fit_lsi, fit_eac
+from dtfit import fit, Original
 from dtfit.image import fft_frequency_seed
 
 
@@ -18,7 +18,8 @@ def test_eac_recovers_transient():
     rng = np.random.default_rng(4)
     t = np.linspace(0, 3, 400)
     y = 2.0 * (1 - np.exp(-3.0 * t)) + rng.normal(0, 0.02, t.size)
-    r = fit_eac(t, y, "K*(1-exp(-a*x))", "x", p0=[1.0, 1.0])
+    r = fit("K*(1-exp(-a*x))", Original(t, y), "x",
+        basis="block", p0=[1.0, 1.0])
     assert abs(r.coeffs[0] - 2.0) < 0.2 and abs(r.coeffs[1] - 3.0) < 0.5
 
 
@@ -34,13 +35,21 @@ def test_oscillatory_recipe_recovers_sine_where_default_fails():
     w_true = 1.5
     y = 2.0 * np.sin(w_true * t) + rng.normal(0, 0.05, t.size)
 
-    osc = fit_lsi(t, y, "A*sin(w*x)", "x", freq_param="w", p0=[1.0, 1.0])
+    osc = fit(
+        "A*sin(w*x)",
+        Original(t, y),
+        "x",
+        basis="legendre",
+        freq_param="w",
+        p0=[1.0, 1.0],
+    )
     names = ["A", "w"]  # sympy sorts the parameters, so A comes before w
     w_osc = osc.coeffs[names.index("w")]
     assert abs(w_osc - w_true) < 0.1
 
     # without the recipe the default order at p0 need not resolve the cycle
-    plain = fit_lsi(t, y, "A*sin(w*x)", "x", p0=[1.0, 1.0])
+    plain = fit("A*sin(w*x)", Original(t, y), "x",
+        basis="legendre", p0=[1.0, 1.0])
     w_plain = plain.coeffs[names.index("w")]
     # Both fits can land within 1 percent on some platforms; the recipe
     # must then not be worse than the default beyond that level.
@@ -54,12 +63,24 @@ def test_oscillatory_flag_raises_order_under_bounds():
     # the bounds path: a global search brackets the frequency; the recipe
     # still helps
     with pytest.warns(UserWarning, match="differential-evolution"):
-        r = fit_lsi(t, y, "A*sin(w*x)", "x", oscillatory=True,
-                    bounds=[(0.1, 5.0), (0.5, 4.0)])
+        r = fit(
+            "A*sin(w*x)",
+            Original(t, y),
+            "x",
+            basis="legendre",
+            oscillatory=True,
+            bounds=[(0.1, 5.0), (0.5, 4.0)],
+        )
     assert abs(r.coeffs[1] - 2.0) < 0.2
 
 
 def test_freq_param_unknown_raises():
     t = np.linspace(0, 1, 20)
     with pytest.raises(ValueError, match="freq_param"):
-        fit_lsi(t, np.sin(t), "A*sin(w*x)", "x", freq_param="omega")
+        fit(
+            "A*sin(w*x)",
+            Original(t, np.sin(t)),
+            "x",
+            basis="legendre",
+            freq_param="omega",
+        )

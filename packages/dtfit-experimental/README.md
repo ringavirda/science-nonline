@@ -27,7 +27,7 @@ not from here. Already promoted: the LSI **oscillatory recipe**
 (`dtfit.fit_lsi(oscillatory=..., freq_param=...)` +
 `dtfit.image.fft_frequency_seed`); the filter bank and the fused chi-square
 detector live here in `dtfit_experimental.streaming`.
-Adaptive-window EAC (#6, curvature-placed windows) is retired; `fit_eac`
+Adaptive-window EAC (#6, curvature-placed windows) is retired; `fit(basis="block")`
 places equal windows. The map-reduce estimators (`PartitionedLSI` /
 `PartitionedEAC`, #1) and the GEMM-batched `fit_lsi_batched` /
 `project_spectra` / `PartitionedBatchLSI` live here in

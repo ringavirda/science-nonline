@@ -25,7 +25,7 @@ from dtfit._pandas import (
     extend_index,
     to_1d_array,
 )
-from dtfit.image.fit import fit_lsi, fft_frequency_seed
+from dtfit.image.fit import fft_frequency_seed, fit, Original
 
 
 def _rmse(a: np.ndarray, b: np.ndarray) -> float:
@@ -78,16 +78,26 @@ def _fit_model(model: str, t: np.ndarray, y: np.ndarray, t_all: np.ndarray,
         # lets the global search latch onto a near-vertical step: a degenerate
         # fit that matches in sample and then extrapolates to overflow.
         k_seed = 6.0 / xspan
-        r = fit_lsi(
-            t, y, "L/(1 + exp(-k*(x - x0)))", "x",
+        r = fit(
+            "L/(1 + exp(-k*(x - x0)))",
+            Original(t, y),
+            "x",
+            basis="legendre",
+            order=6,
             p0={"L": ylast * 1.5, "k": k_seed, "x0": float(t[0]) + xspan},
             bounds={"L": (ylast * 0.8, ylast * 12.0),
                     "k": (0.2 * k_seed, 8.0 * k_seed),
                     "x0": (float(t[0]), float(t[0]) + 2.5 * xspan)},
-            k_star=6)
+        )
         return np.asarray(r.model(t_all), dtype=float), r
     if model == "linear":
-        r = fit_lsi(t, y, "a0 + a1*x", "x", p0=_poly_seed(y, t, 1))
+        r = fit(
+            "a0 + a1*x",
+            Original(t, y),
+            "x",
+            basis="legendre",
+            p0=_poly_seed(y, t, 1),
+        )
         return np.asarray(r.model(t_all), dtype=float), r
     if model == "linear_seasonal":
         s = _poly_seed(y, t, 1)
@@ -98,16 +108,26 @@ def _fit_model(model: str, t: np.ndarray, y: np.ndarray, t_all: np.ndarray,
             w0 = fft_frequency_seed(t, y) or (2 * np.pi / xspan)
         amp = float(np.std(y)) + 1e-3
         expr = "a0 + a1*x + A*sin(w*x + p)"
-        r = fit_lsi(
-            t, y, expr, "x",
+        r = fit(
+            expr,
+            Original(t, y),
+            "x",
+            basis="legendre",
             p0={"a0": s[0], "a1": s[1], "A": amp, "p": 0.0, "w": w0},
             bounds={"a0": (-1e6, 1e6), "a1": (-1e6, 1e6),
                     "A": (1e-3, 5 * amp), "p": (-np.pi, np.pi),
                     "w": (0.7 * w0, 1.3 * w0)},
-            freq_param="w")
+            freq_param="w",
+        )
         return np.asarray(r.model(t_all), dtype=float), r
     # poly (quadratic level)
-    r = fit_lsi(t, y, "a0 + a1*x + a2*x**2", "x", p0=_poly_seed(y, t, 2))
+    r = fit(
+        "a0 + a1*x + a2*x**2",
+        Original(t, y),
+        "x",
+        basis="legendre",
+        p0=_poly_seed(y, t, 2),
+    )
     return np.asarray(r.model(t_all), dtype=float), r
 
 

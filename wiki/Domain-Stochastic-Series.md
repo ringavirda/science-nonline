@@ -20,7 +20,7 @@ against the established toolkit -- reported honestly.
 
 - **estimators** -- `hurst_spectral` / `hurst_aggvar` (long memory), `ar1_reversion`
   (mean reversion), `garch_persistence` (volatility), `cycle_period` (stochastic
-  cycle), `decompose_trend_cycle`; each feeds a functional to `fit_lsi` / `fit_eac`.
+  cycle), `decompose_trend_cycle`; each feeds a functional to `fit(basis="legendre")` / `fit(basis="block")`.
 - **`fit_stochastic`** -- the merged solution: a gated, ordered pipeline (an ADF
   unit-root gate off the image's autocovariances -> deterministic mean -> whiten ->
   long memory on the innovations -> mean reversion -> volatility) returning a
@@ -38,7 +38,7 @@ against the established toolkit -- reported honestly.
 - **Mean reversion:** the lag-1 autocorrelation; **cycle:** the FFT periodogram peak.
 - **Forecasting:** random walk, drift, AR(1), ARIMA(2,1,2), Holt-Winters ETS, Theta,
   seasonal-naive.
-- **Streaming reference:** dtfit's own `LSIFilter` (per-sample cost), the bar for the
+- **Streaming reference:** dtfit's own `ImageFilter(basis="legendre")` (per-sample cost), the bar for the
   filter's flat-memory / bounded-speed characteristics.
 
 ## What it shows
@@ -50,7 +50,7 @@ against the established toolkit -- reported honestly.
 | **forecasting is honest** | beats the random walk where structure extrapolates -- **CO2 (trend+seasonal) ~0.15x, GDP (drift) ~0.41x, sunspots (cyclical) ~0.72x** -- and ties it on a near-martingale (FX level, T-bill rate); never loses badly (a rolling-origin holdout guard falls back to persistence) |
 | **reproduces the literature** | Nelson-Plosser's random-walk-with-drift US GDP, the ~11-year sunspot cycle, Mauna Loa CO2 as trend+season, Hurst's Nile at `H ~ 0.9` (agreeing with R/S and DFA), near-unit-root interest rates, FX as a random walk with volatility clustering (long memory in `\|returns\|`) |
 | **it generates, not just summarizes** | the fit -> simulate -> refit round-trip recovers the regime **100%** across every process type |
-| **streaming works** | online phi tracking MAE ~0.03, structural-break detection 100% at ~78-step latency, ~0.7 false alarms / 3000 samples; flat memory and ~11 us/sample (faster than `LSIFilter`'s ~36 us) |
+| **streaming works** | online phi tracking MAE ~0.03, structural-break detection 100% at ~78-step latency, ~0.7 false alarms / 3000 samples; flat memory and ~11 us/sample (faster than `ImageFilter(basis="legendre")`'s ~36 us) |
 
 ## The honest ceiling
 

@@ -37,10 +37,22 @@ def _errs(name):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             pe = param_err(scn, names,
-                           dt.fit_eac(x, y, m.expr, m.var, p0=p0).coeffs)
+                           dt.fit(
+                               m.expr,
+                               dt.Original(x, y),
+                               m.var,
+                               basis="block",
+                               p0=p0,
+                           ).coeffs)
             ee = param_err(scn, names,
-                           dt.fit_eac(x, y, m.expr, m.var, p0=p0,
-                                      robust=True).coeffs)
+                           dt.fit(
+                               m.expr,
+                               dt.Original(x, y),
+                               m.var,
+                               basis="block",
+                               p0=p0,
+                               robust=True,
+                           ).coeffs)
         plain.append(pe)
         rob.append(ee)
     return np.array(plain), np.array(rob)

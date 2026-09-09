@@ -4,7 +4,7 @@ displays."""
 import numpy as np
 import pytest
 
-from dtfit import fit_lsi
+from dtfit import fit, Original
 from dtfit.diagnostics import fit_report, residual_diagnostics
 
 
@@ -13,7 +13,7 @@ def exp_fit():
     rng = np.random.default_rng(0)
     t = np.linspace(0, 3, 300)
     y = 2.0 * np.exp(0.8 * t) + rng.normal(0, 0.05, t.size)
-    r = fit_lsi(t, y, "a*exp(b*t)", "t", p0=[1.0, 1.0])
+    r = fit("a*exp(b*t)", Original(t, y), "t", basis="legendre", p0=[1.0, 1.0])
     return r, t, y
 
 
@@ -35,7 +35,8 @@ def test_fit_report_aic_bic_prefer_correct_model(exp_fit):
     r, t, y = exp_fit
     good = fit_report(r, t, y)
     # an underspecified linear model scores worse (higher) on AIC/BIC
-    bad = fit_report(fit_lsi(t, y, "a0 + a1*t", "t", p0=[1.0, 1.0]), t, y)
+    bad = fit_report(fit("a0 + a1*t", Original(t, y), "t",
+        basis="legendre", p0=[1.0, 1.0]), t, y)
     assert good["aic"] < bad["aic"] and good["bic"] < bad["bic"]
 
 

@@ -20,8 +20,7 @@ signatures, arguments, return types, and behavior.
 - Fitters take an `Original` or an `Image` directly, or plain 1-D NumPy arrays
   `x`, `y` (from which the batch fitters build an `Original`), and a model as
   a **sympy-style expression string**, a `sympy.Expr`, or a callable `f(x,
-  *params)`, plus the name of its main variable, e.g. `fit_lsi(x, y,
-  "a*exp(b*x)", "x")`.
+  *params)`, plus the name of its main variable, e.g. `fit("a*exp(b*x)", Original(x, y), "x", basis="legendre")`.
 - **Parameters are the free symbols** of the expression (everything except the
   variable), and results are ordered by **sorted parameter name** -- a stable
   layout used everywhere. So `"a*exp(b*x)"` has parameters `[a, b]` in that order.
@@ -33,21 +32,21 @@ signatures, arguments, return types, and behavior.
 
 | Area | Names | Page |
 |---|---|---|
-| **Batch fitting** | `fit`, `Original`, `Image`, `order_for`, `fit_lsi`, `fit_eac` (`coverage`, `fft_frequency_seed` and the `Image` analytics `noise_sigma` / `effective_order` / `decay` / `test_equal` / `test_structure` in `dtfit.image`) | [fitting.md](API-Fitting) |
+| **Batch fitting** | `fit`, `Original`, `Image`, `order_for`, `fit(basis="legendre")`, `fit(basis="block")` (`coverage`, `fft_frequency_seed` and the `Image` analytics `noise_sigma` / `effective_order` / `decay` / `test_equal` / `test_structure` in `dtfit.image`) | [fitting.md](API-Fitting) |
 | **Result type** | `FittingResult` | [types.md](API-Types) |
 | **sklearn estimator** | `NonlineRegressor` (in `dtfit.sklearn`) | [estimator.md](API-Estimator) |
 | **Forecasting** | `auto_forecast`, `ForecastResult` | [auto.md](API-Auto) |
 | **Model framework** | `models`, `suggest_models` (`Model`, `register`, `unregister` and the catalog families in `dtfit.models`) | [models.md](API-Models) |
 | **Reference method** | `fit_dsb`, `find_degree` (in `dtfit.reference`) | [dsb.md](Methods-DSB) |
 | **Stochastic series** | `stochastic` (`fit_stochastic`, `StochasticModel`, `StochasticFilter`, `SecondOrderImage`, `SecondOrderStream` and the estimators in `dtfit.stochastic`; `Stochastic` in `dtfit.models`) | [stochastic.md](API-Stochastic) |
-| **Streaming / online** | `ImageFilter`, `LSIFilter`, `EACFilter` (`DriftDetector` in `dtfit.streaming`) | [streaming.md](API-Streaming) |
+| **Streaming / online** | `ImageFilter`, `ImageFilter(basis="legendre")`, `ImageFilter(basis="block")` (`DriftDetector` in `dtfit.streaming`) | [streaming.md](API-Streaming) |
 | **Streams and scale** | `ImageStream`, `fit_many` (`FittingProblem`, `assemble`, `legendre_transfer`, `block_transfer` in `dtfit.image`) | [scaling.md](API-Scaling) |
 | **Diagnostics** | `diagnostics` (`fit_report`, `residual_diagnostics`, `residual_stats`, `FitDisplay`, `ResidualsDisplay`) | [diagnostics.md](API-Diagnostics) |
 | **Logging** | `enable_logging`, `logger` (in `dtfit.log`) | [below](#logging) |
 
 The top level holds fifteen names and three subpackages: `Original`, `Image`,
-`ImageStream`, `ImageFilter`, `fit`, `fit_lsi`, `fit_eac`, `LSIFilter`,
-`EACFilter`, `order_for`, `fit_many`, `suggest_models`, `auto_forecast`,
+`ImageStream`, `ImageFilter`, `fit`, `fit(basis="legendre")`, `fit(basis="block")`, `ImageFilter(basis="legendre")`,
+`ImageFilter(basis="block")`, `order_for`, `fit_many`, `suggest_models`, `auto_forecast`,
 `FittingResult`, `ForecastResult`, plus `models`, `stochastic` and
 `diagnostics`. Everything else is reached through its own module, as the
 import map below shows.
@@ -56,8 +55,7 @@ import map below shows.
 
 ```python
 # batch fitting
-from dtfit import (fit, Original, Image, order_for, fit_lsi, fit_eac,
-                   FittingResult)
+from dtfit import fit, Original, Image, order_for, FittingResult
 from dtfit.image import coverage, fft_frequency_seed
 
 # forecasting
@@ -83,7 +81,7 @@ from dtfit.stochastic import (
 from dtfit.sklearn import NonlineRegressor
 
 # streaming
-from dtfit import ImageFilter, LSIFilter, EACFilter
+from dtfit import ImageFilter
 from dtfit.streaming import DriftDetector
 
 # streams and scale
@@ -128,13 +126,13 @@ enable logging.
 
 ```python
 import numpy as np
-from dtfit import fit_lsi
+from dtfit import fit, Original
 from dtfit.diagnostics import fit_report
 
 x = np.linspace(0, 4, 200)
 y = 0.5 + 2.0 * np.exp(0.5 * x) + np.random.default_rng(0).normal(0, 0.2, x.size)
 
-res = fit_lsi(x, y, "a0 + a1*exp(a2*x)", "x", k_star=6)
+res = fit("a0 + a1*exp(a2*x)", Original(x, y), "x", basis="legendre", order=6)
 print(res.summary())                 # parameters +/- standard errors
 print(fit_report(res, x, y)["r2"])   # goodness of fit
 y_hat = res.predict(x)               # evaluate the fitted model

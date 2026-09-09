@@ -18,7 +18,7 @@ from typing import Any, Sequence
 
 import numpy as np
 
-from dtfit.streaming import LSIFilter
+from dtfit.streaming import ImageFilter
 
 from . import isd, ngl
 
@@ -272,7 +272,7 @@ def run_filter(
     }
     if config.q_diag is not None:
         kwargs["q_diag"] = list(config.q_diag)
-    filt = LSIFilter(config.expr, "t", **kwargs)
+    filt = ImageFilter(config.expr, "t", **kwargs, basis="legendre")
     flags: list[float] = []
     flag_indices: list[int] = []
     started = time.perf_counter()

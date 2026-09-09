@@ -1,7 +1,7 @@
 """Guards for the embedded-LSI codegen: the facts the on-silicon numbers
 rest on, neither needing a board.
 
-* The float64 golden reproduces the real ``dtfit.streaming.LSIFilter`` on a
+* The float64 golden reproduces the real ``dtfit.ImageFilter`` on a
   uniform, drift-free window, making the firmware the dtfit method and not
   a lookalike there; the level-shift and jitter cases below bound how far
   the two part ways once drift fires or the grid stops being uniform.
@@ -25,7 +25,7 @@ from dtfit_hardware.tools import embed_lsi
 
 
 def test_golden_matches_real_lsi_filter() -> None:
-    # The embedded float64 golden tracks the configured LSIFilter to 1e-6 in
+    # The embedded float64 golden tracks the configured ImageFilter to 1e-6 in
     # every parameter on a uniform, drift-free window -- the regime the port
     # targets. See test_golden_diverges_under_level_shift and
     # test_golden_diverges_on_jittered_grid for what happens outside it.
@@ -33,7 +33,7 @@ def test_golden_matches_real_lsi_filter() -> None:
 
 
 def test_golden_diverges_under_level_shift() -> None:
-    # Outside cross_check's no-drift regime: LSIFilter's jump test fires
+    # Outside cross_check's no-drift regime: ImageFilter's jump test fires
     # (cusum_k=inf only disables the two CUSUM arms), the golden has no
     # model of it, and the two do not re-converge. Regression guard on the
     # gap's size, not a bound to shrink here.
@@ -41,7 +41,7 @@ def test_golden_diverges_under_level_shift() -> None:
 
 
 def test_golden_diverges_on_jittered_grid() -> None:
-    # tables() freezes B on a uniform grid; LSIFilter rebuilds it from the
+    # tables() freezes B on a uniform grid; ImageFilter rebuilds it from the
     # window's actual sample times. cross_check's fixed 0.1 s step cannot
     # see this. A 1% jitter, close to the sketches' millis()-gated 1 Hz
     # loop, already clears the 1e-6 bound by more than an order.
@@ -105,7 +105,7 @@ def test_shared_headers_are_in_sync_across_sketch_dirs() -> None:
 
 def test_no_block_image_firmware_is_shipped() -> None:
     # Ruling: the embedded tier ships the window (LSI) image only; the block
-    # (EAC) image stays host-side (EACFilter / ImageStream over logged
+    # (EAC) image stays host-side (block-basis ImageFilter / ImageStream over logged
     # fixes). This guards the scope from silently half-drifting into a
     # block firmware path with no board to validate it.
     fw = embed_lsi.FIRMWARE

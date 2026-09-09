@@ -29,7 +29,7 @@ from sklearn.model_selection import KFold, cross_val_score
 
 import dtfit as dt
 from dtfit.sklearn import NonlineRegressor
-from dtfit.streaming import EACFilter
+from dtfit.streaming import ImageFilter
 
 DATA_DIR = Path(__file__).resolve().parent / "data"
 
@@ -89,8 +89,8 @@ def experiment_covid() -> None:
 
     bounds = [(0.2, 5.0), (0.5, 4.0)]  # a, b  (growth)
     results = {}
-    res_lsi = dt.fit_lsi(t_tr, ys_tr, "a*exp(b*x)", "x", bounds=bounds)
-    res_eac = dt.fit_eac(t_tr, ys_tr, "a*exp(b*x)", "x", p0=[ys_tr[0], 1.0])
+    res_lsi = dt.fit("a*exp(b*x)", dt.Original(t_tr, ys_tr), "x", basis="legendre", bounds=bounds)
+    res_eac = dt.fit("a*exp(b*x)", dt.Original(t_tr, ys_tr), "x", basis="block", p0=[ys_tr[0], 1.0])
     results["LSI"] = res_lsi.coeffs
     results["EAC"] = res_eac.coeffs
 
@@ -136,8 +136,8 @@ def experiment_currency_batch() -> None:
     print(f"window: {dates[0]} .. {dates[-1]}  ({rate[0]:.3f} -> {rate[-1]:.3f} UAH/USD)")
 
     bounds = [(0.5, 3.0), (0.1, 4.0)]
-    res_lsi = dt.fit_lsi(t, rs, "a*exp(b*x)", "x", bounds=bounds)
-    res_eac = dt.fit_eac(t, rs, "a*exp(b*x)", "x", p0=[1.0, 1.0])
+    res_lsi = dt.fit("a*exp(b*x)", dt.Original(t, rs), "x", basis="legendre", bounds=bounds)
+    res_eac = dt.fit("a*exp(b*x)", dt.Original(t, rs), "x", basis="block", p0=[1.0, 1.0])
 
     print(f"\n{'method':18s} {'a':>10s} {'b':>10s}   {'fit over full window':^34s}")
     for name, coeffs in [("LSI", res_lsi.coeffs), ("EAC", res_eac.coeffs)]:
@@ -159,9 +159,9 @@ def experiment_currency_streaming() -> None:
     r0 = rate[0]
     rs = rate / r0  # scale to O(1)
 
-    flt = EACFilter(
+    flt = ImageFilter(
         "a*exp(b*x)", "x", p0=[1.0, 0.0],
-        window_size=window, q_diag=[5e-3, 5e-3],
+        window_size=window, q_diag=[5e-3, 5e-3], basis="block",
     )
 
     track, truth = [], []

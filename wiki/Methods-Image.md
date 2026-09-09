@@ -116,7 +116,7 @@ parameters.
 ## The robust image
 
 Robustness is a property of the image, decided once at construction, before
-any model is involved. `robust=True` on `fit`, `fit_lsi`, `fit_eac` or
+any model is involved. `robust=True` on `fit`, `fit(basis="legendre")`, `fit(basis="block")` or
 `Original.image` runs Huber IRLS on the basis regression `y ~ Phi beta`:
 each of five passes fits the regression at the current weights, reads its
 residual and MAD scale `s`, and sets sample `i`'s weight to `w_i * min(1, c s
@@ -307,8 +307,8 @@ robust image recovers `a=1.006, b=0.798`, close to the outlier-free fit.
 [LSI](Methods-LSI) and [EAC](Methods-EAC) are presets of `fit` in the
 Legendre and block bases; [ImageStream](Methods-Scaling) runs the same `S`
 and `G` update over a running accumulator, block images or channel batches;
-the [EACFilter](Methods-Equal-Areas-Filter) and
-[LSIFilter](Methods-Legendre-Filter) read a window image each step; and the
+the [ImageFilter(basis="block")](Methods-Equal-Areas-Filter) and
+[ImageFilter(basis="legendre")](Methods-Legendre-Filter) read a window image each step; and the
 stochastic tier builds its own second-order image -- lagged sums, dyadic block
 sums and a fixed-grid DFT -- and fits the functionals it reads off that with
 the same LSI and EAC presets -- see

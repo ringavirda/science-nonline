@@ -38,7 +38,7 @@ from accuracy.harness import (  # noqa: E402
 )
 from accuracy.scenarios import SCENARIOS_BY_NAME  # noqa: E402
 
-from dtfit import EACFilter, ImageStream, fit  # noqa: E402
+from dtfit import ImageStream, fit, ImageFilter  # noqa: E402
 
 REPEATS = 7
 
@@ -154,7 +154,7 @@ def streaming_point() -> str:
     y = A_true * np.sin(t) + rng.normal(0.0, 0.05, n)
 
     # Online: track A(t) with a sliding-window EAC filter (w baked to 1.0).
-    flt = EACFilter("A*sin(t)", "t", p0=[1.0], window_size=40)
+    flt = ImageFilter("A*sin(t)", "t", p0=[1.0], window_size=40, basis="block")
     a_track = np.empty(n)
     for i in range(n):
         flt.partial_fit(t[i], y[i])

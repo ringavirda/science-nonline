@@ -44,7 +44,7 @@
 - [LSI](Methods-LSI)
 - [EAC](Methods-EAC)
 - [ImageFilter](Methods-Legendre-Filter)
-- [EACFilter](Methods-Equal-Areas-Filter)
+- [ImageFilter(basis="block")](Methods-Equal-Areas-Filter)
 - [Streams](Methods-Scaling)
 - [Auto](Methods-Auto)
 - [Stochastic](Methods-Stochastic)

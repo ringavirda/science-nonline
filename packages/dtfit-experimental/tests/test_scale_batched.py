@@ -98,7 +98,7 @@ def test_batched_matches_serial_fit_lsi(channels):
     batched = fit_lsi_batched(x, Y, "a*exp(b*t)", "t", order=6, p0=[1.0, 1.0])
     assert isinstance(batched, list)
     for i, r in enumerate(batched):
-        serial = dt.fit_lsi(x, Y[:, i], "a*exp(b*t)", "t", p0=[1.0, 1.0])
+        serial = dt.fit("a*exp(b*t)", dt.Original(x, Y[:, i]), "t", basis="legendre", p0=[1.0, 1.0])
         np.testing.assert_allclose(r.coeffs, serial.coeffs, rtol=0.05, atol=0.05)
 
 

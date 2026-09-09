@@ -5,7 +5,7 @@ import pytest
 from scipy.optimize import curve_fit
 
 from dtfit.image import (
-    Original, Image, fit, fit_lsi, order_for, coverage, fft_frequency_seed,
+    Original, Image, fit, order_for, coverage, fft_frequency_seed,
 )
 from dtfit.types import FittingResult
 
@@ -323,7 +323,7 @@ def test_default_order_and_coverage_warning():
     with pytest.warns(UserWarning, match="coverage"):
         fit(expr, Original(x, y), var, order=4, p0=pt)
     with pytest.warns(UserWarning, match="coverage"):
-        fit_lsi(x, y, expr, var, k_star=4, p0=pt)
+        fit(expr, Original(x, y), var, basis="legendre", order=4, p0=pt)
 
 
 def test_oscillatory_recipe_seeds_frequency():

@@ -8,14 +8,37 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from dtfit import fit_eac, fit_lsi, LSIFilter, EACFilter, suggest_models
+from dtfit import suggest_models, fit, Original, ImageFilter
 from dtfit.stochastic import fit_stochastic
 
 
-@pytest.mark.parametrize("Filter", [LSIFilter, EACFilter])
-def test_streaming_covariance_stays_symmetric_and_psd(Filter):
+
+def _in(basis, x, y, expr, var=None, **kw):
+    order = kw.pop("order", None)
+    if "k_star" in kw:
+        v = kw.pop("k_star")
+        order = None if v in (None, "auto") else v
+    if "n_windows" in kw:
+        order = kw.pop("n_windows")
+    original = Original(
+        x, y, sigma=kw.pop("sigma", None),
+        nan_policy=kw.pop("nan_policy", "raise"),
+    )
+    return fit(expr, original, var, basis=basis, order=order, **kw)
+
+
+def _lsi(x, y, expr, var=None, **kw):
+    return _in("legendre", x, y, expr, var, **kw)
+
+
+def _eac(x, y, expr, var=None, **kw):
+    return _in("block", x, y, expr, var, **kw)
+
+
+@pytest.mark.parametrize("basis", ["legendre", "block"])
+def test_streaming_covariance_stays_symmetric_and_psd(basis):
     rng = np.random.default_rng(0)
-    flt = Filter.tracking("a + b*t + c*t**2", "t")
+    flt = ImageFilter.tracking("a + b*t + c*t**2", "t", basis=basis)
     for t in np.linspace(0, 20, 2500):
         flt.partial_fit(float(t), 1.0 + 0.3 * t - 0.05 * t**2
                         + 0.02 * rng.standard_normal())
@@ -35,12 +58,12 @@ def test_svd_covariance_finite_for_illconditioned_model():
     x = np.linspace(0.0, 0.05, 60)
     noise = 1e-4 * np.random.default_rng(1).standard_normal(x.size)
     y = 2.0 * np.exp(0.1 * x) + noise
-    r = fit_lsi(x, y, "a*exp(b*t)", "t")
+    r = fit("a*exp(b*t)", Original(x, y), "t", basis="legendre")
     if r.cov is not None:
         assert np.all(np.isfinite(r.cov)), "ill-cond covariance not finite"
 
 
-@pytest.mark.parametrize("fitter", [fit_eac, fit_lsi])
+@pytest.mark.parametrize("fitter", [_eac, _lsi])
 def test_robust_image_beats_plain_under_dense_outliers(fitter):
     """``robust=True`` builds the image with per-sample Huber weights from an
     IRLS regression on the basis. That is what survives outliers dense
@@ -66,7 +89,7 @@ def test_robust_image_beats_plain_under_dense_outliers(fitter):
     assert relerr(fitter(x, yc, "a*exp(b*t)", "t", robust=True)) < 0.05
 
 
-@pytest.mark.parametrize("fitter", [fit_lsi, fit_eac])
+@pytest.mark.parametrize("fitter", [_lsi, _eac])
 def test_wrong_length_p0_raises(fitter):
     x = np.linspace(0.1, 3.0, 60)
     y = 2.0 * np.exp(-0.4 * x)
@@ -99,7 +122,7 @@ def test_trend_seasonal_forecast_bands_do_not_fan_out():
         assert width[-1] <= 1.5 * width[0] + 1e-9, "bands fan out like a RW"
 
 
-@pytest.mark.parametrize("fitter", [fit_lsi, fit_eac])
+@pytest.mark.parametrize("fitter", [_lsi, _eac])
 def test_nan_policy_omit(fitter):
     x = np.linspace(0.2, 3.0, 200)
     y = 2.3 * np.exp(-0.7 * x)
@@ -111,8 +134,8 @@ def test_nan_policy_omit(fitter):
 
 
 def test_regressor_coast_rolls_model_forward():
-    f = LSIFilter("a + b*t + c*t**2 + k*acc", "t", regressors="acc",
-                  order=4, p0=[0.0, 0.5, 0.2, 1.0])
+    f = ImageFilter("a + b*t + c*t**2 + k*acc", "t", regressors="acc",
+                  order=4, p0=[0.0, 0.5, 0.2, 1.0], basis="legendre")
     rng = np.random.default_rng(0)
     for t in np.linspace(0, 5, 200):
         acc = float(np.sin(t))
@@ -136,7 +159,8 @@ def test_regressor_coast_rolls_model_forward():
 
 def test_coast_cov_grows_with_gap():
     rng = np.random.default_rng(0)
-    f = LSIFilter.tracking("a + b*t + c*t**2", "t", order=4)
+    f = ImageFilter.tracking("a + b*t + c*t**2", "t", order=4,
+                         basis="legendre")
     for t in np.linspace(0, 5, 120):
         noise = 0.01 * rng.standard_normal()
         f.partial_fit(float(t), 1.0 + 0.5 * t + 0.2 * t**2 + noise)

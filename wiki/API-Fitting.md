@@ -17,8 +17,8 @@ return a
 - [`Original`](#original) -- the sampled signal
 - [`Image`](#image) -- the basis projection of an `Original`
 - [`order_for`](#order_for), [`coverage`](#coverage) -- picking and checking the order
-- [`fit_lsi`](#fit_lsi) -- `fit` in the Legendre basis
-- [`fit_eac`](#fit_eac) -- `fit` in the block basis
+- [`fit(basis="legendre")`](#fit(basis="legendre")) -- `fit` in the Legendre basis
+- [`fit(basis="block")`](#fit(basis="block")) -- `fit` in the block basis
 - [`fit_dsb`](#fit_dsb) -- Differential Spectra Balance (the reference method, in `dtfit.reference`)
 - [`find_degree`](#find_degree) -- polynomial degree selection (DSB support, in `dtfit.reference`)
 - [`fft_frequency_seed`](#fft_frequency_seed) -- frequency seed for oscillatory fits
@@ -36,7 +36,7 @@ fit(model, data, var=None, *, basis="legendre", order=None, p0=None,
 ```
 
 Fit `model` to `data` by nonlinear least squares restricted to the span of a
-basis, on the data's image. `fit_lsi` and `fit_eac` are `fit` in the Legendre
+basis, on the data's image. `fit(basis="legendre")` and `fit(basis="block")` are `fit` in the Legendre
 and block bases respectively -- presets, not separate methods.
 
 **Arguments**
@@ -343,14 +343,11 @@ print(k, coverage("a0 + a1*exp(a2*x)", params, img, var="x"))
 
 ---
 
-<a name="fit_lsi"></a>
-## `fit_lsi`
+<a name="fit(basis="legendre")"></a>
+## `fit(basis="legendre")`
 
 ```python
-fit_lsi(data_x, data_y, expr, var=None, *, k_star=None, p0=None,
-        bounds=None, sigma=None, absolute_sigma=False, oscillatory=False,
-        freq_param=None, random_state=0, robust=False, solver_options=None,
-        nan_policy="raise", param_names=None, **legacy) -> FittingResult
+fit(expr, Original(data_x, data_y, sigma=None, nan_policy="raise"), *, basis="legendre", p0=None, bounds=None, absolute_sigma=False, oscillatory=False, freq_param=None, random_state=0, robust=False, solver_options=None, param_names=None, **legacy) -> FittingResult
 ```
 
 LSI: [`fit`](#fit) in the Legendre basis. `k_star` is the order; `None` or
@@ -399,22 +396,19 @@ behaves exactly as documented there.
 **Example**
 
 ```python
-from dtfit import fit_lsi
+from dtfit import fit, Original
 
-res = fit_lsi(x, y, "A*sin(w*x + p)", "x", freq_param="w")   # oscillatory recipe
+res = fit("A*sin(w*x + p)", Original(x, y), "x", basis="legendre", freq_param="w")   # oscillatory recipe
 print({k: round(v, 3) for k, v in res.params.items()})
 ```
 
 ---
 
-<a name="fit_eac"></a>
-## `fit_eac`
+<a name="fit(basis="block")"></a>
+## `fit(basis="block")`
 
 ```python
-fit_eac(data_x, data_y, expr, var=None, *, n_windows=None, p0=None,
-        bounds=None, sigma=None, absolute_sigma=False, robust=False,
-        loss="linear", solver_options=None, nan_policy="raise",
-        param_names=None, **legacy) -> FittingResult
+fit(expr, Original(data_x, data_y, sigma=None, nan_policy="raise"), *, basis="block", order=None, p0=None, bounds=None, absolute_sigma=False, robust=False, solver_options=None, param_names=None, **legacy) -> FittingResult
 ```
 
 EAC: [`fit`](#fit) in the block basis with `n_windows` windows (default four
@@ -459,9 +453,9 @@ here behaves exactly as documented there.
 **Example**
 
 ```python
-from dtfit import fit_eac
+from dtfit import fit, Original
 
-res = fit_eac(x, y, "a0 + a1*exp(a2*x)", "x", n_windows=16, robust=True)
+res = fit("a0 + a1*exp(a2*x)", Original(x, y), "x", basis="block", order=16, robust=True)
 ```
 
 ---
@@ -539,7 +533,7 @@ real FFT of the detrended signal, with the DC bin ignored, returned as
 when `x` already is one) and the least-squares straight line is removed, which
 is what lets a cycle riding on a trend be seen: the trend's own leakage
 otherwise owns the lowest non-zero bin and the peak lands there. This is the
-seed [`fit_lsi`](#fit_lsi)'s oscillatory recipe uses for `freq_param`; a
+seed [`fit(basis="legendre")`](#fit(basis="legendre"))'s oscillatory recipe uses for `freq_param`; a
 sinusoid's frequency can't be recovered without it.
 
 ```python

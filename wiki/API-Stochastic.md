@@ -212,7 +212,7 @@ Each takes a series, an `Original` or a [`SecondOrderImage`](#image) --
 `as_image` builds one if it is not one already, none of these estimators
 taking lag or frequency budgets of its own. Most recover a stochastic-model
 parameter by feeding a functional read off the image to
-[`fit_lsi`](API-Fitting#fit_lsi) / [`fit_eac`](API-Fitting#fit_eac).
+[`fit(basis="legendre")`](API-Fitting#fit(basis="legendre")) / [`fit(basis="block")`](API-Fitting#fit(basis="block")).
 `method="lsi"` (default) / `"eac"` pick the engine; `"ols"` / `"acf1"` /
 `"yw"` are plain baselines. The AR helpers (`ar_order` / `fit_ar`) are direct
 Yule-Walker instead, `fractional_difference` is a transform on the raw
@@ -438,7 +438,7 @@ StochasticFilter(nlags=24, halflife=150.0, warmup=80, settle=500, z_thresh=4.0)
 ```
 
 The **per-input streaming twin** of `fit_stochastic`'s second-order stage -- the
-stochastic counterpart of [`EACFilter` / `LSIFilter`](API-Streaming). It maintains
+stochastic counterpart of [`ImageFilter(basis="block")` / `ImageFilter(basis="legendre")`](API-Streaming). It maintains
 EWMA autocovariances of the level and of `|level - mean|` in `O(K)` per sample (the
 running ACF), and reads the parameters in **closed form** using dtfit's principles
 in streaming form: the **EAC equal-areas criterion** for the AR(1) persistence and
@@ -464,7 +464,7 @@ low false-alarm rate. Flat memory, bounded per-sample cost.
 
 - `update(x) -> self` -- ingest one sample. `partial_fit(xs)` ingests a **batch**
   (an array of samples, looped through `update`) -- note this differs from
-  [`EACFilter` / `LSIFilter`](API-Streaming), whose `partial_fit` takes a **single**
+  [`ImageFilter(basis="block")` / `ImageFilter(basis="legendre")`](API-Streaming), whose `partial_fit` takes a **single**
   sample.
 - `params_ -> dict` -- current `{level, sigma, ar1_phi, cycle_period, vol_persistence, n}`.
 - `snapshot() -> dict` -- `params_` plus a coarse online `regime` label.

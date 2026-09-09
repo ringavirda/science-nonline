@@ -24,7 +24,7 @@ from __future__ import annotations
 import numpy as np
 from scipy.optimize import least_squares
 
-from dtfit.streaming import EACFilter, LSIFilter
+from dtfit.streaming import ImageFilter
 
 from dtfit_experimental.streaming import FilterBank
 
@@ -228,14 +228,14 @@ def _make_axis_filters(kind, fixes, off):
     """
     model = "c0 + c1*t + c2*t**2"  # Local CA model; params sort c0, c1, c2.
     if kind == "lsi":
-        return [LSIFilter(
+        return [ImageFilter(
             model, "t", p0=[float(fixes[0, ax]), 0.0, 0.0], window_size=15,
             order=3, q_diag=[1e-2, 1e-2, 1e-2],
-            drift_reset="inflate", **off) for ax in range(3)]
-    return [EACFilter(
+            drift_reset="inflate", **off, basis="legendre") for ax in range(3)]
+    return [ImageFilter(
         model, "t", p0=[float(fixes[0, ax]), 0.0, 0.0], window_size=15,
         q_diag=[1e-2, 1e-2, 1e-2], order=3,
-        drift_reset="inflate", **off) for ax in range(3)]
+        drift_reset="inflate", **off, basis="block") for ax in range(3)]
 
 
 def dtfit_eval(t, fixes, horizons, *, kind="eac", fused=False, inflate=INFLATE,

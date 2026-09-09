@@ -51,7 +51,7 @@ x = np.linspace(0, 10, 400)
 y = ...  # your observations
 
 # Batch fit, numeric (no polynomial pre-fit needed):
-result = dt.fit_eac(x, y, "a*atan(w*x)", "x")
+result = dt.fit("a*atan(w*x)", dt.Original(x, y), "x", basis="block")
 print(result.params)
 
 # ...or through the scikit-learn compatible estimator:
@@ -65,10 +65,10 @@ y_hat = reg.predict(x)
 ### Real-time / streaming
 
 `dt.ImageFilter` tracks parameters online on the sliding window's image;
-`LSIFilter` and `EACFilter` fix its basis to Legendre and block:
+`ImageFilter(basis="legendre")` and `ImageFilter(basis="block")` fix its basis to Legendre and block:
 
 ```python
-flt = dt.EACFilter("A*sin(w*t)", "t", p0=[1.0, 1.0], window_size=50)
+flt = dt.ImageFilter("A*sin(w*t)", "t", p0=[1.0, 1.0], window_size=50, basis="block")
 for t, y in stream:           # bounded-cost per-sample update
     flt.partial_fit(t, y)
 print(flt.params_)            # tracks time-varying parameters
@@ -97,7 +97,7 @@ A `FittingResult` is self-describing - named parameters, uncertainty, and a
 JSON-friendly round-trip:
 
 ```python
-r = dt.fit_lsi(x, y, "a*exp(b*x)", "x", p0=[1, 1])
+r = dt.fit("a*exp(b*x)", dt.Original(x, y), "x", basis="legendre", p0=[1, 1])
 r.params                       # {'a': ..., 'b': ...}
 r.stderr(); r.confidence_intervals(0.95)
 r.rsquared, r.aic, r.bic       # fit-quality diagnostics
@@ -105,8 +105,7 @@ y_hat, y_std = r.predict(x, return_std=True)   # prediction band
 dt.FittingResult.from_dict(r.to_dict())        # save / ship a fitted model
 
 # a Python callable model + per-point sigma both work (numerically opt-in):
-r2 = dt.fit_eac(x, y, lambda x, a, b: a * np.exp(b * x),
-                sigma=noise_std)               # signature-order params, weighted fit
+r2 = dt.fit(lambda x, a, b: a * np.exp(b * x), dt.Original(x, y, sigma=noise_std), basis="block")               # signature-order params, weighted fit
 ```
 
 ### Diagnostics & visualization
@@ -128,12 +127,12 @@ FitDisplay.from_estimator(reg, x, y)  # data + fitted curve (needs the viz extra
 
 ## Methods
 
-- **LSI** (`fit_lsi`, `basis="legendre"`) - least-squares integral; numeric
+- **LSI** (`fit(basis="legendre")`, `basis="legendre"`) - least-squares integral; numeric
   integral-OLS in the differential-transformation scheme (successor to DSBI).
-- **EAC** (`fit_eac`, `basis="block"`) - equal-areas criterion; numeric,
+- **EAC** (`fit(basis="block")`, `basis="block"`) - equal-areas criterion; numeric,
   integration-based and noise-robust (successor to DSBE).
 - **ImageFilter** - recursive/online tracker on the window image, with NIS
-  drift detection; **LSIFilter** and **EACFilter** fix its basis to Legendre
+  drift detection; **ImageFilter(basis="legendre")** and **ImageFilter(basis="block")** fix its basis to Legendre
   and block for real-time tracking.
 - **Image analytics** - an `Image` reports its own noise level
   (`noise_sigma`), how many orders carry signal (`effective_order`), how its

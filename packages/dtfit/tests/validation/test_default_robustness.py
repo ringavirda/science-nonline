@@ -1,8 +1,9 @@
 """Phase-2 default-config robustness: the bare public entry points must work.
 
 The docs and notebooks call the library on defaults: ``models.x().fit``,
-``NonlineRegressor(expr).fit``, ``suggest_models(x, y)``, ``fit_lsi(x, y, expr,
-var)`` and no hand-tuned ``p0``. These tests run those paths across the whole
+``NonlineRegressor(expr).fit``, ``suggest_models(x, y)``,
+``fit(expr, Original(x, y), var, basis="legendre")`` and no hand-tuned
+``p0``. These tests run those paths across the whole
 catalogue and require each to produce a finite, usable fit or to fail loudly.
 Nothing may quietly return NaN or a stalled seed.
 """

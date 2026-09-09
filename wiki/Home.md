@@ -31,7 +31,7 @@ same idea (match integral fingerprints) applied differently:
   not for production.
 - **ImageFilter** -- the streaming version: feed one sample at a time, track
   parameters that change over time, and detect when the system changes regime.
-  `LSIFilter` and `EACFilter` fix its basis to Legendre and block.
+  `ImageFilter(basis="legendre")` and `ImageFilter(basis="block")` fix its basis to Legendre and block.
 
 On top of those sit convenience layers: a [scikit-learn estimator](API-Estimator)
 (`NonlineRegressor`), a [model catalog](API-Models) so you pick a *shape*

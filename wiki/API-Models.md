@@ -141,7 +141,7 @@ two different inputs.
 
 For a genuinely separable multi-predictor model `y = g1(x1) + g2(x2)` (distinct
 predictors), dtfit does not fit it in one call. Either **backfit** -- alternate
-1-D `fit_lsi`/`fit_eac` fits on the partial residuals (`g1` on `y - g2`, then `g2`
+1-D `fit(basis="legendre")`/`fit(basis="block")` fits on the partial residuals (`g1` on `y - g2`, then `g2`
 on `y - g1`, repeat) so each component keeps dtfit's seeding/robustness -- or use a
 general nonlinear-least-squares tool (`scipy.optimize.curve_fit` / `lmfit`), which
 is dimension-agnostic. dtfit is complementary to those; its edge (1-D streaming,

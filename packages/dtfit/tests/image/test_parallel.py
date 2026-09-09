@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from dtfit import fit_many, fit_eac
+from dtfit import fit_many, fit, Original
 from dtfit.image import FittingProblem
 
 
@@ -33,7 +33,8 @@ def test_fit_many_matches_direct_fit():
     probs = _problems(n=3)
     res = fit_many(probs, n_jobs=1)
     for p, r in zip(probs, res):
-        direct = fit_eac(p.x, p.y, p.expr, p.var, **p.kwargs)
+        direct = fit(p.expr, Original(p.x, p.y), p.var,
+            basis="block", **p.kwargs)
         np.testing.assert_allclose(r.coeffs, direct.coeffs,
                                     rtol=1e-8, atol=1e-8)
 

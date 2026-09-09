@@ -1,5 +1,7 @@
 # Lineage, versions & variants -- the complete atlas
 
+> The names `fit_lsi`, `fit_eac`, `LSIFilter` and `EACFilter` below are the pre-image API. Today they are `fit(basis="legendre")`, `fit(basis="block")` and `ImageFilter(basis=...)`; the historical forms themselves live in the `dtfit-legacy` package.
+
 This page is the **single map of everything `dtfit` contains**: where each method
 came from, how it was improved (its *versions*), every variant and tuning
 *approach*, and every *adaptation* -- promoted or still experimental. If
@@ -154,16 +156,16 @@ the complete list across the stable API.
 
 | approach | call / switch | what it is |
 |---|---|---|
-| **LSI (default)** | `fit_lsi(...)` | accurate batch fit on the Legendre image; `k_star=None`/`"auto"` (an omitted `order`) takes `order_for`'s default |
-| **LSI, global search** | `fit_lsi(..., bounds=...)` | trust-region local solve, with a differential-evolution stage when it's poor -- escapes bad local minima |
-| **LSI oscillatory recipe** | `fit_lsi(..., freq_param="w")` or `oscillatory=True` | order raised to resolve a cycle, frequency seeded from the FFT -- recovers sinusoids to <1% |
-| **EAC (default)** | `fit_eac(...)` | overdetermined block image, most robust/fastest |
-| **Robust image** | `robust=True` on `fit`, `fit_lsi`, `fit_eac` | Huber-reweights the image before any model is fit -- self-scaling, no scale to tune |
-| **EAC, bounded** | `fit_eac(..., bounds=...)` | constrained trust-region fit |
-| **Missing data** | `fit_lsi/fit_eac(..., nan_policy="omit")` | drop NaNs instead of raising |
+| **LSI (default)** | `fit(..., basis="legendre")` | accurate batch fit on the Legendre image; `k_star=None`/`"auto"` (an omitted `order`) takes `order_for`'s default |
+| **LSI, global search** | `fit(..., bounds=..., basis="legendre")` | trust-region local solve, with a differential-evolution stage when it's poor -- escapes bad local minima |
+| **LSI oscillatory recipe** | `fit(..., freq_param="w", basis="legendre")` or `oscillatory=True` | order raised to resolve a cycle, frequency seeded from the FFT -- recovers sinusoids to <1% |
+| **EAC (default)** | `fit(..., basis="block")` | overdetermined block image, most robust/fastest |
+| **Robust image** | `robust=True` on `fit`, `fit(basis="legendre")`, `fit(basis="block")` | Huber-reweights the image before any model is fit -- self-scaling, no scale to tune |
+| **EAC, bounded** | `fit(..., bounds=..., basis="block")` | constrained trust-region fit |
+| **Missing data** | `fit_lsi/fit(..., nan_policy="omit", basis="block")` | drop NaNs instead of raising |
 | **DSB** | `fit_dsb(...)` (in `dtfit.reference`) | symbolic exact balance (reference only) |
-| **EACFilter** | `EACFilter(...)` | streaming EAC (area measurement) |
-| **LSIFilter** | `LSIFilter(...)` | streaming LSI (spectrum measurement) -- for oscillatory plants |
+| **EACFilter** | `ImageFilter(..., basis="block")` | streaming EAC (area measurement) |
+| **LSIFilter** | `ImageFilter(..., basis="legendre")` | streaming LSI (spectrum measurement) -- for oscillatory plants |
 | **Gap coasting** | `filter.coast(...)`, `coast_cov(...)` | dead-reckon a streaming fit through measurement dropouts (uncertainty grows with the gap) |
 | **Fused detection** | `sum(f.nis_ for f in filters)` | several filters' `nis_` sum to a chi-square with the summed degrees of freedom, pooling their innovations into a shared-fault test |
 | **Stochastic fit** | `fit_stochastic(...)` -> `StochasticModel` | detect the regime of a *random* series (long-memory / mean-reversion / GARCH / cycle), forecast it, and `.simulate` it -- by fitting its functionals |
@@ -195,7 +197,7 @@ kept experimental until it proves itself. Here is the complete list with status.
 |---|---|---|---|
 | **#1** | one-pass / distributed map-reduce | `ImageStream` accumulator | the image is **additive over the domain** (a sum of per-chunk projections), so a dataset too big for memory is reduced chunk-by-chunk in one pass, and distributed workers' partial images `merge()` exactly on contiguous chunks of a uniform grid (or `grid="explicit"` for other sample sets); the estimators of the original study live in `dtfit_experimental.scale`. -> [../api/scaling.md](API-Scaling) |
 | **--** | GEMM-batched projection | `ImageStream(channels=B)` | the image is **linear across channels**, so `B` channels' projections are one matrix multiply over one shared Gram, on CPU/GPU by swapping only the backend; the estimators of the original study live in `dtfit_experimental.scale`. -> [../api/scaling.md](API-Scaling) |
-| **--** | LSI oscillatory recipe | `fit_lsi(oscillatory=..., freq_param=...)`, `fft_frequency_seed` | high order + FFT-seeded frequency, so a cycle isn't erased. -> [../api/fitting.md#fit_lsi](API-Fitting#fit_lsi) |
+| **--** | LSI oscillatory recipe | `fit(oscillatory=..., freq_param=..., basis="legendre")`, `fft_frequency_seed` | high order + FFT-seeded frequency, so a cycle isn't erased. -> [../api/fitting.md#fit_lsi](API-Fitting#fit_lsi) |
 
 ### Still experimental (in `dtfit-experimental`)
 

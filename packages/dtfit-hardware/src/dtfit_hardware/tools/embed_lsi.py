@@ -1,7 +1,7 @@
 """Freeze a streaming-LSI config into embeddable form plus a golden reference.
 
 The on-MCU filter is a fixed-size specialization of
-``dtfit.streaming.LSIFilter``: one model, a fixed window ``W`` and Legendre
+``dtfit.ImageFilter``: one model, a fixed window ``W`` and Legendre
 ``order``, full-window only, with no adaptive-window, drift, robust or
 damped-step-rejection paths. This module bridges the Python method and the
 C firmware.
@@ -13,7 +13,7 @@ C firmware.
 * :func:`golden_run` reimplements the C hot path in float64, operation for
   operation. It is the host reference the embedded float32 filter is checked
   against.
-* :func:`cross_check` shows the golden matches the real ``LSIFilter``
+* :func:`cross_check` shows the golden matches the real ``ImageFilter``
   configured to the same fixed-window subset while no drift fires, no step
   is rejected and the window is exactly uniform -- the regime the two
   compute the same algebra in, which is what makes the embedded filter
@@ -31,7 +31,7 @@ precision.
 
 The embedded tier carries the window (LSI) image only: the on-MCU filter is
 the recursive Legendre-window tracker. The block (EAC) image is a batch
-accumulator whose assembly is host-side (``EACFilter`` and ``ImageStream``
+accumulator whose assembly is host-side (``block-basis ImageFilter`` and ``ImageStream``
 block mode over the logged fixes), so it is not ported to firmware; spec 6's
 per-block on-MCU emit is a future telemetry option, not built here.
 """
@@ -49,7 +49,7 @@ ORDER = 5               # Legendre spectral order -> M = ORDER + 1 coefficients
 DEGREE = 1              # model degree: y = sum_{k=0..DEGREE} c_k t^k  (N = DEGREE+1)
 R0 = 1.0                # base measurement-noise variance
 Q_DIAG = (0.01, 0.01)   # process-noise variance per parameter (len == N)
-P0_DIAG = 10.0          # initial covariance diagonal (LSIFilter uses eye*10)
+P0_DIAG = 10.0          # initial covariance diagonal (ImageFilter uses eye*10)
 F_CPU_HZ = 64_000_000   # nRF52840 core clock, for cycles -> microseconds
 
 M = ORDER + 1
@@ -119,7 +119,7 @@ def golden_run(t: np.ndarray, y: np.ndarray, p0: np.ndarray) -> np.ndarray:
 
 
 def dtfit_run(t: np.ndarray, y: np.ndarray, p0: np.ndarray) -> np.ndarray:
-    """The real ``LSIFilter`` constrained to the embedded fixed-window subset.
+    """The real ``ImageFilter`` constrained to the embedded fixed-window subset.
 
     Matches :func:`golden_run` only while no drift fires and no step is
     rejected: ``cusum_k=inf`` disables the two CUSUM arms, but
@@ -128,15 +128,15 @@ def dtfit_run(t: np.ndarray, y: np.ndarray, p0: np.ndarray) -> np.ndarray:
     ``ImageFilter.partial_fit`` has no counterpart here either. See
     :func:`cross_check_level_shift`.
     """
-    from dtfit.streaming import LSIFilter
+    from dtfit.streaming import ImageFilter
 
     expr = " + ".join(["c0"] + [f"c{k}*t**{k}" if k > 1 else "c1*t"
                                  for k in range(1, N)])
-    f = LSIFilter(
+    f = ImageFilter(
         expr, "t", window_size=W, order=ORDER, min_window=W,
         noise_var=R0, q_diag=list(Q_DIAG), p0=list(p0),
         adaptive_window=False, robust=False,
-        cusum_k=float("inf"), alpha=1e-15,
+        cusum_k=float("inf"), alpha=1e-15, basis="legendre",
     )
     out = np.empty((len(t), N))
     for s in range(len(t)):
@@ -146,7 +146,7 @@ def dtfit_run(t: np.ndarray, y: np.ndarray, p0: np.ndarray) -> np.ndarray:
 
 
 def cross_check() -> float:
-    """Golden against the real LSIFilter on a synthetic ramp plus noise.
+    """Golden against the real ImageFilter on a synthetic ramp plus noise.
 
     Uniform sampling, no drift, no rejected step: the regime where
     :func:`golden_run` and :func:`dtfit_run` compute the same algebra
@@ -166,10 +166,10 @@ def cross_check() -> float:
 
 
 def cross_check_level_shift() -> float:
-    """Golden against the real LSIFilter across a mid-run level shift.
+    """Golden against the real ImageFilter across a mid-run level shift.
 
     Same ramp as :func:`cross_check` with a +50 step at sample 60.
-    ``LSIFilter``'s jump test fires and diverts through ``_on_drift``, which
+    ``ImageFilter``'s jump test fires and diverts through ``_on_drift``, which
     :func:`golden_run` has no model of; the two estimates do not re-converge
     within the run. This is a regression guard on the size of that gap, not
     a target to shrink -- fixing it is a change to ``ImageFilter`` itself.
@@ -187,9 +187,9 @@ def cross_check_level_shift() -> float:
 
 
 def cross_check_jitter(pct: float) -> float:
-    """Golden against the real LSIFilter on a window with timing jitter.
+    """Golden against the real ImageFilter on a window with timing jitter.
 
-    :func:`tables` freezes ``B`` on a uniform grid; ``LSIFilter`` rebuilds
+    :func:`tables` freezes ``B`` on a uniform grid; ``ImageFilter`` rebuilds
     its basis from the window's actual sample times, so the two only agree
     exactly when the window is uniformly spaced, which :func:`cross_check`'s
     fixed-step grid cannot exercise.
@@ -348,7 +348,7 @@ def emit_testvec(t: np.ndarray, y: np.ndarray, path: Path | None = None) -> Path
 
 if __name__ == "__main__":
     diff = cross_check()
-    print(f"golden vs dtfit.LSIFilter  max|dp| = {diff:.3e}")
+    print(f"golden vs dtfit.ImageFilter  max|dp| = {diff:.3e}")
     for hdr in emit_header():
         print("wrote", hdr)
     t, y = load_sample()

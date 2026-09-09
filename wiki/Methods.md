@@ -25,8 +25,8 @@ right variant automatically.
 | **core** | **Image** -- the discrete differential transform | [image.md](Methods-Image) | numeric (offline) | the statistic every batch method fits on |
 | **batch** | **LSI** -- Least-Squares Integral | [lsi.md](Methods-LSI) | numeric (offline) | accurate batch fit in the Legendre image, model selection, oscillatory recipe |
 | **batch** | **EAC** -- Equal-Areas Criterion | [eac.md](Methods-EAC) | numeric (offline) | fast batch fit in the block image, the robust image |
-| **streaming** | **EACFilter** -- recursive EAC | [equal_areas_filter.md](Methods-Equal-Areas-Filter) | numeric (online) | real-time tracking via an **area** measurement + drift detection |
-| **streaming** | **LSIFilter** -- recursive LSI | [legendre_filter.md](Methods-Legendre-Filter) | numeric (online) | real-time tracking via a **spectrum** measurement (oscillatory plants) |
+| **streaming** | **ImageFilter(basis="block")** -- recursive EAC | [equal_areas_filter.md](Methods-Equal-Areas-Filter) | numeric (online) | real-time tracking via an **area** measurement + drift detection |
+| **streaming** | **ImageFilter(basis="legendre")** -- recursive LSI | [legendre_filter.md](Methods-Legendre-Filter) | numeric (online) | real-time tracking via a **spectrum** measurement (oscillatory plants) |
 | **scale** | **ImageStream** -- streams, blocks, channels | [scaling.md](Methods-Scaling) | numeric (offline/online) | one-pass / block / many-channel image map-reduce |
 | **compose** | **auto_forecast** | [auto.md](Methods-Auto) | numeric (offline) | structured fit-then-extrapolate forecasting |
 | **stochastic** | **Stochastic series** -- fit the functionals of a *random* process | [stochastic.md](Methods-Stochastic) | numeric (offline + online) | characterize / forecast / generate / track random (economic, financial) data |
@@ -119,8 +119,7 @@ methods go further and replace the monomial spectrum with a better-conditioned
                   |               |
           run recursively, one sample at a time
                   |               |
-              LSIFilter        EACFilter
-           (spectrum meas.)  (area meas.)
+              ImageFilter(basis="legendre")        ImageFilter(spectrum meas., basis="block")  (area meas.)
 ```
 
 - **DSB** sets the empirical spectrum (from a polynomial pre-fit) equal to the
@@ -132,7 +131,7 @@ methods go further and replace the monomial spectrum with a better-conditioned
 - **EAC** matches **integrals (areas)** of model and data over windows rather than
   spectra -- integration smooths noise, so it is the most robust; the robust
   image is its outlier defense.
-- **EACFilter / LSIFilter** run EAC / LSI **recursively**, one sample at a time,
+- **ImageFilter(basis="block") / ImageFilter(basis="legendre")** run EAC / LSI **recursively**, one sample at a time,
   through a shared `ImageFilter`, with drift detection and a calibrated
   `result()`; summing several filters' `nis_` pools their innovations into
   one fused fault test (`FilterBank` and `FusedChiSquareDetector` are the

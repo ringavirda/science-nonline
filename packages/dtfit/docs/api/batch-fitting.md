@@ -2,7 +2,7 @@
 
 The core batch fitters run on the **image** of the data -- a fixed-size basis
 projection, additive over sample sets. `fit` runs on an `Original` or an
-`Image` directly; `fit_lsi` and `fit_eac` are `fit`'s presets in the Legendre
+`Image` directly; `fit(basis="legendre")` and `fit(basis="block")` are `fit`'s presets in the Legendre
 and block bases.
 
 See [the image](../guide/image.md) for the statistic every fitter runs on
@@ -32,8 +32,8 @@ and the [guide](../guide/choosing-a-method.md) for the decision tree.
 
 ::: dtfit.image.analytics.ChiSquareTest
 
-::: dtfit.fit_lsi
+::: dtfit.fit(basis="legendre")
 
-::: dtfit.fit_eac
+::: dtfit.fit(basis="block")
 
 ::: dtfit.FittingResult

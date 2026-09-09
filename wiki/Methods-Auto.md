@@ -43,7 +43,7 @@ from the data's shape:
 | otherwise | **poly** (`"poly"`, a quadratic level) $a_0+a_1x+a_2x^2$ |
 
 Each class is fit with the matching stable lever -- the logistic and seasonal fits
-use [`fit_lsi`](Methods-LSI) with **data-driven seeds and bounds** (the growth rate is
+use [`fit(basis="legendre")`](Methods-LSI) with **data-driven seeds and bounds** (the growth rate is
 bracketed by the time span; the seasonal frequency is seeded from
 [`fft_frequency_seed`](API-Fitting#fft_frequency_seed)), so the global search
 is well-posed.
@@ -83,8 +83,8 @@ The return is the length-`horizon` forecast on the extrapolated grid.
 ## Why this belongs in the method reference
 
 `fit(..., basis="auto")` and `auto_forecast` are where the per-method math is *operationalized*
-into a usable default. They compose only stable pieces ([`fit_lsi`](Methods-LSI),
-[`fit_eac`](Methods-EAC) (the block image),
+into a usable default. They compose only stable pieces ([`fit(basis="legendre")`](Methods-LSI),
+[`fit(basis="block")`](Methods-EAC) (the block image),
 [`fft_frequency_seed`](API-Fitting#fft_frequency_seed)) -- the conservative
 merges the domain studies validated -- and they preserve the honest negatives those
 studies reported:

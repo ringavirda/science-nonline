@@ -1,8 +1,8 @@
 # Streaming filters -- recursive O(1)/sample tracking
 
 > **Status (2026-09):** `FilterBank` and `FusedChiSquareDetector` live in
-> `dtfit_experimental.streaming` for the notebooks; `EACFilter` and
-> `LSIFilter` are `ImageFilter` aliases tracking the window image, and the
+> `dtfit_experimental.streaming` for the notebooks; `ImageFilter(basis="block")` and
+> `ImageFilter(basis="legendre")` are `ImageFilter` aliases tracking the window image, and the
 > pooled `nis_` sum is the stable fused test. The sections below describe
 > the study as it was run.
 
@@ -17,7 +17,7 @@ real-time/streaming operation, change detection, and a tiny fixed footprint that
 fits a microcontroller (Exp 9) -- not raw accuracy superiority.
 
 Source: [`streaming/`](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit/src/dtfit/streaming)
-(`EACFilter`, `LSIFilter`, `FilterBank`).
+(`ImageFilter(basis="block")`, `ImageFilter(basis="legendre")`, `FilterBank`).
 Tested in: [Control (1)](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit-experimental/src/dtfit_experimental/experiments/cases/01_control_systems/01_control_systems.ipynb),
 [Big-data (2)](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit-experimental/src/dtfit_experimental/experiments/cases/02_big_data_streaming/02_big_data_streaming.ipynb),
 [GPS (5)](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit-experimental/src/dtfit_experimental/experiments/cases/05_gps_trajectory/05_gps_trajectory.ipynb),
@@ -36,7 +36,7 @@ detector that flags structural breaks. `FilterBank` runs K of them in parallel
 
 | updater | cost | scaling | memory |
 |---|---|---|---|
-| **EACFilter (online)** | **103.1 us/sample** | **O(1)/sample** | **11.7 MB (bounded)** |
+| **ImageFilter(online, basis="block")** | **103.1 us/sample** | **O(1)/sample** | **11.7 MB (bounded)** |
 | batch re-fit, 10 k samples | 2.8 ms/refit | O(N) | O(N) |
 | batch re-fit, 50 k samples | 5.0 ms/refit | O(N) | O(N) |
 | batch re-fit, 250 k samples | 20.3 ms/refit | O(N) | O(N) |
@@ -162,8 +162,8 @@ wandered toward it, `exp(-t/tau)` overflowed, and the non-finite innovation was
 committed straight into the EKF state -- after which **every** later `predict()`
 returned `nan` (one bad sample permanently poisoned the filter).
 
-The **durable fix** (still in place, regression-tested): both `EACFilter`
-and `LSIFilter` now **reject a non-finite update** -- if the
+The **durable fix** (still in place, regression-tested): both `ImageFilter(basis="block")`
+and `ImageFilter(basis="legendre")` now **reject a non-finite update** -- if the
 innovation/Jacobian or the candidate `(p, P)` is not finite, the sample is skipped
 and the last good estimate kept. A streaming EKF should never be able to
 NaN-poison itself, regardless of which model it is fitting. (The matched-model

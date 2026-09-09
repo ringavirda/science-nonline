@@ -12,7 +12,7 @@ producing a wrong fit:
 import numpy as np, dtfit as dt
 X = np.random.default_rng(0).normal(size=(200, 2))   # two predictors
 y = np.random.default_rng(1).normal(size=200)
-dt.fit_lsi(X, y, "a*x", "x")
+dt.fit("a*x", dt.Original(X, y), "x", basis="legendre")
 # ValueError: data_x and data_y must be 1-D; got shapes (200, 2) and (200,).
 # dtfit's integral criteria (LSI/EAC) are one-dimensional, so multivariate X
 # (several predictors) is not supported. ...
@@ -47,15 +47,15 @@ If you truly have distinct predictors and an additively-separable model
 `x`). Two honest options:
 
 1. **Backfitting** — alternate 1-D dtfit fits on the partial residuals until they
-   stabilize. Each step is a normal 1-D `fit_lsi` / `fit_eac`, so you keep
+   stabilize. Each step is a normal 1-D `fit(basis="legendre")` / `fit(basis="block")`, so you keep
    dtfit's seeding, robustness and uncertainty per component:
 
    ```python
    g2 = np.zeros_like(y)
    for _ in range(10):                       # a few passes converge for smooth g
-       f1 = dt.fit_eac(x1, y - g2, "a*x1 + b", "x1")   # g1 on the x1 residual
+       f1 = dt.fit("a*x1 + b", dt.Original(x1, y - g2), "x1", basis="block")   # g1 on the x1 residual
        g1 = np.asarray(f1.model(x1))
-       f2 = dt.fit_eac(x2, y - g1, "c*sin(w*x2)", "x2")  # g2 on the x2 residual
+       f2 = dt.fit("c*sin(w*x2)", dt.Original(x2, y - g1), "x2", basis="block")  # g2 on the x2 residual
        g2 = np.asarray(f2.model(x2))
    ```
 

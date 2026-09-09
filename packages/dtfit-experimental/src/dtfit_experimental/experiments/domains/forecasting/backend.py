@@ -478,10 +478,7 @@ def _seasonal_stage(y_tr, t_tr, period_hint):
 def dtfit_lsi(cfg, t_tr, y_tr, t_all):
     """Base LSI (Legendre spectral match) on the series' structural model."""
     spec, scale = _trend_spec(cfg["trend"], y_tr, t_tr, cfg["period"])
-    r = dt.fit_lsi(t_tr, y_tr / scale, spec["expr"], spec["var"],
-                   p0=spec.get("p0"), bounds=_fit_bounds(spec, cfg["trend"]),
-                   k_star=spec.get("k_star", 5),
-                   filter_data=spec.get("filter_data", True))
+    r = dt.fit(spec["expr"], dt.Original(t_tr, y_tr / scale), spec["var"], basis="legendre", order=spec.get("k_star", 5), p0=spec.get("p0"), bounds=_fit_bounds(spec, cfg["trend"]))
     return np.asarray(r.model(t_all)) * scale
 
 
@@ -491,8 +488,7 @@ def dtfit_eac(cfg, t_tr, y_tr, t_all):
     spec, scale = _trend_spec(cfg["trend"], y_tr, t_tr, cfg["period"])
     bnds = None if cfg["trend"] in LOCAL_FIT_KINDS else spec.get("bounds")
     eac_b = ([b[0] for b in bnds], [b[1] for b in bnds]) if bnds else None
-    r = dt.fit_eac(t_tr, y_tr / scale, spec["expr"], spec["var"],
-                   p0=spec.get("p0"), bounds=eac_b)
+    r = dt.fit(spec["expr"], dt.Original(t_tr, y_tr / scale), spec["var"], basis="block", p0=spec.get("p0"), bounds=eac_b)
     return np.asarray(r.model(t_all)) * scale
 
 
@@ -656,10 +652,7 @@ def _auto_kind(cfg, y_tr, t_tr=None):
 
 def _fit_kind(kind, t_tr, y_tr, t_all, period_hint=None):
     spec, scale = _trend_spec(kind, y_tr, t_tr, period_hint)
-    r = dt.fit_lsi(t_tr, y_tr / scale, spec["expr"], spec["var"],
-                   p0=spec.get("p0"), bounds=_fit_bounds(spec, kind),
-                   k_star=spec.get("k_star", 5),
-                   filter_data=spec.get("filter_data", True))
+    r = dt.fit(spec["expr"], dt.Original(t_tr, y_tr / scale), spec["var"], basis="legendre", order=spec.get("k_star", 5), p0=spec.get("p0"), bounds=_fit_bounds(spec, kind))
     return np.asarray(r.model(t_all)) * scale
 
 

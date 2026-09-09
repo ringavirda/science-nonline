@@ -3,7 +3,7 @@
 > Numeric batch method, successor to the symbolic DSBE. Source:
 > [`image/fit.py`](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit/src/dtfit/image/fit.py),
 > [`image/bases.py`](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit/src/dtfit/image/bases.py).
-> Invoke via `fit_eac(x, y, expr, var, ...)`, `fit(model, data, basis="block",
+> Invoke via `fit(expr, Original(x, y), var, basis="block", ...)`, `fit(model, data, basis="block",
 > order=n_windows)`, or `NonlineRegressor(..., basis="block")`.
 
 EAC is [`fit`](Methods-Image) in the **block** basis: the basis is the set of
@@ -12,7 +12,7 @@ indicator functions of `n_windows` equal windows in the normalized variable
 Gram `G` is diagonal, each entry the sum of the sample weights in its window.
 The model is projected on the same grid and matched window sum for window
 sum. EAC is the numeric successor of the symbolic DSBE, and its block image
-is the basis of the streaming [EACFilter](Methods-Equal-Areas-Filter).
+is the basis of the streaming [ImageFilter(basis="block")](Methods-Equal-Areas-Filter).
 
 ## Mathematical grounding
 
@@ -55,7 +55,7 @@ identification: the h-version of the same weak-form fit LSI runs with a
 global polynomial basis. EAC owns the h-version's regime -- a jump or a
 regime change aligned to a window edge -- and the diagonal block Gram makes
 it the cheap, well-conditioned image at high order and the basis of the
-streaming EACFilter and the map-reduce tiers. It is not more robust to
+streaming ImageFilter(basis="block") and the map-reduce tiers. It is not more robust to
 noise or outliers than LSI: robustness is a property of the robust image
 (below), not of the block basis.
 
@@ -70,7 +70,7 @@ and half-open: a sample exactly on a window's upper edge belongs to the
 Measured on the model catalog, this recovers parameter RMSE 1.02 to 1.06
 times NLLS at four windows per parameter.
 
-`fit_eac` recovers a sharp sigmoid step with its windows spread evenly across
+`fit(basis="block")` recovers a sharp sigmoid step with its windows spread evenly across
 `x` (dotted edges): the block preset uses four uniform windows per parameter,
 and the estimate comes from the projection on those windows, not from where
 the curve bends.
@@ -110,7 +110,7 @@ explains *why* the defaults are what they are.
   indicator) test functions** $\phi_i$: $\sum_k \phi_i(x_k)\, w_k\,
   [y_k - f(x_k;\theta)] = 0$. The exactly-determined case ($M = m$) is the
   classical square Galerkin system.
-- **Over-identified method of moments (GMM).** `fit_eac`'s default of $M =
+- **Over-identified method of moments (GMM).** `fit(basis="block")`'s default of $M =
   4m$ windows is an **over-identified moment system** -- more moment
   conditions than unknowns, solved by least squares. This is the lens that
   justifies windows beyond the parameter count: Hansen's GMM theory says
@@ -182,7 +182,7 @@ chose; do not choose EAC for robustness.
   Such a sample is zeroed before the projection so it cannot poison a window
   sum or a Jacobian column.
 - **Sample-count guard** -- an image at `n_windows` windows needs at least
-  `n_windows + 1` samples; `fit_eac` raises otherwise.
+  `n_windows + 1` samples; `fit(basis="block")` raises otherwise.
 - **Coverage does not apply** -- [`coverage`](Methods-Image) measures
   Legendre truncation error and returns `0.0` for the block basis; `fit`
   never runs the coverage check on an EAC image.
@@ -214,7 +214,7 @@ EAC recovers the parameters essentially as well as LSI and the NLS gold standard
 while being the **fastest** of the dtfit methods (~=3 ms here -- roughly 5x LSI),
 because it solves a small area-matching system instead of a spectral least-squares
 problem. That speed and its derivative-free, O(1)-per-sample form are why EAC is the
-basis of the streaming [EACFilter](Methods-Equal-Areas-Filter).
+basis of the streaming [ImageFilter(basis="block")](Methods-Equal-Areas-Filter).
 
 **Real data -- COVID-19 Ukraine** (28-day take-off, 548->8617 cases),
 `y = a.exp(b.t)`:
@@ -232,7 +232,7 @@ version's exact case), high-order conditioning (the diagonal block Gram --
 the showcase's 1,275-station Legendre Gram hit condition 1e19 where the
 block Gram stays diagonal), and the streaming and map-reduce tiers where the
 block image is `n_windows` sums, the batch form of the streaming
-[EACFilter](Methods-Equal-Areas-Filter)'s measurement and of the MCU block
+[ImageFilter(basis="block")](Methods-Equal-Areas-Filter)'s measurement and of the MCU block
 images. It is also a fast, stable initializer for a slower method. For peaks
 and cycles the Legendre preset at [`order_for`](Methods-Image) is the more
 efficient image, and `Model.fit` and the `auto` route send peaks there
@@ -242,5 +242,5 @@ error on the peaked families). Outlier-prone data reach for the robust image
 
 **Caveats.** EAC's window sums partly cancel **oscillations** -- for a cycle
 use [LSI](Methods-LSI)'s oscillatory recipe or the streaming
-[LSIFilter](Methods-Legendre-Filter). For real-time tracking of
-*time-varying* parameters, use the recursive [EACFilter](Methods-Equal-Areas-Filter).
+[ImageFilter(basis="legendre")](Methods-Legendre-Filter). For real-time tracking of
+*time-varying* parameters, use the recursive [ImageFilter(basis="block")](Methods-Equal-Areas-Filter).

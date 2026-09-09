@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from dtfit.streaming import EACFilter, LSIFilter
+from dtfit.streaming import ImageFilter
 
 from dtfit_experimental.experiments.common import baselines as bl
 from dtfit_experimental.experiments.domains.common import embedded_footprint
@@ -194,12 +194,12 @@ def _axis_filters(fixes, kind="lsi", model="poly", robust=False, off=None):
     # on the noisy, anomaly-heavy harsh stream, with no per-regime
     # hand-tuning; this applies to both bases below.
     if kind == "lsi":   # the Legendre spectrum, right for trajectories
-        return [LSIFilter(m["expr"], "t", p0=p0(ax), window_size=15, order=m["order"],
+        return [ImageFilter(m["expr"], "t", p0=p0(ax), window_size=15, order=m["order"],
                           q_diag=[1e-2] * nq,
-                          robust=robust, drift_reset="inflate", **off) for ax in range(3)]
-    return [EACFilter(m["expr"], "t", p0=p0(ax), window_size=15,
+                          robust=robust, drift_reset="inflate", **off, basis="legendre") for ax in range(3)]
+    return [ImageFilter(m["expr"], "t", p0=p0(ax), window_size=15,
                       order=nq, q_diag=[1e-2] * nq,
-                      robust=robust, drift_reset="inflate", **off) for ax in range(3)]
+                      robust=robust, drift_reset="inflate", **off, basis="block") for ax in range(3)]
 
 
 class FusedCUSUM:
@@ -523,10 +523,10 @@ def imu_lsi_track(t, fixes, gyro, accel, R0, horizons=(10,), *, window=28,
             return f"c0 + c1*tt + {drift} + {ax[a]}"
         return f"c0 + c1*tt + {ax[a]}"
 
-    flts = [LSIFilter(expr(a), "tt", regressors=ax[a],
+    flts = [ImageFilter(expr(a), "tt", regressors=ax[a],
                       p0=[float(fixes[0, a])] + [0.0] * (nq - 1), window_size=window,
                       order=6, q_diag=[1e-2] * nq,
-                      drift_reset="inflate") for a in range(3)]
+                      drift_reset="inflate", basis="legendre") for a in range(3)]
     pred = {h: np.full((n, 3), np.nan) for h in horizons}
     for i in range(n):
         miss = np.any(np.isnan(fixes[i]))

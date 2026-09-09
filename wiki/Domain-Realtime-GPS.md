@@ -20,7 +20,7 @@ package.
 Track and forecast a maneuvering vehicle online from a fix-level GPS stream (plus
 an IMU) with bounded per-sample cost and a fixed memory budget, survive urban-canyon
 dropouts and multipath glitches, and flag a maneuver -- testing dtfit's streaming
-`LSIFilter` / `EACFilter` (now with **external regressors**, so a measured
+`ImageFilter(basis="legendre")` / `ImageFilter(basis="block")` (now with **external regressors**, so a measured
 side-channel like an IMU strapdown basis enters the integral model) against the
 trackers a maneuvering-target practitioner actually deploys (a constant-acceleration
 Kalman, a gyro-aided coordinated-turn EKF, and -- on the position-only benchmarks --
@@ -32,7 +32,7 @@ edge (multi-step forecast; clean-Gaussian smoothing on the idealized benchmarks)
 
 ## Methods under test (dtfit streaming, integral)
 
-- **`LSIFilter`** -- streaming integral least-squares measuring the window's
+- **`ImageFilter(basis="legendre")`** -- streaming integral least-squares measuring the window's
   **Legendre spectrum**; the trajectory smoother. Fitted per axis on a local
   constant-acceleration **cubic** `c0+c1*t+c2*t**2+c3*t**3` (the robust all-round
   default; the extra curvature term the turn needs) or a **coordinated-turn** model
@@ -40,13 +40,13 @@ edge (multi-step forecast; clean-Gaussian smoothing on the idealized benchmarks)
   cannot represent at all, dtfit's differentiator on the maneuvering segment.
   `adapt_noise` self-tunes the measurement noise from an online residual EWMA, and
   `robust=True` winsorizes the projection.
-- **`EACFilter`** -- the streaming equal-areas twin; carried here mainly as the
+- **`ImageFilter(basis="block")`** -- the streaming equal-areas twin; carried here mainly as the
   **honest negative** (an area is the wrong measurement for oscillatory motion, so it
   trails the spectrum filter on turns). Note its `partial_fit` takes one sample at a
-  time (the online recursion), the same single-sample contract as `LSIFilter`.
+  time (the online recursion), the same single-sample contract as `ImageFilter(basis="legendre")`.
 - **Full-IMU strapdown through LSI (external regressor)** -- the 9-DOF IMU (3-axis
   gyro + accelerometer + an absolute magnetometer heading) is strapdown-integrated
-  into a washed-out per-axis position basis `S` and fed to `LSIFilter` as an
+  into a washed-out per-axis position basis `S` and fed to `ImageFilter(basis="legendre")` as an
   **external regressor**: the per-axis model becomes `c0 + c1*t + (quadratic drift)
   + S`. The accelerometer supplies the sensed motion shape, the polynomial absorbs
   residual INS drift, the GPS anchors the absolute path, and the magnetometer is a

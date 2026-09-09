@@ -19,7 +19,7 @@ each one across all the experiments that exercised it.
 | [03_overlapping_ensemble.md](Cases-Analysis-03-Overlapping-Ensemble) | #3 overlapping-window ensemble | Study finding: whole-window rejection helps a contiguous burst; the shipped robustness tool is the robust image (`robust=True`), best on the Legendre basis for a burst. |
 | [04_joint_multichannel.md](Cases-Analysis-04-Joint-Multichannel) | #4 joint shared-parameter fit | Experimental -- loss where tested |
 | [05_stagewise_boosting.md](Cases-Analysis-05-Stagewise-Boosting) | #5 stage-wise boosting | Experimental -- win, 1 domain |
-| [06_adaptive_window_eac.md](Cases-Analysis-06-Adaptive-Window-EAC) | #6 adaptive-window EAC | Retired -- `fit_eac` places equal windows |
+| [06_adaptive_window_eac.md](Cases-Analysis-06-Adaptive-Window-EAC) | #6 adaptive-window EAC | Retired -- `fit(basis="block")` places equal windows |
 
 ## Performance & parallelization optimizations
 

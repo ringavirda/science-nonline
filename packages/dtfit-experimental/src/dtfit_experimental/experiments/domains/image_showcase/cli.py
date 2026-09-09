@@ -29,7 +29,7 @@ import numpy as np
 from threadpoolctl import threadpool_limits
 
 from dtfit.image import ImageStream, assemble
-from dtfit.streaming import LSIFilter
+from dtfit.streaming import ImageFilter
 
 from . import (
     compare, filters, isd, isd_fits, isd_reduce, ngl, ngl_fits,
@@ -639,7 +639,7 @@ def cmd_stream_track(args: argparse.Namespace) -> int:
         }
         if config.q_diag is not None:
             kwargs["q_diag"] = list(config.q_diag)
-        filt = LSIFilter(config.expr, "t", **kwargs)
+        filt = ImageFilter(config.expr, "t", **kwargs, basis="legendre")
         blocks = ImageStream(
             "legendre", args.order, domain=(0.0, args.span),
             block=args.block, detect="previous", grid="explicit",

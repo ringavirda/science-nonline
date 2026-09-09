@@ -140,7 +140,7 @@ strictly* they match it. From strictest/most-fragile to most-relaxed/robust:
                                   |
    +------------------+----------------------+---------------------+
    |                  |                      |                     |
- DSB                 LSI                    EAC                EACFilter / LSIFilter
+ DSB                 LSI                    EAC                ImageFilter(basis="block") / ImageFilter(basis="legendre")
  match the           match the              match integrated     match fingerprints
  fingerprint         fingerprints in a      AREAS over           one sample at a
  EXACTLY             least-squares sense    windows              time (streaming)
@@ -166,7 +166,7 @@ strictly* they match it. From strictest/most-fragile to most-relaxed/robust:
   Best for few-parameter transient and saturating shapes.
   -> [methods-explained.md#eac](Guides-Methods-Explained#eac)
 
-- **EACFilter / LSIFilter -- the streaming versions.** Run EAC's (or LSI's)
+- **ImageFilter(basis="block") / ImageFilter(basis="legendre") -- the streaming versions.** Run EAC's (or LSI's)
   matching **recursively**, updating the estimate with each new sample at fixed
   cost, like a Kalman filter. They **track parameters that change over time** and
   **detect regime changes** (a sudden break in the data). This is the real-time

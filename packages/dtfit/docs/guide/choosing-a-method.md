@@ -34,17 +34,17 @@ river levels -- with no smooth curve to fit?
 Is the data arriving live / do the parameters change over time?
 |
 +- YES > use ImageFilter (a STREAMING filter)
-|        +- signal oscillates (a cycle)         > LSIFilter   (Legendre spectrum)
-|        +- signal is monotone / saturating      > EACFilter   (block sums, cheaper)
+|        +- signal oscillates (a cycle)         > ImageFilter(Legendre spectrum, basis="legendre")
+|        +- signal is monotone / saturating      > ImageFilter(block sums, cheaper, basis="block")
 |
 +- NO (you have the whole batch) > use a BATCH method
-         +- you want one reliable default        > LSI            (fit_lsi)
+         +- you want one reliable default        > LSI            (fit(basis="legendre"))
          +- data is very noisy / few parameters
-         |   / a transient or saturating shape    > EAC           (fit_eac)
+         |   / a transient or saturating shape    > EAC           (fit(basis="block"))
          +- a sinusoid / clear cycle               > LSI oscillatory recipe
-         |                                           (fit_lsi(..., freq_param="w"))
+         |                                           (fit(..., freq_param="w", basis="legendre"))
          +- outliers / glitches present            > robust image (robust=True on
-                                                      fit_lsi / fit_eac), on whichever
+                                                      fit(basis="legendre") / fit(basis="block")), on whichever
                                                       basis the shape chose
 ```
 
@@ -62,11 +62,11 @@ production fitter (see [methods-explained.md#dsb](https://github.com/ringavirda/
 - **Use the oscillatory recipe for anything with a cycle.** A plain fit
   erases cycles; you must pass `freq_param`/`oscillatory=True`.
 - **Use the robust image when outliers/glitches contaminate a record.**
-  `robust=True` on `fit_lsi` / `fit_eac` Huber-reweights the image before any
+  `robust=True` on `fit(basis="legendre")` / `fit(basis="block")` Huber-reweights the image before any
   model is fit -- no scale to tune. For a *densely* contaminated record use
   the robust image on the global (Legendre) basis: a contiguous burst fills
   whole block windows the per-window reweighting cannot isolate, so
-  `fit_lsi(..., robust=True)` beats `fit_eac(..., robust=True)` there.
+  `fit(..., robust=True, basis="legendre")` beats `fit(..., robust=True, basis="block")` there.
 - **One image, several models.** Build the image once --
   `Original(x, y).image("legendre", order)` -- and `fit` each candidate on it;
   the fits are exact in the span and cost no further data pass.

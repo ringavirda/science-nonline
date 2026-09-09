@@ -11,15 +11,15 @@ its Image in a basis at an order is the pair of sums ``S = Phi^T (w y)`` and
 of that basis, additive over sample sets and nested in the order.
 
 Fitting:
-    fit(model, data) on either type, with basis="auto" routing by outcome;
-    fit_lsi and fit_eac are its Legendre and block presets; order_for gives
-    the order a model's sensitivities need. fit_many fans independent fits
+    fit(model, data) on either type, with basis="legendre", "block" or
+    "auto" routing by outcome; order_for gives the order a model's
+    sensitivities need. fit_many fans independent fits
     across processes or threads. auto_forecast fits a deterministic curve
-    through fit_lsi, then extrapolates it.
+    in the Legendre basis, then extrapolates it.
 
 Streaming and scale:
-    ImageFilter tracks parameters online on the window image; LSIFilter and
-    EACFilter fix its basis. ImageStream accumulates a signal in fixed
+    ImageFilter tracks parameters online on the window image in either
+    basis. ImageStream accumulates a signal in fixed
     memory as it arrives, emits block images and assembles them back.
 
 Models:
@@ -55,12 +55,10 @@ from dtfit.image import (
     Image,
     ImageStream,
     fit,
-    fit_lsi,
-    fit_eac,
     order_for,
 )
 from dtfit.image.parallel import fit_many
-from dtfit.streaming import ImageFilter, LSIFilter, EACFilter
+from dtfit.streaming import ImageFilter
 from dtfit.models import suggest_models
 from dtfit.forecast import auto_forecast, ForecastResult
 from dtfit import stochastic
@@ -71,10 +69,6 @@ __all__ = [
     "ImageStream",
     "ImageFilter",
     "fit",
-    "fit_lsi",
-    "fit_eac",
-    "LSIFilter",
-    "EACFilter",
     "order_for",
     "fit_many",
     "models",

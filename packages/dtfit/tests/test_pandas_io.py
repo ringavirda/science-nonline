@@ -8,7 +8,7 @@ ndarray paths are covered elsewhere.
 import numpy as np
 import pytest
 
-from dtfit import fit_lsi, fit_eac
+from dtfit import fit, Original
 from dtfit.stochastic import fit_stochastic
 from dtfit.sklearn import NonlineRegressor
 from dtfit._pandas import (
@@ -20,6 +20,28 @@ from dtfit._pandas import (
     is_series,
     to_1d_array,
 )
+
+
+def _in(basis, x, y, expr, var=None, **kw):
+    order = kw.pop("order", None)
+    if "k_star" in kw:
+        v = kw.pop("k_star")
+        order = None if v in (None, "auto") else v
+    if "n_windows" in kw:
+        order = kw.pop("n_windows")
+    original = Original(
+        x, y, sigma=kw.pop("sigma", None),
+        nan_policy=kw.pop("nan_policy", "raise"),
+    )
+    return fit(expr, original, var, basis=basis, order=order, **kw)
+
+
+def _lsi(x, y, expr, var=None, **kw):
+    return _in("legendre", x, y, expr, var, **kw)
+
+
+def _eac(x, y, expr, var=None, **kw):
+    return _in("block", x, y, expr, var, **kw)
 
 pd = pytest.importorskip("pandas")
 
@@ -112,7 +134,7 @@ def test_extend_index_non_inferable_freq_returns_none():
     assert extend_index(pd.RangeIndex(0, 0), 3) is None
 
 
-@pytest.mark.parametrize("fit", [fit_lsi, fit_eac])
+@pytest.mark.parametrize("fit", [_lsi, _eac])
 def test_fitters_accept_series_matches_ndarray(fit, exp_xy):
     x, y = exp_xy
     r_arr = fit(x, y, "a*exp(b*x)", "x", p0=[1.0, -0.5])
@@ -120,7 +142,7 @@ def test_fitters_accept_series_matches_ndarray(fit, exp_xy):
     np.testing.assert_array_equal(r_ser.coeffs, r_arr.coeffs)
 
 
-@pytest.mark.parametrize("fit", [fit_lsi, fit_eac])
+@pytest.mark.parametrize("fit", [_lsi, _eac])
 def test_fitters_accept_single_col_dataframe(fit, exp_xy):
     x, y = exp_xy
     r_arr = fit(x, y, "a*exp(b*x)", "x", p0=[1.0, -0.5])
@@ -131,7 +153,7 @@ def test_fitters_accept_single_col_dataframe(fit, exp_xy):
     np.testing.assert_array_equal(r_df.coeffs, r_arr.coeffs)
 
 
-@pytest.mark.parametrize("fit", [fit_lsi, fit_eac])
+@pytest.mark.parametrize("fit", [_lsi, _eac])
 def test_fitters_reject_multicol_dataframe(fit, exp_xy):
     x, y = exp_xy
     bad = pd.DataFrame({"a": x, "b": x})
@@ -141,7 +163,8 @@ def test_fitters_reject_multicol_dataframe(fit, exp_xy):
 
 def test_predict_series_returns_aligned_series(exp_xy):
     x, y = exp_xy
-    r = fit_lsi(x, y, "a*exp(b*x)", "x", p0=[1.0, -0.5])
+    r = fit("a*exp(b*x)", Original(x, y), "x",
+        basis="legendre", p0=[1.0, -0.5])
     idx = pd.date_range("2024-01-01", periods=x.size, freq="D")
     xs = pd.Series(x, index=idx)
 
@@ -155,7 +178,8 @@ def test_predict_series_returns_aligned_series(exp_xy):
 
 def test_predict_series_return_std_pair(exp_xy):
     x, y = exp_xy
-    r = fit_lsi(x, y, "a*exp(b*x)", "x", p0=[1.0, -0.5])
+    r = fit("a*exp(b*x)", Original(x, y), "x",
+        basis="legendre", p0=[1.0, -0.5])
     idx = pd.RangeIndex(start=5, stop=5 + x.size)
     xs = pd.Series(x, index=idx)
 
@@ -169,7 +193,7 @@ def test_predict_series_return_std_pair(exp_xy):
 
 def test_predict_single_col_dataframe_returns_series(exp_xy):
     x, y = exp_xy
-    r = fit_eac(x, y, "a*exp(b*x)", "x", p0=[1.0, -0.5])
+    r = fit("a*exp(b*x)", Original(x, y), "x", basis="block", p0=[1.0, -0.5])
     df = pd.DataFrame({"t": x})
     out = r.predict(df)
     assert isinstance(out, pd.Series)
@@ -178,7 +202,8 @@ def test_predict_single_col_dataframe_returns_series(exp_xy):
 
 def test_predict_ndarray_still_ndarray(exp_xy):
     x, y = exp_xy
-    r = fit_lsi(x, y, "a*exp(b*x)", "x", p0=[1.0, -0.5])
+    r = fit("a*exp(b*x)", Original(x, y), "x",
+        basis="legendre", p0=[1.0, -0.5])
     assert isinstance(r.predict(x), np.ndarray)
     yv, sv = r.predict(x, return_std=True)
     assert isinstance(yv, np.ndarray) and isinstance(sv, np.ndarray)
@@ -200,15 +225,18 @@ def test_multivariate_x_raises_clear_error_everywhere():
     X2 = rng.normal(size=(40, 2))          # genuinely multivariate
     y = rng.normal(size=40)
     entries = [
-        lambda: dt.fit_lsi(X2, y, "a*x", "x"),
-        lambda: dt.fit_eac(X2, y, "a*x", "x"),
+        lambda: dt.fit("a*x", dt.Original(X2, y), "x", basis="legendre"),
+        lambda: dt.fit("a*x", dt.Original(X2, y), "x", basis="block"),
         lambda: dt.fit("a*x", dt.Original(X2, y), "x"),
         lambda: dt.auto_forecast(X2, y, horizon=3),
         lambda: fit_stochastic(X2),
         lambda: NonlineRegressor("a*x", "x").fit(X2, y),
-        lambda: dt.fit_lsi(
-            pd.DataFrame({"a": np.arange(40.0), "b": np.arange(40.0)}),
-            y, "a*x", "x",
+        lambda: dt.fit(
+            "a*x",
+            dt.Original(
+                pd.DataFrame({"a": np.arange(40.0), "b": np.arange(40.0)}), y),
+            "x",
+            basis="legendre",
         ),
     ]
     for entry in entries:

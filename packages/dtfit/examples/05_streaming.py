@@ -5,8 +5,8 @@ These estimators ingest one sample at a time with bounded per-update cost
 the streaming twin of a batch method and carries built-in drift detection.
 Start from the .tracking() / .robust() presets instead of the ~20 raw knobs.
 
-- EACFilter    -- streaming equal-areas (twin of fit_eac).
-- LSIFilter    -- streaming Legendre spectrum (twin of fit_lsi).
+- ImageFilter in the block basis -- streaming equal areas.
+- ImageFilter in the Legendre basis -- streaming spectrum.
 - result()     -- the window as a batch fit, with a calibrated covariance.
 - fused nis_   -- pooling several filters' innovations into one fault test.
 
@@ -15,7 +15,7 @@ Run headless:   python examples/05_streaming.py
 
 import numpy as np
 
-from dtfit import EACFilter, LSIFilter
+from dtfit import ImageFilter
 
 
 def track_drifting_parameter(rng) -> None:
@@ -26,10 +26,11 @@ def track_drifting_parameter(rng) -> None:
     b_true = np.where(t < 4, 0.30, 0.55)
     y = np.exp(b_true * t) + rng.normal(0, 0.05, T)
 
-    flt = EACFilter("exp(b*t)", "t", p0=[0.2], window_size=40, q_diag=[1e-4])
+    flt = ImageFilter("exp(b*t)", "t", p0=[0.2], window_size=40, q_diag=[1e-4],
+        basis="block")
     for ti, yi in zip(t, y):
         flt.partial_fit(ti, yi)
-    print("== EACFilter: track a mid-stream step ==")
+    print("== block basis: track a mid-stream step ==")
     print("final b estimate:", round(flt.params_["b"], 3), " (true 0.55)")
     print("drifts detected :", flt.n_drifts_)
 
@@ -39,25 +40,26 @@ def preset(rng) -> None:
     # the outlier-resilient gains. Both keep the full kwargs for overrides.
     t = np.linspace(0, 6, 300)
     y = 2.0 * np.sin(1.5 * t) + rng.normal(0, 0.05, t.size)
-    flt = EACFilter.tracking("A*sin(w*x)", "x")
+    flt = ImageFilter.tracking("A*sin(w*x)", "x", basis="block")
     for ti, yi in zip(t, y):
         flt.partial_fit(ti, yi)
-    print("\n== EACFilter.tracking() preset ==")
+    print("\n== tracking() preset, block basis ==")
     print("params:", {k: round(v, 3) for k, v in flt.params_.items()})
 
 
 def lsi_filter(rng) -> None:
-    # LSIFilter is the streaming twin of fit_lsi: its measurement is the
+    # The Legendre basis measures the window's spectrum: its measurement is the
     # window's Legendre spectrum (order+1 independent equations per step),
     # which identifies an oscillation's amplitude AND frequency -- shape the
     # single area measurement partly cancels. Here it recovers both online
     # from a noisy sinusoid.
     t = np.linspace(0, 20, 500)
     y = 2.0 * np.sin(1.3 * t) + rng.normal(0, 0.05, t.size)
-    flt = LSIFilter.tracking("A*sin(w*x)", "x", p0=[1.0, 1.0])
+    flt = ImageFilter.tracking("A*sin(w*x)", "x", p0=[1.0, 1.0],
+                             basis="legendre")
     for ti, yi in zip(t, y):
         flt.partial_fit(ti, yi)
-    print("\n== LSIFilter.tracking(): online amplitude + frequency ==")
+    print("\n== tracking(), Legendre basis: online amplitude + frequency ==")
     print("params:", {k: round(v, 3) for k, v in flt.params_.items()},
           " (true A=2.0, w=1.3)")
 
@@ -67,7 +69,8 @@ def window_result(rng) -> None:
     # so the streamed estimate comes with a calibrated covariance.
     t = np.linspace(0, 12, 400)
     y = 1.5 * np.exp(0.25 * t) + rng.normal(0, 0.05, t.size)
-    flt = LSIFilter("a*exp(b*t)", "t", p0=[1.0, 0.1], window_size=40)
+    flt = ImageFilter("a*exp(b*t)", "t", p0=[1.0, 0.1], window_size=40,
+        basis="legendre")
     for ti, yi in zip(t, y):
         flt.partial_fit(ti, yi)
     res = flt.result()
@@ -88,9 +91,10 @@ def fused_detection(rng) -> None:
     Y = np.column_stack(
         [amp * np.sin(1.2 * t + p) + rng.normal(0, 0.05, t.size)
          for p in phases])
-    flts = [LSIFilter("A*sin(1.2*t + p)", "t", p0=[1.0, 0.0], window_size=40,
+    flts = [ImageFilter("A*sin(1.2*t + p)", "t", p0=[1.0, 0.0], window_size=40,
                       order=4, adaptive_window=False, alpha=1e-15,
-                      cusum_k=float("inf")) for _ in range(K)]
+                      cusum_k=float("inf"),
+                          basis="legendre") for _ in range(K)]
     dof = sum(f.basis.n_coef for f in flts)
     threshold = chi2.ppf(1 - 1e-4, dof)
     first = None

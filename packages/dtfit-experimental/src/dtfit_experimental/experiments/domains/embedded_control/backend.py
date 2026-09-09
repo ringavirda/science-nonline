@@ -35,7 +35,7 @@ import time
 
 import numpy as np
 
-from dtfit.streaming import EACFilter, LSIFilter
+from dtfit.streaming import ImageFilter
 
 from dtfit_experimental.streaming import FilterBank
 
@@ -55,7 +55,7 @@ __all__ = [
     "make_multi", "MergedTracker", "run_tracker", "kalman_multi",
     "footprint_rows", "embedded_footprint",
     "load_fx", "fx_track",
-    "EACFilter", "LSIFilter", "FilterBank", "KalmanCA", "EKFParam", "RLSPredictor",
+    "ImageFilter", "FilterBank", "KalmanCA", "EKFParam", "RLSPredictor",
     "metrics",
 ]
 
@@ -130,9 +130,9 @@ class EAAd(_Ad):
     name = "dtfit EACFilter"
 
     def __init__(self, plant, window=None):
-        self.f = EACFilter(plant["expr"], "t", p0=list(plant["p0"]),
+        self.f = ImageFilter(plant["expr"], "t", p0=list(plant["p0"]),
                            window_size=window or plant["window"],
-                           order=len(plant["p0"]), q_diag=list(plant["q"]))
+                           order=len(plant["p0"]), q_diag=list(plant["q"]), basis="block")
 
     def step(self, t, y):
         self.f.partial_fit(t, y)
@@ -148,9 +148,9 @@ class LegAd(_Ad):
     name = "dtfit LSIFilter"
 
     def __init__(self, plant, window=None):
-        self.f = LSIFilter(plant["expr"], "t", p0=list(plant["p0"]),
+        self.f = ImageFilter(plant["expr"], "t", p0=list(plant["p0"]),
                            window_size=window or plant["window"],
-                           order=5, q_diag=list(plant["q"]))
+                           order=5, q_diag=list(plant["q"]), basis="legendre")
 
     def step(self, t, y):
         self.f.partial_fit(t, y)
@@ -465,7 +465,7 @@ class MergedTracker:
 
     def __init__(self, n_axes, p0, *, window=60, fuse_alpha=1e-4, inflate=4.0):
         self.bank = FilterBank.from_model(
-            OSC, "t", n_axes, filter_cls=LSIFilter, p0=list(p0),
+            OSC, "t", n_axes, basis="legendre", p0=list(p0),
             window_size=window, order=5, q_diag=[1e-3] * len(p0),
             cusum_h=np.inf)
         self.n_axes = n_axes
@@ -581,8 +581,8 @@ def fx_track(t, y):
     """Stream the FX series and track a local exponential ``a*exp(b*t)`` online,
     one step ahead, against the EKF, RLS and a random walk. Returns
     ``(actual, {method: predictions})``."""
-    ea = EACFilter("a*exp(b*t)", "t", p0=[1.0, 0.5], window_size=40, order=2,
-                   q_diag=[1e-4, 1e-4])
+    ea = ImageFilter("a*exp(b*t)", "t", p0=[1.0, 0.5], window_size=40, order=2,
+                   q_diag=[1e-4, 1e-4], basis="block")
     ekf = EKFParam("a*exp(b*t)", "t", [1.0, 0.5], q=1e-5, r=0.1)
     rls = RLSPredictor(order=2, lam=1.0, delta=1e3)
     preds = {"dtfit EACFilter": [], "EKF": [], "RLS": [], "random walk": []}

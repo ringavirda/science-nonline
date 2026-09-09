@@ -69,7 +69,7 @@ def load_co2():
 # Forecasters: fit on the train split, predict over the full t.
 def dtfit_exp(t_tr, y_tr, t_all):
     y0 = y_tr[0]
-    r = dt.fit_lsi(t_tr, y_tr / y0, "a*exp(b*x)", "x", bounds=[(0.1, 5), (0.05, 5)])
+    r = dt.fit("a*exp(b*x)", dt.Original(t_tr, y_tr / y0), "x", basis="legendre", bounds=[(0.1, 5), (0.05, 5)])
     return np.asarray(r.model(t_all)) * y0, "LSI exp"
 
 

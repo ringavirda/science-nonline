@@ -9,7 +9,7 @@ bounded problem must stay constrained, never be quietly solved unbounded.
 import numpy as np
 import pytest
 
-from dtfit import fit_lsi
+from dtfit import fit, Original
 from dtfit._core._spectral import solve_weighted_nlls
 
 
@@ -72,8 +72,14 @@ def test_fit_lsi_with_mixed_bounds_converges_and_respects_bound():
     rng = np.random.default_rng(0)
     x = np.linspace(0.0, 2.0, 120)
     y = 2.5 * np.exp(-1.2 * x) + rng.normal(0, 0.02, x.size)
-    result = fit_lsi(x, y, "a*exp(b*x)", "x", p0=[1.0, -0.5],
-                     bounds=[(0.0, np.inf), (-np.inf, np.inf)])
+    result = fit(
+        "a*exp(b*x)",
+        Original(x, y),
+        "x",
+        basis="legendre",
+        p0=[1.0, -0.5],
+        bounds=[(0.0, np.inf), (-np.inf, np.inf)],
+    )
     a, b = result.coeffs
     assert result.converged
     assert a >= 0.0
@@ -94,4 +100,10 @@ def test_lo_above_hi_raises_from_fit_lsi():
     x = np.linspace(0.0, 2.0, 60)
     y = np.exp(-x)
     with pytest.raises(ValueError, match="'b'"):
-        fit_lsi(x, y, "a*exp(b*x)", "x", bounds={"b": (2.0, -2.0)})
+        fit(
+            "a*exp(b*x)",
+            Original(x, y),
+            "x",
+            basis="legendre",
+            bounds={"b": (2.0, -2.0)},
+        )

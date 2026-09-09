@@ -64,7 +64,7 @@ been tested**, and this is a subtler gap than it first looks. The GPS experiment
    [09_streaming_filters.md](Cases-Analysis-09-Streaming-Filters)). So GPS produces real
    numbers again.
 2. **But GPS does not actually exercise `fit_joint`.** Its per-axis trajectory
-   path uses *independent* `EACFilter`s (one per axis), not a joint
+   path uses *independent* `ImageFilter(basis="block")`s (one per axis), not a joint
    shared-parameter fit -- the axes don't share a parameter, so there is nothing
    to couple. The experiment's mention of #4 is aspirational, not realized.
 

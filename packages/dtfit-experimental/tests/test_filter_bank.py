@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from scipy.stats import chi2
 
-from dtfit.streaming import EACFilter, LSIFilter
+from dtfit.streaming import ImageFilter
 from dtfit_experimental.streaming import FilterBank, FusedChiSquareDetector
 
 
@@ -26,7 +26,7 @@ def test_fused_detector_sums_the_current_filters_nis(seed=0):
     rng = np.random.default_rng(seed)
     t = np.linspace(0, 4 * np.pi, 300)
     bank = FilterBank.from_model(
-        OSC, "t", 2, filter_cls=LSIFilter, p0=[2.0, 2.5, 0.1],
+        OSC, "t", 2, basis="legendre", p0=[2.0, 2.5, 0.1],
         window_size=40, order=4)
     det = bank.fused_detector(alpha=1e-3)
     df = sum(f.basis.n_coef for f in bank.filters)
@@ -97,12 +97,12 @@ def test_filter_bank_process_backend_matches_serial():
 def test_filter_bank_matches_standalone_filters():
     t, Y, bs = _streams(K=3)
     kw: dict[str, Any] = dict(
-        p0=[1.0, 0.3], window_size=40, q_diag=[1e-4, 1e-3]
+        p0=[1.0, 0.3], window_size=40, q_diag=[1e-4, 1e-3], basis="block"
     )
     bank = FilterBank.from_model("a*exp(b*t)", "t", 3, **kw)
     bank.run(t, Y, n_jobs=1)
     for k in range(3):
-        flt = EACFilter("a*exp(b*t)", "t", **kw)
+        flt = ImageFilter("a*exp(b*t)", "t", **kw)
         for s in range(t.size):
             flt.partial_fit(t[s], Y[s, k])
         np.testing.assert_allclose(bank[k].p, flt.p, rtol=1e-9, atol=1e-9)
@@ -115,7 +115,7 @@ def test_filter_bank_skips_nan_sample_without_shape_corruption():
     t, Y, bs = _streams(K=3, n=300)
     Y[150, 1] = np.nan
     kw: dict[str, Any] = dict(
-        p0=[1.0, 0.3], window_size=40, q_diag=[1e-4, 1e-3]
+        p0=[1.0, 0.3], window_size=40, q_diag=[1e-4, 1e-3], basis="block"
     )
     bank = FilterBank.from_model("a*exp(b*t)", "t", 3, **kw)
     with pytest.warns(RuntimeWarning, match="non-finite sample skipped"):
@@ -161,7 +161,7 @@ def test_fused_detector_flags_multiaxis_fault():
     rng = np.random.default_rng(0)
     t, Y, fault_at = _multiaxis(rng, n=600)
     bank = FilterBank.from_model(
-        OSC, "t", 3, filter_cls=LSIFilter, p0=[2.0, 2.5, 0.1],
+        OSC, "t", 3, basis="legendre", p0=[2.0, 2.5, 0.1],
         window_size=60, order=5, q_diag=[1e-3] * 3,
         cusum_h=np.inf)
     det = bank.fused_detector(alpha=1e-4, inflate=4.0)
@@ -176,7 +176,7 @@ def test_fused_detector_flags_multiaxis_fault():
 
 def test_fused_detector_factory_matches_class():
     bank = FilterBank.from_model(
-        OSC, "t", 2, filter_cls=LSIFilter, p0=[2.0, 2.5, 0.1],
+        OSC, "t", 2, basis="legendre", p0=[2.0, 2.5, 0.1],
         window_size=40, order=4)
     det = bank.fused_detector(alpha=1e-3)
     assert isinstance(det, FusedChiSquareDetector)

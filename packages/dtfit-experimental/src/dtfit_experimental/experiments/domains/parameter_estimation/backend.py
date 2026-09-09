@@ -34,7 +34,7 @@ from __future__ import annotations
 import numpy as np
 
 import dtfit as dt
-from dtfit import fit_eac
+from dtfit import fit, Original
 from dtfit_experimental import fit_joint
 
 from dtfit_experimental.experiments.common import EXPERIMENTS_DIR, metrics
@@ -247,28 +247,25 @@ def est_lsi(m, t, y):
     # FFT and raises the spectral order. ``m["osc"]`` names the angular
     # frequency.
     p0 = list(m["p0"]) if m.get("p0") else [(lo + hi) / 2 for lo, hi in m["bounds"]]
-    r = dt.fit_lsi(t, y, m["expr"], "t", p0=p0, bounds=m["bounds"],
-                   freq_param=m.get("osc") or None)
+    r = dt.fit(m["expr"], dt.Original(t, y), "t", basis="legendre", p0=p0, bounds=m["bounds"], freq_param=m.get("osc") or None)
     return dict(zip(sorted(m["names"]), r.coeffs))
 
 
 def est_eac(m, t, y, loss="linear"):
     p0 = list(m["p0"]) if m.get("p0") else None
-    r = dt.fit_eac(t, y, m["expr"], "t", p0=p0, bounds=m["bounds"],
-                   loss=loss)
+    r = dt.fit(m["expr"], dt.Original(t, y), "t", basis="block", p0=p0, bounds=m["bounds"])
     return dict(zip(sorted(m["names"]), r.coeffs))
 
 
 def est_adaptive(m, t, y):
     p0 = list(m["p0"]) if m.get("p0") else None
-    r = fit_eac(t, y, m["expr"], "t", p0=p0, window_mode="curvature")
+    r = fit(m["expr"], Original(t, y), "t", basis="block", p0=p0)
     return dict(zip(sorted(m["names"]), r.coeffs))
 
 
 def est_robust(m, t, y):
     """The robust image: Huber IRLS on the basis regression before the fit."""
-    r = dt.fit_eac(t, y, m["expr"], "t", p0=m["p0"], bounds=m["bounds"],
-                   robust=True)
+    r = dt.fit(m["expr"], dt.Original(t, y), "t", basis="block", p0=m["p0"], bounds=m["bounds"], robust=True)
     return dict(zip(sorted(m["names"]), r.coeffs))
 
 
@@ -509,8 +506,7 @@ def joint_channels(rng):
     indep = []
     for (tx, yx) in chans:
         try:
-            r = dt.fit_eac(tx, yx, "K*(1-exp(-t/tau))", "t", p0=[1.0, 1.0],
-                           bounds=[(0.1, 10), (0.05, 5)])
+            r = dt.fit("K*(1-exp(-t/tau))", dt.Original(tx, yx), "t", basis="block", p0=[1.0, 1.0], bounds=[(0.1, 10), (0.05, 5)])
             indep.append(float(r.coeffs[1]))     # sorted names [K, tau] -> tau
         except Exception:
             pass

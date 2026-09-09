@@ -40,7 +40,7 @@ from scipy.optimize import curve_fit
 
 import dtfit as dt
 from dtfit.reference import find_degree, fit_dsb
-from dtfit.streaming import EACFilter
+from dtfit.streaming import ImageFilter
 from dtfit_experimental.scale import PartitionedLSI, fit_lsi_batched
 
 DATA_DIR = Path(__file__).resolve().parent / "data"
@@ -135,10 +135,10 @@ def table_model_exponential() -> str:
         rows.append([name, ab, f"{m['R2']:.4f}", f"{m['RMSE']:.4g}",
                      f"{m['MAPE']:.2f}", f"{dt_ms:.1f}"])
 
-    res, ms = timed(lambda: dt.fit_lsi(x, y, expr, var, bounds=bounds))
+    res, ms = timed(lambda: dt.fit(expr, dt.Original(x, y), var, basis="legendre", bounds=bounds))
     add("LSI", res.coeffs, np.asarray(res.model(x)), ms)
 
-    res, ms = timed(lambda: dt.fit_eac(x, y, expr, var, p0=[1.0, 1.0]))
+    res, ms = timed(lambda: dt.fit(expr, dt.Original(x, y), var, basis="block", p0=[1.0, 1.0]))
     add("EAC", res.coeffs, np.asarray(res.model(x)), ms)
 
     def sci():
@@ -182,7 +182,7 @@ def table_dsb_additive() -> str:
     m = metrics(clean, np.asarray(res.model(x)))
     rows.append(["DSB (symbolic ref.)", f"{m['R2']:.4f}", f"{m['RMSE']:.4g}",
                  f"{m['MAPE']:.2f}", f"{ms:.1f}"])
-    res, ms = timed(lambda: dt.fit_lsi(x, y, expr, var))
+    res, ms = timed(lambda: dt.fit(expr, dt.Original(x, y), var, basis="legendre"))
     m = metrics(clean, np.asarray(res.model(x)))
     rows.append(["LSI (same model)", f"{m['R2']:.4f}", f"{m['RMSE']:.4g}",
                  f"{m['MAPE']:.2f}", f"{ms:.1f}"])
@@ -214,8 +214,8 @@ def table_real_data() -> str:
 
     cov_rows = []
     for name, coeffs in [
-        ("LSI", dt.fit_lsi(t, ys, "a*exp(b*x)", "x", bounds=bounds).coeffs),
-        ("EAC", dt.fit_eac(t, ys, "a*exp(b*x)", "x", p0=[ys[0], 1.0]).coeffs),
+        ("LSI", dt.fit("a*exp(b*x)", dt.Original(t, ys), "x", basis="legendre", bounds=bounds).coeffs),
+        ("EAC", dt.fit("a*exp(b*x)", dt.Original(t, ys), "x", basis="block", p0=[ys[0], 1.0]).coeffs),
     ]:
         a, b = coeffs
         m = metrics(y, a * np.exp(b * t) * y[0])
@@ -234,8 +234,8 @@ def table_real_data() -> str:
     tt = np.arange(n) * h
     r0 = rate[0]
     rs = rate / r0
-    flt = EACFilter("a*exp(b*x)", "x", p0=[1.0, 0.0],
-                           window_size=30, q_diag=[5e-3, 5e-3])
+    flt = ImageFilter("a*exp(b*x)", "x", p0=[1.0, 0.0],
+                           window_size=30, q_diag=[5e-3, 5e-3], basis="block")
     track, truth, drifts = [], [], 0
     for i in range(n):
         flt.partial_fit(tt[i], rs[i])
@@ -248,9 +248,9 @@ def table_real_data() -> str:
     m_step = metrics(truth[1:], track[:-1])
     m_rw = metrics(truth[1:], truth[:-1])
     fx_rows = [
-        ["EACFilter (lag-1 tracking)", f"{m_track['R2']:.4f}",
+        ["block image (lag-1 tracking)", f"{m_track['R2']:.4f}",
          f"{m_track['RMSE']:.4g}", f"{m_track['MAPE']:.2f}"],
-        ["EACFilter (1-step-ahead)", f"{m_step['R2']:.4f}",
+        ["block image (1-step-ahead)", f"{m_step['R2']:.4f}",
          f"{m_step['RMSE']:.4g}", f"{m_step['MAPE']:.2f}"],
         ["naive random walk (1-step)", f"{m_rw['R2']:.4f}",
          f"{m_rw['RMSE']:.4g}", f"{m_rw['MAPE']:.2f}"],
@@ -271,7 +271,7 @@ def table_real_data() -> str:
 def fig_lsi() -> None:
     x, y, clean, _ = synthetic_exponential()
     n_tr = int(x.size * 0.7)
-    res = dt.fit_lsi(x[:n_tr], y[:n_tr], "a*exp(b*x)", "x", bounds=[(0.2, 5), (0.5, 4)])
+    res = dt.fit("a*exp(b*x)", dt.Original(x[:n_tr], y[:n_tr]), "x", basis="legendre", bounds=[(0.2, 5), (0.5, 4)])
     yhat = np.asarray(res.model(x))
 
     fig, ax = plt.subplots(1, 2, figsize=(10, 3.8))
@@ -304,7 +304,7 @@ def fig_lsi() -> None:
 
 def fig_eac() -> None:
     x, y, clean, _ = synthetic_atan()
-    res = dt.fit_eac(x, y, "a*atan(w*x)", "x", p0=[1.0, 1.0])
+    res = dt.fit("a*atan(w*x)", dt.Original(x, y), "x", basis="block", p0=[1.0, 1.0])
     yhat = np.asarray(res.model(x))
     a, w = res.coeffs
 
@@ -347,8 +347,8 @@ def fig_filter() -> None:
     t = np.arange(n) * h
     r0 = rate[0]
     rs = rate / r0
-    flt = EACFilter("a*exp(b*x)", "x", p0=[1.0, 0.0],
-                           window_size=30, q_diag=[5e-3, 5e-3])
+    flt = ImageFilter("a*exp(b*x)", "x", p0=[1.0, 0.0],
+                           window_size=30, q_diag=[5e-3, 5e-3], basis="block")
     track, drift_idx = [], []
     b_hist = []
     for i in range(n):
@@ -417,8 +417,8 @@ def fig_comparison() -> None:
     x, y, clean, _ = synthetic_exponential()
     expr, var = "a*exp(b*x)", "x"
     preds = {}
-    preds["LSI"] = np.asarray(dt.fit_lsi(x, y, expr, var, bounds=[(0.2, 5), (0.5, 4)]).model(x))
-    preds["EAC"] = np.asarray(dt.fit_eac(x, y, expr, var, p0=[1.0, 1.0]).model(x))
+    preds["LSI"] = np.asarray(dt.fit(expr, dt.Original(x, y), var, basis="legendre", bounds=[(0.2, 5), (0.5, 4)]).model(x))
+    preds["EAC"] = np.asarray(dt.fit(expr, dt.Original(x, y), var, basis="block", p0=[1.0, 1.0]).model(x))
     p, _ = curve_fit(lambda xx, a, b: a * np.exp(b * xx), x, y, p0=[1, 1], maxfev=10000)
     preds["SciPy\ncurve_fit"] = p[0] * np.exp(p[1] * x)
     c = np.polyfit(x, y, 5)
@@ -450,10 +450,10 @@ def fig_lsi_oscillatory() -> None:
     clean = A_t * np.sin(w_t * x + p_t)
     y = clean + rng.normal(0, 0.15, x.size)
 
-    recipe = dt.fit_lsi(x, y, "A*sin(w*x + p)", "x", freq_param="w")
+    recipe = dt.fit("A*sin(w*x + p)", dt.Original(x, y), "x", basis="legendre", freq_param="w")
     yhat_r = np.asarray(recipe.model(x))
     try:  # default LSI: order 5, no FFT seed, so it locks onto a wrong cycle
-        naive = dt.fit_lsi(x, y, "A*sin(w*x + p)", "x")
+        naive = dt.fit("A*sin(w*x + p)", dt.Original(x, y), "x", basis="legendre")
         yhat_n = np.asarray(naive.model(x))
         w_n = naive.params["w"]
     except Exception:
@@ -493,7 +493,7 @@ def fig_eac_adaptive() -> None:
     L_t, k_t, x0_t = 1.0, 2.5, 5.0
     clean = L_t / (1.0 + np.exp(-k_t * (x - x0_t)))   # sharp step at x0=5
     y = clean + rng.normal(0, 0.02, x.size)
-    res = dt.fit_eac(x, y, "L/(1 + exp(-k*(x - x0)))", "x", p0=[1.0, 1.0, 5.0])
+    res = dt.fit("L/(1 + exp(-k*(x - x0)))", dt.Original(x, y), "x", basis="block", p0=[1.0, 1.0, 5.0])
     yhat = np.asarray(res.model(x))
     edges = np.linspace(x[0], x[-1], res.image_order + 1)[1:-1]
 
@@ -514,7 +514,7 @@ def fig_lsi_filter() -> None:
     measurement locks onto the cycle's frequency. The EACFilter's area
     measurement nearly cancels over a cycle and cannot; the LSIFilter exists
     for that reason."""
-    from dtfit.streaming import LSIFilter, EACFilter
+    from dtfit.streaming import ImageFilter
 
     rng = np.random.default_rng(5)
     t = np.linspace(0, 50, 1200)
@@ -529,16 +529,16 @@ def fig_lsi_filter() -> None:
             pr.append(float(flt.predict(np.array([t[i]]))[0]) if len(flt._t) else np.nan)
         return np.array(wh), np.array(pr)
 
-    w_lsi, p_lsi = run(LSIFilter("A*sin(w*t)", "t", p0=[1.0, 0.8],
-                                 window_size=120, order=6, q_diag=[1e-3, 1e-3]))
-    w_eac, p_eac = run(EACFilter("A*sin(w*t)", "t", p0=[1.0, 0.8],
-                                 window_size=120, q_diag=[1e-3, 1e-3]))
+    w_lsi, p_lsi = run(ImageFilter("A*sin(w*t)", "t", p0=[1.0, 0.8],
+                                 window_size=120, order=6, q_diag=[1e-3, 1e-3], basis="legendre"))
+    w_eac, p_eac = run(ImageFilter("A*sin(w*t)", "t", p0=[1.0, 0.8],
+                                 window_size=120, q_diag=[1e-3, 1e-3], basis="block"))
 
     fig, ax = plt.subplots(1, 2, figsize=(10, 3.8))
     sl = slice(int(t.size * 0.62), int(t.size * 0.74))   # zoom for the overlay
     ax[0].plot(t[sl], y[sl], "0.75", lw=1.2, label="signal")
-    ax[0].plot(t[sl], p_lsi[sl], "tab:blue", lw=1.6, label="LSIFilter (spectrum)")
-    ax[0].plot(t[sl], p_eac[sl], "tab:orange", lw=1.6, ls="--", label="EACFilter (area)")
+    ax[0].plot(t[sl], p_lsi[sl], "tab:blue", lw=1.6, label="legendre image (spectrum)")
+    ax[0].plot(t[sl], p_eac[sl], "tab:orange", lw=1.6, ls="--", label="block image (area)")
     ax[0].set_title("Online 1-step prediction — A·sin(w·t)")
     ax[0].set_xlabel("t"); ax[0].set_ylabel("y"); ax[0].legend(fontsize=8)
 
@@ -555,7 +555,6 @@ def fig_lsi_filter() -> None:
 def fig_filter_bank() -> None:
     """FilterBank + fused χ²: a fault shared across 3 channels is weak per-axis but
     strong in the pooled statistic."""
-    from dtfit.streaming import LSIFilter
     from dtfit_experimental.streaming import FilterBank
 
     rng = np.random.default_rng(6)
@@ -569,7 +568,7 @@ def fig_filter_bank() -> None:
         amps[k] * env * np.sin(w_t * t) + rng.normal(0, 0.15, t.size) for k in range(K)
     ])
 
-    bank = FilterBank.from_model("A*sin(w*t)", "t", K, filter_cls=LSIFilter,
+    bank = FilterBank.from_model("A*sin(w*t)", "t", K, basis="legendre",
                                  p0=[2.0, 1.3], window_size=120, order=6,
                                  q_diag=[2e-3, 5e-4])
     det = bank.fused_detector(alpha=1e-3, inflate=4.0, warmup=550, cooldown=700)
@@ -618,7 +617,7 @@ def fig_scaling() -> None:
     clean = a_t * np.exp(b_t * x)
     y = clean + rng.normal(0, 0.03 * clean.std(), x.size)
 
-    whole = dt.fit_lsi(x, y, "a*exp(b*x)", "x")
+    whole = dt.fit("a*exp(b*x)", dt.Original(x, y), "x", basis="legendre")
     acc = PartitionedLSI("a*exp(b*x)", "x", domain=(0.0, 1.5), order=6)
     n_chunks = 8
     bnds = np.linspace(0, x.size, n_chunks + 1).astype(int)

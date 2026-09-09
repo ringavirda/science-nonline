@@ -27,7 +27,7 @@ import numpy as np
 
 import dtfit as dt
 from dtfit_experimental import fit_joint
-from dtfit.streaming import EACFilter
+from dtfit.streaming import ImageFilter
 
 from dtfit_experimental.experiments.common import metrics, timed
 from dtfit_experimental.experiments.common import baselines as bl
@@ -90,10 +90,9 @@ def damped_table(t, y, clean, true, *, with_scipy=True, with_mlp=True):
                      "R2": m["R2"], "RMSE": m["RMSE"], "fit (ms)": ms})
         preds[label] = pred
 
-    r, ms = timed(lambda: dt.fit_eac(t, y, DAMP_EXPR, "t", p0=p0, bounds=(lo, hi)))
+    r, ms = timed(lambda: dt.fit(DAMP_EXPR, dt.Original(t, y), "t", basis="block", p0=p0, bounds=(lo, hi)))
     add("EAC", r.coeffs, np.asarray(r.model(t)), ms)
-    r, ms = timed(lambda: dt.fit_lsi(t, y, DAMP_EXPR, "t", p0=p0,
-                                     bounds=list(zip(lo, hi))))
+    r, ms = timed(lambda: dt.fit(DAMP_EXPR, dt.Original(t, y), "t", basis="legendre", p0=p0, bounds=list(zip(lo, hi))))
     add("LSI", r.coeffs, np.asarray(r.model(t)), ms)
     if with_scipy:
         p, ms = timed(lambda: bl.scipy_curve_fit(t, y, _damped, p0, bounds=(lo, hi)))
@@ -118,9 +117,9 @@ def first_order_table(t, y, clean, true, *, with_scipy=True, with_mlp=True):
                      "R2": m["R2"], "RMSE": m["RMSE"], "fit (ms)": ms})
         preds[label] = pred
 
-    r, ms = timed(lambda: dt.fit_eac(t, y, FO_EXPR, "t", p0=[1.0, 1.0]))
+    r, ms = timed(lambda: dt.fit(FO_EXPR, dt.Original(t, y), "t", basis="block", p0=[1.0, 1.0]))
     add("EAC", r.coeffs, np.asarray(r.model(t)), ms)
-    r, ms = timed(lambda: dt.fit_lsi(t, y, FO_EXPR, "t", p0=[1.0, 1.0]))
+    r, ms = timed(lambda: dt.fit(FO_EXPR, dt.Original(t, y), "t", basis="legendre", p0=[1.0, 1.0]))
     add("LSI", r.coeffs, np.asarray(r.model(t)), ms)
 
     def f(tt, K, tau):
@@ -153,9 +152,9 @@ def regime_change(rng, n=900):
     phase = np.cumsum(wd * dtt)
     clean = A * np.exp(-z_arr * w * t) * np.sin(phase)
     y = clean + rng.normal(0, 0.05, n)
-    flt = EACFilter(DAMP_EXPR, "t", p0=[2.0, 2.5, 0.1],
+    flt = ImageFilter(DAMP_EXPR, "t", p0=[2.0, 2.5, 0.1],
                     window_size=60, q_diag=[1e-3, 1e-3, 1e-3],
-                    order=3)
+                    order=3, basis="block")
     track, z_hist, drift_idx = [], [], []
     for i in range(n):
         flt.partial_fit(t[i], y[i])
@@ -184,7 +183,6 @@ def mimo_joint(rng, n=200):
     # independent per-channel EAC for contrast
     indep_w = []
     for (tx, yx) in chans:
-        r = dt.fit_eac(tx, yx, DAMP_EXPR, "t", p0=[1.0, 2.5, 0.1],
-                       bounds=([0.1, 1, 0.01], [5, 6, 0.9]))
+        r = dt.fit(DAMP_EXPR, dt.Original(tx, yx), "t", basis="block", p0=[1.0, 2.5, 0.1], bounds=([0.1, 1, 0.01], [5, 6, 0.9]))
         indep_w.append(dict(zip(["A", "w", "z"], r.coeffs))["w"])
     return w_true, amps, j, indep_w, chans, t

@@ -26,7 +26,7 @@ import tracemalloc
 import numpy as np
 
 import dtfit as dt
-from dtfit.streaming import EACFilter
+from dtfit.streaming import ImageFilter
 from dtfit_experimental.scale import PartitionedLSI
 
 __all__ = [
@@ -96,8 +96,8 @@ def online_track(n, *, seed=0, batch_sizes=(10_000, 50_000, 250_000)):
     phase = np.cumsum(w * dt_)
     y = 3.0 * np.sin(phase) + rng.normal(0, 0.3, n)
 
-    flt = EACFilter("A*sin(w*t)", "t", p0=[2.0, 1.0], window_size=50,
-                    q_diag=[1e-3, 5e-4], order=2)
+    flt = ImageFilter("A*sin(w*t)", "t", p0=[2.0, 1.0], window_size=50,
+                    q_diag=[1e-3, 5e-4], order=2, basis="block")
     tracemalloc.start()
     costs, track, w_hist, drift = [], [], [], []
     for i in range(n):
@@ -117,14 +117,13 @@ def online_track(n, *, seed=0, batch_sizes=(10_000, 50_000, 250_000)):
     # timing fit_eac at increasing sizes shows that growth. The throwaway fit
     # first warms the SymPy lambdify and solver caches; without it the
     # smallest size absorbs the one-off compilation cost.
-    dt.fit_eac(np.linspace(0, 40, 500), np.sin(np.linspace(0, 40, 500)),
-               "A*sin(w*t)", "t", p0=[2.0, 1.0])
+    dt.fit("A*sin(w*t)", dt.Original(np.linspace(0, 40, 500), np.sin(np.linspace(0, 40, 500))), "t", basis="block", p0=[2.0, 1.0])
     batch_costs = []
     for m in batch_sizes:
         tm = np.linspace(0, 40, m)
         ym = 3.0 * np.sin(1.0 * tm) + rng.normal(0, 0.3, m)
         t0 = time.perf_counter()
-        dt.fit_eac(tm, ym, "A*sin(w*t)", "t", p0=[2.0, 1.0])
+        dt.fit("A*sin(w*t)", dt.Original(tm, ym), "t", basis="block", p0=[2.0, 1.0])
         batch_costs.append((m, (time.perf_counter() - t0) * 1e3))
 
     return {"us_step": us_step, "peak_mb": peak_mb, "batch_costs": batch_costs,

@@ -16,14 +16,14 @@ import sys
 
 import numpy as np
 
-from dtfit import fit_lsi, FittingResult
+from dtfit import FittingResult, fit, Original
 
 
 def main() -> None:
     rng = np.random.default_rng(0)
     x = np.linspace(0, 4, 250)
     y = 0.5 + 2.0 * np.exp(0.5 * x) + rng.normal(0, 0.2, x.size)
-    res = fit_lsi(x, y, "a0 + a1*exp(a2*x)", "x")
+    res = fit("a0 + a1*exp(a2*x)", Original(x, y), "x", basis="legendre")
 
     # fit_report -- sample/param counts, RSS, RMSE, r2, AIC/BIC, Durbin-Watson.
     from dtfit.diagnostics import fit_report, residual_diagnostics

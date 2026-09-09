@@ -15,10 +15,27 @@ from typing import Any, Callable, Sequence
 
 import numpy as np
 
-from dtfit import fit_lsi, fit_eac
+from dtfit import fit, Original
 from dtfit.types import FittingResult
 
-_FITTERS: dict[str, Callable[..., FittingResult]] = {"lsi": fit_lsi, "eac": fit_eac}
+def _fit_in(basis, x, y, expr, var, **kw):
+    order = kw.pop("order", None)
+    if "k_star" in kw:
+        v = kw.pop("k_star")
+        order = None if v in (None, "auto") else v
+    if "n_windows" in kw:
+        order = kw.pop("n_windows")
+    original = Original(
+        x, y, sigma=kw.pop("sigma", None),
+        nan_policy=kw.pop("nan_policy", "raise"),
+    )
+    return fit(expr, original, var, basis=basis, order=order, **kw)
+
+
+_FITTERS: dict[str, Callable[..., FittingResult]] = {
+    "lsi": lambda *a, **kw: _fit_in("legendre", *a, **kw),
+    "eac": lambda *a, **kw: _fit_in("block", *a, **kw),
+}
 
 
 @dataclass

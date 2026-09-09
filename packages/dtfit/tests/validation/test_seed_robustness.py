@@ -13,7 +13,7 @@ import warnings
 import numpy as np
 import pytest
 
-from dtfit import fit_lsi
+from dtfit import fit, Original
 from accuracy.scenarios import SCENARIOS
 from accuracy.harness import ordered_params, param_err, r2, predict
 
@@ -65,7 +65,8 @@ def test_basin_stability_to_seed_perturbation(name, factor):
     names = ordered_params(scn)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        res = fit_lsi(x, y, m.expr, m.var, p0=perturbed)
+        res = fit(m.expr, Original(x, y), m.var,
+            basis="legendre", p0=perturbed)
     assert np.all(np.isfinite(res.coeffs))
     assert param_err(scn, names, res.coeffs) <= 0.12, (
         f"{name} from {factor}x seed: "

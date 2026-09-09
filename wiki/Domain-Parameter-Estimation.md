@@ -1,6 +1,6 @@
 # Domain -- Model parameter estimation (comprehensive)
 
-> **Status (2026-09):** The adaptive-window EAC (#6) is retired; `fit_eac` places
+> **Status (2026-09):** The adaptive-window EAC (#6) is retired; `fit(basis="block")` places
 > equal windows. The table's method labels below name the variant that was run.
 > The sections below describe the study as it was run.
 
@@ -12,8 +12,8 @@ Recover physical parameters from noisy responses of systems with a known nonline
 
 ## Methods under test (dtfit)
 
-- **LSI** (`fit_lsi`) -- integral least-squares matching the model's Legendre spectrum to the data's; spectral projection smooths noise, with a global differential-evolution search before local refinement. **Oscillatory families** are fitted with `fit_lsi(..., freq_param=...)` (an FFT frequency seed drives the oscillatory recipe; else the low-order default erases the cycle).
-- **EAC** (`fit_eac`) -- equal areas over four windows per parameter (overdetermined, noise-averaging); `robust=True` is its outlier defence.
+- **LSI** (`fit(basis="legendre")`) -- integral least-squares matching the model's Legendre spectrum to the data's; spectral projection smooths noise, with a global differential-evolution search before local refinement. **Oscillatory families** are fitted with `fit(..., freq_param=..., basis="legendre")` (an FFT frequency seed drives the oscillatory recipe; else the low-order default erases the cycle).
+- **EAC** (`fit(basis="block")`) -- equal areas over four windows per parameter (overdetermined, noise-averaging); `robust=True` is its outlier defence.
 - **#6 adaptive-window EAC, retired** -- the table's adaptive-EAC columns are the variant that was run.
 - **#3 overlapping-window ensemble** -- a study finding: a median over
   overlapping-window fits rejects whole corrupted windows; the shipped tool
@@ -122,7 +122,7 @@ Mean parameter-recovery error (over seeds) as the Gaussian noise grows to 40%. E
 
 ### B2. Parameter error vs outlier fraction
 
-With gross **evenly-scattered** outliers, the dedicated **robust NLLS (soft-L1) is the clear winner** on this sweep -- the honest verdict that scattered outliers want a robust loss, not window ensembling. Experiment #3 measured that a median over overlapping-window fits rejects whole outlier-corrupted **windows** for a different corruption mode: a burst that wipes out a contiguous stretch, rather than sprinkled point spikes. The shipped tool for that corruption mode is the robust image on the global (Legendre) basis (`fit_lsi(..., robust=True)`), which measures 1.41 against 3.65 for the same robust image on the block basis under a contiguous burst; the overlapping-window ensemble is not part of `dtfit`.
+With gross **evenly-scattered** outliers, the dedicated **robust NLLS (soft-L1) is the clear winner** on this sweep -- the honest verdict that scattered outliers want a robust loss, not window ensembling. Experiment #3 measured that a median over overlapping-window fits rejects whole outlier-corrupted **windows** for a different corruption mode: a burst that wipes out a contiguous stretch, rather than sprinkled point spikes. The shipped tool for that corruption mode is the robust image on the global (Legendre) basis (`fit(..., robust=True, basis="legendre")`), which measures 1.41 against 3.65 for the same robust image on the block basis under a contiguous burst; the overlapping-window ensemble is not part of `dtfit`.
 
 ![Parameter error vs outlier fraction (log scale), damped oscillator.](figures/figures-outlier_sweep.png)
 

@@ -916,8 +916,8 @@ def filter_characteristics(lengths: tuple[int, ...] = (1000, 10000, 100000)) -> 
                      "us / sample": round(us, 1)})
     ref = float("nan")
     try:
-        from dtfit import LSIFilter
-        f2 = LSIFilter("a0 + a1*t", "t", window_size=60)
+        from dtfit import ImageFilter
+        f2 = ImageFilter("a0 + a1*t", "t", window_size=60, basis="legendre")
         y = np.cumsum(rng.standard_normal(5000))
         t0 = time.perf_counter()
         for i, v in enumerate(y):

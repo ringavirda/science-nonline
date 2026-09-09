@@ -6,29 +6,30 @@ import warnings
 import numpy as np
 import pytest
 
-from dtfit import fit_lsi, fit_eac, FittingResult
+from dtfit import FittingResult, fit, Original
 from dtfit.models import resolve_model, result_kwargs
 from dtfit._stats import information_criteria, nlls_covariance
 
 
 @pytest.fixture
-def fit():
+def fitted():
     rng = np.random.default_rng(0)
     t = np.linspace(0, 3, 300)
     y = 2.0 * np.exp(0.8 * t) + rng.normal(0, 0.05, t.size)
-    return fit_lsi(t, y, "a*exp(b*t)", "t", p0=[1.0, 1.0]), t, y
+    return fit("a*exp(b*t)", Original(t, y), "t",
+        basis="legendre", p0=[1.0, 1.0]), t, y
 
 
-def test_named_params_and_back_compat(fit):
-    r, t, y = fit
+def test_named_params_and_back_compat(fitted):
+    r, t, y = fitted
     assert set(r.params) == {"a", "b"}
     assert r.params["a"] == pytest.approx(2.0, abs=0.1)
     assert r.coeffs.shape == (2,)
     assert np.asarray(r.model(t)).shape == t.shape
 
 
-def test_stderr_and_confidence_intervals(fit):
-    r, t, y = fit
+def test_stderr_and_confidence_intervals(fitted):
+    r, t, y = fitted
     se = r.stderr()
     assert set(se) == {"a", "b"} and all(v >= 0 for v in se.values())
     ci = r.confidence_intervals(level=0.95)
@@ -36,15 +37,15 @@ def test_stderr_and_confidence_intervals(fit):
     assert lo < r.params["b"] < hi
 
 
-def test_predict_with_std(fit):
-    r, t, y = fit
+def test_predict_with_std(fitted):
+    r, t, y = fitted
     yhat, std = r.predict(t, return_std=True)
     assert yhat.shape == t.shape and std.shape == t.shape
     assert np.all(std >= 0)
 
 
-def test_serialization_roundtrip(fit):
-    r, t, y = fit
+def test_serialization_roundtrip(fitted):
+    r, t, y = fitted
     d = r.to_dict()
     assert set(d) >= {"expr", "var", "names", "coeffs", "cov"}
     r2 = FittingResult.from_dict(d)
@@ -53,17 +54,17 @@ def test_serialization_roundtrip(fit):
     assert r2.x_range == r.x_range
 
 
-def test_convergence_flag_is_reported(fit):
-    r, t, y = fit
+def test_convergence_flag_is_reported(fitted):
+    r, t, y = fitted
     assert r.converged is True
     assert isinstance(r.message, str) and r.message
     # eac populates it too
-    re = fit_eac(t, y, "a*exp(b*t)", "t", p0=[1.0, 1.0])
+    re = fit("a*exp(b*t)", Original(t, y), "t", basis="block", p0=[1.0, 1.0])
     assert re.converged is True
 
 
-def test_predict_warns_only_on_extrapolation(fit):
-    r, t, y = fit
+def test_predict_warns_only_on_extrapolation(fitted):
+    r, t, y = fitted
     assert r.x_range is not None
     assert r.x_range[0] <= t[0] and r.x_range[1] >= t[-1]
     # inside the fitted range: no warning
@@ -79,8 +80,8 @@ def test_predict_warns_only_on_extrapolation(fit):
         r.predict(np.array([t[-1] + 10.0]))
 
 
-def test_summary_is_str(fit):
-    r, _, _ = fit
+def test_summary_is_str(fitted):
+    r, _, _ = fitted
     s = r.summary()
     assert "a =" in s and "b =" in s
 
@@ -96,10 +97,10 @@ def test_no_expr_result_degrades_gracefully():
         r.to_dict()
 
 
-def test_param_model_std_band_matches_expr_band(fit):
+def test_param_model_std_band_matches_expr_band(fitted):
     # a callable-only result must reproduce the expr-based std band by
     # finite-differencing param_model, to ~1e-6.
-    r, t, y = fit
+    r, t, y = fitted
     coeffs = r.coeffs
 
     def f(x, a, b):
@@ -134,8 +135,8 @@ def test_rsquared_aic_bic_math():
     assert bare.rsquared is None and bare.aic is None and bare.bic is None
 
 
-def test_stats_roundtrip_and_summary(fit):
-    r, t, y = fit
+def test_stats_roundtrip_and_summary(fitted):
+    r, t, y = fitted
     yhat = r.predict(t)
     rss = float(np.sum((y - yhat) ** 2))
     tss = float(np.sum((y - np.mean(y)) ** 2))
@@ -150,16 +151,16 @@ def test_stats_roundtrip_and_summary(fit):
     assert "R^2" in r2.summary()
 
 
-def test_residuals_helper(fit):
-    r, t, y = fit
+def test_residuals_helper(fitted):
+    r, t, y = fitted
     res = r.residuals(t, y)
     assert res.shape == t.shape
     np.testing.assert_allclose(res, y - r.predict(t))
 
 
-def test_predict_pandas_in_pandas_out(fit):
+def test_predict_pandas_in_pandas_out(fitted):
     pd = pytest.importorskip("pandas")
-    r, t, _ = fit
+    r, t, _ = fitted
     idx = pd.date_range("2024-01-01", periods=t.size, freq="D")
     ts = pd.Series(t, index=idx)
 
@@ -198,7 +199,7 @@ def test_covariance_absolute_sigma_invariants():
     cov_def_res = nlls_covariance(jac, k * res, n)
     np.testing.assert_allclose(cov_def_res, k**2 * cov_def, rtol=1e-10)
 
-    # scaling jac and res together rescales the assumed sigma, not the fit,
+    # scaling jac and res together rescales the assumed sigma, not the fitted,
     # so the default cov comes out unchanged
     cov_def_global = nlls_covariance(k * jac, k * res, n)
     np.testing.assert_allclose(cov_def_global, cov_def, rtol=1e-10)
