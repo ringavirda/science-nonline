@@ -16,3 +16,15 @@ Nothing here receives new development. Depends on ``dtfit`` only.
 """
 
 __version__ = "0.1.0"
+
+from .book import (  # noqa: E402
+    dsb_balance, eac_areas, intermediate_polynomial, lsi_integral_monomial,
+    monomial_weight_matrix,
+)
+from .dsb import find_degree, fit_dsb  # noqa: E402
+
+__all__ = [
+    "dsb_balance", "eac_areas", "intermediate_polynomial",
+    "lsi_integral_monomial", "monomial_weight_matrix", "find_degree",
+    "fit_dsb", "__version__",
+]
