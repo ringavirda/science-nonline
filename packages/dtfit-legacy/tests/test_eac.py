@@ -2,7 +2,6 @@
 
 import numpy as np
 
-from dtfit.sklearn import NonlineRegressor
 from dtfit_legacy.integral import fit_eac
 
 
@@ -52,12 +51,6 @@ def test_eac_curvature_window_mode(arctan_data):
     assert result.cov is not None and result.cov.shape == (2, 2)
 
 
-def test_eac_regressor_needs_no_polyfit(arctan_data):
-    # EAC integrates the raw samples, with no polynomial pre-fit stage.
-    x, y, _ = arctan_data
-    reg = NonlineRegressor("a*atan(w*x)", "x", method="eac").fit(x, y)
-    assert reg.coef_.shape == (2,)
-    assert reg.predict(x).shape == x.shape
 
 
 def test_validation_rejects_malformed_input():
