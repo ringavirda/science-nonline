@@ -107,11 +107,11 @@ On clean Gaussian noise the **EKF wins** -- it is the pointwise maximum-likeliho
 
 With gross outliers (sensor spikes, GPS multipath) the picture **inverts**: a single bad sample is a huge pointwise innovation that throws the EKF -- its error explodes -- while the integral filters average the glitch over the window and stay usable. This is the honest case for the dtfit filters in embedded sensing.
 
-| outliers % | 20% |
-|---|---|
-| dtfit Legendre filter | 25.8066 |
-| dtfit block filter | 4.7933 |
-| EKF | 2.4194 |
+| outliers % | 0% | 10% |
+|---|---|---|
+| dtfit Legendre filter | 18.4245 | 48.8573 |
+| dtfit block filter | 23.5921 | 21.9452 |
+| EKF | 1.0285 | 730.6008 |
 
 ### 2c. Sample dropout / irregular sampling
 
