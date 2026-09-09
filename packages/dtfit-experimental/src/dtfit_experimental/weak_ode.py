@@ -15,7 +15,11 @@ projected. Two structural tricks widen the reach:
 
 The projection is exactly the image's derivative-basis machinery: ``I0``, ``I1``
 and ``I2`` project ``g``, ``g'`` and ``g''`` onto the same test-function family.
-This is the batch weak form, the first experimental cut. The GLS weighting of
+The construction is the modulating-function method of system identification
+(Shinbrot 1957; Preisig and Rippin 1993), the same one weak SINDy uses for
+noisy data (Messenger and Bortz 2021); this module adopts it into the image
+scheme rather than proposes it. This is the batch weak form, the first
+experimental cut. The GLS weighting of
 the weak residuals and the instrumental-variable step that close the remaining
 1.1-2x accuracy gap to NLLS (measured on the design prototype) are follow-ups;
 ``beta`` in the prey-only Lotka-Volterra is structurally unidentifiable and is
