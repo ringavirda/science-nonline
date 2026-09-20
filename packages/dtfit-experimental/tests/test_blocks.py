@@ -149,10 +149,9 @@ def test_segment_basis_gram_is_block_diagonal():
 
 
 def test_on_with_one_segment_reproduces_legendre():
-    # Fails if on()'s edge-to-u mapping per segment slips (an extra
-    # rescale, or the segment's own domain used instead of the whole
-    # one): with a single segment the basis must be exactly the plain
-    # Legendre basis on the same domain.
+    # Fails if on() skips or misapplies u_of when mapping edges to the
+    # unit variable: a single segment must be exactly the plain Legendre
+    # basis on the domain.
     domain = (2.0, 12.0)
     x = np.linspace(*domain, 50)
     b = SegmentBasis.on([domain[0], domain[1]], domain, n_coef=6)
@@ -164,8 +163,7 @@ def test_on_with_one_segment_reproduces_legendre():
 
 def test_on_shares_coefficients_with_a_floor_of_two():
     # Fails if the max(2, ...) floor is dropped: the short first segment
-    # here would otherwise get zero or one coefficient (no room for a
-    # slope, or none at all).
+    # here rounds to a negative order.
     edges = [0.0, 0.1, 5.0, 10.0]
     domain = (0.0, 10.0)
     b = SegmentBasis.on(edges, domain, n_coef=9)
@@ -207,10 +205,8 @@ def _exact_efficiency(phi, jac):
 
 
 def test_segment_on_the_switch_reaches_efficiency_where_legendre_does_not():
-    # Fails if on() ignores the given interior edge (the edges ignored):
-    # the segment basis would then behave like plain Legendre across the
-    # whole domain, and a2's efficiency would fall to Legendre's ~0.66
-    # instead of reaching 1.0.
+    # Fails if on() ignores the given interior edge: a2's efficiency then
+    # falls to Legendre's ~0.66 instead of reaching 1.0.
     domain = (0.0, 10.0)
     x = np.linspace(*domain, 2000)
     jac = _num_jac(_two_regime, x, _TWO_REGIME_TRUTH)
