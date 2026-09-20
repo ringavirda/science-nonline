@@ -1,9 +1,8 @@
 # Experiments
 
-Every number this study quotes comes from a notebook here, and the notebook
-is the report: no `summary.md` writer, no page regenerator, no CSV-to-markdown
-renderer. Open one, read the claim at the top, run it, read the numbers it
-prints against the prose that follows.
+Every number this study quotes comes from a notebook here. Each notebook is
+one experiment and its report: open it, read the claim at the top, run it,
+and compare the numbers it prints against the prose that follows.
 
 ## Index
 
@@ -14,12 +13,7 @@ beyond what `python -m dtfit_experimental.study.download_data` fetches.
 
 | Notebook | Claim | Runtime | Data |
 |---|---|---|---|
-| 13_two_bases | h versus p refinement: reconstruction error against coefficient count on a smooth and a discontinuous target, the Gram conditioning by order and grid, the cost of restricting a linear fit to either basis | a few seconds | none |
-
-The rest of `method/`, `technology/` and `realdata/` fill in as the later
-lanes of the restructure land; see
-`docs/superpowers/specs/2026-09-20-experimental-restructure-design.md`
-section 4 for the planned table.
+| 13_two_bases | h versus p refinement: Legendre wins a smooth target, block is exact on a step only where a window boundary falls on the jump and at parity with Legendre otherwise, the Gram conditioning by order and grid, the cost of restricting a linear fit to either basis | a few seconds | none |
 
 ## Writing a notebook
 
@@ -62,7 +56,12 @@ stays in the notebook's own cells.
 
 At execution time, a notebook may import only what the CI research job
 installs: `numpy`, `scipy`, `sympy`, `matplotlib`, `pandas`, `statsmodels`,
-`dtfit`, `dtfit_experimental`, `dtfit_legacy`. Anything heavier -
+`dtfit`, `dtfit_experimental`, `dtfit_legacy`. `numpy`, `scipy`, `sympy`
+and `dtfit` are core dependencies of this package; `matplotlib`, `pandas`,
+`statsmodels`, `dtfit-legacy` and the notebook harness (`nbclient`,
+`ipykernel`) come with its `bench` extra, so
+`pip install -e 'packages/dtfit-experimental[bench]'` is what a notebook
+needs. Anything heavier -
 `torch`, `cupy` - goes through `study.notebook.optional_import(name)`, and
 the section that needs it skips the same way a missing data file does.
 `dtfit_legacy` is imported only where a comparison of historical stages is
@@ -87,20 +86,13 @@ jupyter lab experiments/method/13_two_bases.ipynb
 jupyter nbconvert --to notebook --execute --inplace experiments/method/13_two_bases.ipynb
 ```
 
+A notebook is written and edited in Jupyter like any other. Before it is
+committed it is rerun from a fresh kernel with `DTFIT_QUICK` unset -
+Restart and Run All, or the `nbconvert` line above - so that the committed
+file carries the outputs of the full run and the CSV exports on disk match
+them.
+
 `tests/test_notebooks.py` executes every notebook here under
 `DTFIT_QUICK=1` with a per-cell and a whole-notebook time budget; that is
 the check CI runs, never a substitute for opening the committed, full-run
 notebook.
-
-## Authoring a notebook
-
-The committed notebook is never hand-edited JSON. Write the cells through a
-throwaway `nbformat` script kept outside the repository, then execute it
-with `DTFIT_QUICK` unset:
-
-```bash
-jupyter nbconvert --to notebook --execute --inplace experiments/method/<name>.ipynb
-```
-
-The file that command writes, full run and all outputs attached, is what
-gets committed.
