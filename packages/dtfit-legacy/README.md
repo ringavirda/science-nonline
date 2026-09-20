@@ -1,8 +1,8 @@
 # dtfit-legacy
 
-The historical stages of the dtfit method, kept runnable for the evolution
-matrix in `dtfit_experimental.experiments.evolution`. Depends on `dtfit`
-only and receives no new development.
+The historical stages of the dtfit method, kept runnable for the comparisons
+of historical stages against the current image; imported only where a stage is
+placed beside it. Depends on `dtfit` only and receives no new development.
 
 | Stage | Module | Source |
 |---|---|---|

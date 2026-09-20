@@ -19,7 +19,7 @@ prototyped and evaluated here.
   match.
 - **`dtfit_experimental.experiments`** -- the experiment suite: `cases/` (each
   adaptation in isolation), `domains/` (per-application-domain validation against
-  the established baselines), shared `common/` framework, and `data/`.
+  the established baselines), shared `study/` framework, and `data/`.
 
 When an adaptation proves effective across enough domains it is **promoted into
 stable `dtfit`** and physically moved there; it is then imported from `dtfit`,
@@ -51,7 +51,7 @@ holds a `backend.py` (the compute) and the notebook (the report: tables, figures
 narrative). Fetch the datasets once, then open or execute any notebook:
 
 ```bash
-python -m dtfit_experimental.experiments.download_data          # fetch datasets
+python -m dtfit_experimental.study.download_data                # fetch datasets
 
 # open and re-run interactively
 jupyter lab src/dtfit_experimental/experiments/cases/01_control_systems/01_control_systems.ipynb

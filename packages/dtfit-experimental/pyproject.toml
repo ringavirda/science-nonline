@@ -24,13 +24,14 @@ dependencies = [
     "numpy>=2.0",
     "scipy>=1.10",
     "sympy>=1.12",
+    "threadpoolctl>=3",
 ]
 
 [project.optional-dependencies]
 # Experiment / benchmark suite (dtfit_experimental.experiments): plotting + the
 # baseline methods compared against (deep nets via torch, classical TS via
 # statsmodels). joblib (parallel fitting) ships with scikit-learn.
-bench = ["dtfit-legacy", "matplotlib>=3.7", "torch>=2.2", "statsmodels>=0.14", "pandas>=2.0"]
+bench = ["dtfit-legacy", "matplotlib>=3.7", "torch>=2.2", "statsmodels>=0.14", "pandas>=2.0", "nbclient>=0.10", "ipykernel>=6"]
 # Optional GPU backend for the GEMM-batched projection (batched.py /
 # experiments .../cases/08_gpu_batched_projection). CuPy is a NumPy-API drop-in
 # on cuBLAS; pick the wheel matching your CUDA driver -- cupy-cuda13x for CUDA 13
@@ -71,6 +72,8 @@ select = ["E4", "E7", "E9", "F"]
 # use short throwaway names in plotting (E741), and write compact one-line
 # control flow / lambdas (E701/E731) -- conventions, not defects.
 "src/dtfit_experimental/experiments/**/*.ipynb" = ["E402", "E701", "E741", "E731"]
+# Same conventions, for the new experiments/ tree that sits outside src/.
+"experiments/**/*.ipynb" = ["E402", "E701", "E741", "E731"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
