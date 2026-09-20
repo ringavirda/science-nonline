@@ -91,8 +91,37 @@ def test_contaminate_burst_leaves_runs_of_five():
     _, idx = contaminate(y, rng=rng, fraction=0.1, sigma=1.0, burst=5)
     assert idx.size == 20
     runs = np.split(idx, np.where(np.diff(idx) != 1)[0] + 1)
-    # fails if burst were ignored and the indices scattered singly
-    assert all(run.size == 5 for run in runs)
+    # every run is a whole number of bursts; two blocks drawn adjacent to
+    # each other merge into a longer run, so a run need not be exactly 5,
+    # but fails if burst were ignored and the indices scattered singly
+    assert all(run.size % 5 == 0 for run in runs)
+
+
+def test_contaminate_undercounts_trailing_short_block():
+    # n=197 does not divide by burst=5, so the last block has only 2
+    # samples; fails if a drawn short block is not made up for elsewhere,
+    # leaving fewer than round(fraction*n) indices covered
+    short_seeds = 0
+    for seed in range(200):
+        rng = np.random.default_rng(seed)
+        y = np.zeros(197)
+        _, idx = contaminate(y, rng=rng, fraction=0.1, sigma=1.0, burst=5)
+        if idx.size != 20:
+            short_seeds += 1
+    assert short_seeds == 0
+
+
+def test_contaminate_trim_keeps_earlier_runs_whole():
+    rng = np.random.default_rng(0)
+    y = np.zeros(200)
+    _, idx = contaminate(y, rng=rng, fraction=0.07, sigma=1.0, burst=5)
+    # round(0.07 * 200) == 14, not a multiple of burst=5, so one run is
+    # trimmed short; fails if the trim scattered indices out of the runs
+    # instead of shortening the last-drawn block from its tail
+    assert idx.size == 14
+    runs = np.split(idx, np.where(np.diff(idx) != 1)[0] + 1)
+    sizes = sorted(run.size for run in runs)
+    assert sizes == [4, 5, 5]
 
 
 def test_numeric_jacobian_matches_known_derivative():
@@ -123,6 +152,18 @@ def test_image_efficiency_coarse_basis_matches_measured_ratio():
     assert eff.ratio[0] < 1.0
 
 
+def test_image_efficiency_deficient_rank_exceeds_one():
+    x = np.linspace(0.0, 1.0, 200)
+    jac = np.stack([np.ones(200), x], axis=1)
+    # one block cannot resolve a two-parameter model: rank 1 < jac.shape[1]
+    eff = image_efficiency(jac, x, basis="block", order=1)
+    assert eff.rank == 1
+    # fails if a fixed restriction were mistaken for a well-posed one: an
+    # unidentified fit is reported as more precise than least squares
+    assert eff.ratio == pytest.approx([6.20335821, 74.25373134], abs=1e-6)
+    assert (eff.ratio > 1.0).all()
+
+
 def test_summarize_counts_nonfinite_instead_of_dropping_silently():
     estimates = np.array([
         [1.0, 2.0],
@@ -141,6 +182,23 @@ def test_summarize_counts_nonfinite_instead_of_dropping_silently():
     assert np.all(np.isfinite(s.rmse))
 
 
+def test_summarize_all_nonfinite_reports_nan_instead_of_raising():
+    estimates = np.array([
+        [np.nan, 2.0],
+        [1.0, np.inf],
+    ])
+    truth = np.array([1.0, 2.0])
+    # fails if summarize raised (np.percentile on an empty array) instead
+    # of reporting the whole batch as non-finite
+    s = summarize(estimates, truth)
+    assert s.n_nonfinite == 2
+    assert s.bias.shape == (2,)
+    assert np.all(np.isnan(s.bias))
+    assert np.all(np.isnan(s.rmse))
+    assert s.percentiles.shape == (3, 2)
+    assert np.all(np.isnan(s.percentiles))
+
+
 def test_summarize_percentiles_shape():
     rng = np.random.default_rng(6)
     estimates = rng.normal(loc=[1.0, 2.0], scale=0.1, size=(500, 2))
@@ -156,7 +214,11 @@ def _one_blas_thread(x):
     return x, bool(limits) and all(n == 1 for n in limits)
 
 
-def test_pool_map_keeps_order_and_caps_blas_threads():
+def test_pool_map_keeps_order_and_caps_blas_threads(monkeypatch):
+    # raised above 1 so the cap under test, not the inherited environment,
+    # is what can bring a worker's thread count back down to 1
+    monkeypatch.setenv("OPENBLAS_NUM_THREADS", "4")
+    monkeypatch.setenv("OMP_NUM_THREADS", "4")
     items = list(range(8))
     out = pool_map(_one_blas_thread, items, workers=2)
     xs = [o[0] for o in out]

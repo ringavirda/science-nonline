@@ -118,10 +118,13 @@ def contaminate(
 
     ``y`` is split into ``ceil(len(y) / burst)`` contiguous, non-overlapping
     blocks of ``burst`` samples (the last block shorter when ``burst`` does
-    not divide ``len(y)``); whole blocks are drawn without replacement until
-    at least ``round(fraction * len(y))`` samples are covered, then trimmed
-    back to exactly that count. Each replaced sample is displaced by
-    ``magnitude * sigma`` standard-normal noise.
+    not divide ``len(y)``); whole blocks are drawn without replacement, in a
+    random order, until their sizes sum to at least
+    ``round(fraction * len(y))``, then the last block drawn is trimmed from
+    its tail down to exactly that count, so every earlier run stays whole.
+    Two blocks drawn adjacent to each other still merge into one longer run.
+    Each replaced sample is displaced by ``magnitude * sigma`` standard-normal
+    noise.
 
     Args:
         y: Signal to contaminate, 1-D; not modified in place.
@@ -145,14 +148,21 @@ def contaminate(
     if sigma is None:
         sigma = float(np.std(y))
     n_blocks = -(-n // burst)
-    n_runs = -(-count // burst)
-    block_ids = rng.choice(n_blocks, size=n_runs, replace=False)
-    idx = np.concatenate(
-        [np.arange(b * burst, min(b * burst + burst, n)) for b in block_ids]
-    )
-    idx = np.sort(idx)
-    if idx.size > count:
-        idx = np.sort(rng.choice(idx, size=count, replace=False))
+    order = rng.permutation(n_blocks)
+    block_idx = []
+    covered = 0
+    for b in order:
+        run = np.arange(b * burst, min(b * burst + burst, n))
+        block_idx.append(run)
+        covered += run.size
+        if covered >= count:
+            break
+    overage = covered - count
+    if overage > 0:
+        # the last block drawn is the one short of covering count exactly;
+        # trim its tail so every earlier run stays whole and contiguous.
+        block_idx[-1] = block_idx[-1][: block_idx[-1].size - overage]
+    idx = np.sort(np.concatenate(block_idx))
     y[idx] = y[idx] + magnitude * sigma * rng.standard_normal(idx.size)
     return y, idx
 
@@ -199,6 +209,13 @@ class Efficiency:
         ratio: Per-parameter efficiency, ``diag((J^T J)^-1) /
             diag(pinv(J^T P J))``; 1.0 where the basis spans the samples
             exactly, below 1.0 where the restriction costs precision.
+            Meaningful only when ``rank`` is at least the Jacobian's column
+            count: a basis image with fewer independent directions than
+            parameters leaves the restricted model unidentified, and
+            ``pinv`` then reports it as arbitrarily more precise than
+            pointwise least squares, so ``ratio`` can exceed 1. Compare
+            ``rank`` against ``jac.shape[1]`` before trusting a value
+            above 1.
         cond: Condition number of the basis's Gram matrix over the samples,
             at least 1.
         rank: Numerical rank of the basis on the sample grid, at most
@@ -301,13 +318,23 @@ def summarize(
             finite replicates.
 
     Returns:
-        A :class:`Summary`.
+        A :class:`Summary`. When every replicate is non-finite, ``bias``,
+        ``rmse`` and ``percentiles`` are all-NaN of the usual shape and
+        ``n_nonfinite`` equals ``len(estimates)``, rather than raising: a
+        sweep where a fitter diverges everywhere is the case this function
+        exists to report, not to fail on.
     """
     estimates = np.asarray(estimates, dtype=float)
     truth = np.asarray(truth, dtype=float)
     finite = np.all(np.isfinite(estimates), axis=1)
     n_nonfinite = int(np.sum(~finite))
     clean = estimates[finite]
+    n_params = truth.shape[0]
+    if clean.shape[0] == 0:
+        nan_row = np.full(n_params, np.nan)
+        pct = np.full((len(percentiles), n_params), np.nan)
+        return Summary(bias=nan_row, rmse=nan_row.copy(), percentiles=pct,
+                        n_nonfinite=n_nonfinite)
     err = clean - truth
     bias = np.mean(err, axis=0)
     rmse = np.sqrt(np.mean(err ** 2, axis=0))
