@@ -1,0 +1,25 @@
+family,noise,method,bias_pct,rmse_pct,n_nonfinite
+exponential (inside the base),0,equal_areas,0.543585,0.543585,0
+exponential (inside the base),0,block,2.77556e-14,2.77556e-14,0
+exponential (inside the base),0,pointwise,0,0,0
+exponential (inside the base),0.05,equal_areas,0.552642,1.4877,0
+exponential (inside the base),0.05,block,0.0304611,1.423,0
+exponential (inside the base),0.05,pointwise,0.0301083,1.21733,0
+exponential (inside the base),0.2,equal_areas,0.628472,5.57145,0
+exponential (inside the base),0.2,block,0.088199,5.69202,0
+exponential (inside the base),0.2,pointwise,0.0933947,4.86327,0
+exponential (inside the base),0.3,equal_areas,0.72005,8.35233,0
+exponential (inside the base),0.3,block,0.129206,8.54339,0
+exponential (inside the base),0.3,pointwise,0.112698,7.29232,0
+gaussian peak (outside the base),0,equal_areas,77.598,77.598,0
+gaussian peak (outside the base),0,block,2.96059e-14,2.96059e-14,0
+gaussian peak (outside the base),0,pointwise,0,0,0
+gaussian peak (outside the base),0.05,equal_areas,77.1389,77.326,0
+gaussian peak (outside the base),0.05,block,0.161895,1.49441,0
+gaussian peak (outside the base),0.05,pointwise,0.021889,1.09792,0
+gaussian peak (outside the base),0.2,equal_areas,74.319,77.6787,0
+gaussian peak (outside the base),0.2,block,0.966897,6.17627,0
+gaussian peak (outside the base),0.2,pointwise,0.183499,4.37097,0
+gaussian peak (outside the base),0.3,equal_areas,70.8532,79.5479,0
+gaussian peak (outside the base),0.3,block,1.94606,9.69242,0
+gaussian peak (outside the base),0.3,pointwise,0.374508,6.55796,0

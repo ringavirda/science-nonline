@@ -1,0 +1,15 @@
+family,degree,delta,status,r2,max_param_error_pct
+exponential,2,0.0207898,ok,0.998091,4.13396
+exponential,3,0.0169872,ok,0.999504,0.777739
+exponential,4,0.0159966,ok,0.993741,5.13303
+exponential,5,0.0159976,ok,0.993365,5.27936
+exponential,6,0.0159212,ok,0.953335,10.8351
+exponential,7,0.0159271,ok,0.941182,15.3612
+exponential,8,0.0158386,ok,0.776942,31.1812
+periodic,2,0.0152686,Only 1 of the first 3 Maclaurin orders constrain the 2 parameters; increase the polynomial degree (rank) so the balance can identify them.,,
+periodic,3,0.00995439,ok,0.905793,230.3
+periodic,4,0.00915438,ok,0.616792,244.026
+periodic,5,0.00915235,ok,0.688168,239.743
+periodic,6,0.00910938,ok,-1.83437,334.432
+periodic,7,0.00911276,ok,0.747827,15780.2
+periodic,8,0.0090621,ok,0.565473,14754.2
