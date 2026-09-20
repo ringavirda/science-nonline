@@ -94,20 +94,25 @@ def test_moment_match_recovers_exponential_growth():
 # the domain head-to-head wiring
 def test_subspace_rate_recovery_head_to_head():
     """Every method the domain helper reports stays inside its error budget: 2
-    percent for dtfit LSI, SciPy NLLS and Matrix Pencil / ESPRIT on both tasks,
-    10 percent for classical Prony and only on the clean exponential. On the
-    noisy sinusoid Prony is asked for nothing but a finite number, which is the
-    textbook reason the subspace methods replaced it."""
+    percent for dtfit Legendre, SciPy NLLS and Matrix Pencil / ESPRIT on both
+    tasks, 10 percent for classical Prony and only on the clean exponential. On
+    the noisy sinusoid Prony is asked for nothing but a finite number, which is
+    the textbook reason the subspace methods replaced it.
+
+    Fails under the row key going back to "dtfit LSI" (a KeyError on the
+    lookup) or under the Legendre error crossing the 2 percent budget
+    (measured today: 0.039 percent on the exponential rate, 0.0003 percent on
+    the sinusoid frequency, against 3.8 and 100 for Prony)."""
     from dtfit_experimental.experiments.domains.parameter_estimation.backend import (
         subspace_rate_recovery,
     )
     rows = subspace_rate_recovery(np.random.default_rng(0), noise=0.03)
     assert len(rows) == 2
     for row in rows:
-        for method in ("dtfit LSI", "SciPy NLLS", "Matrix Pencil/ESPRIT"):
+        for method in ("dtfit Legendre", "SciPy NLLS", "Matrix Pencil/ESPRIT"):
             assert row[method] < 2.0, (row["task"], method, row[method])
     # Prony is held to a number only on rows[0], the clean exponential
     assert rows[0]["Prony"] < 10.0
     # nothing crashes: every method returns a finite error on both tasks
     assert all(np.isfinite(row[m]) for row in rows for m in
-               ("dtfit LSI", "SciPy NLLS", "Prony", "Matrix Pencil/ESPRIT"))
+               ("dtfit Legendre", "SciPy NLLS", "Prony", "Matrix Pencil/ESPRIT"))
