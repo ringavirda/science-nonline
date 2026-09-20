@@ -1,0 +1,5 @@
+amp_sigma,rule,found,reps,step_rmse,epoch_err_fine_widths
+10,left out,192,200,0.0977936,0.131631
+10,kept as window,192,200,0.0999942,0.131631
+4,left out,200,200,0.0969453,0.163754
+4,kept as window,200,200,0.0969052,0.163754

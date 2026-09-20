@@ -1,0 +1,41 @@
+basis,K,param,ratio,n_coef,rank,cond
+segment,8,a1,0.969354,8,8,8.96473
+segment,8,l1,0.95871,8,8,8.96473
+segment,8,a2,0.996138,8,8,8.96473
+segment,8,l2,0.994102,8,8,8.96473
+block on epochs,8,a1,0.762752,8,8,2.96825
+block on epochs,8,l1,0.764708,8,8,2.96825
+block on epochs,8,a2,0.838843,8,8,2.96825
+block on epochs,8,l2,0.852289,8,8,2.96825
+segment,16,a1,1,16,16,16.8766
+segment,16,l1,1,16,16,16.8766
+segment,16,a2,1,16,16,16.8766
+segment,16,l2,1,16,16,16.8766
+block on epochs,16,a1,0.93578,16,16,1.01613
+block on epochs,16,l1,0.935599,16,16,1.01613
+block on epochs,16,a2,0.873493,16,16,1.01613
+block on epochs,16,l2,0.875727,16,16,1.01613
+segment,32,a1,1,32,32,34.637
+segment,32,l1,1,32,32,34.637
+segment,32,a2,1,32,32,34.637
+segment,32,l2,1,32,32,34.637
+block on epochs,32,a1,0.983553,32,32,1.04918
+block on epochs,32,l1,0.983385,32,32,1.04918
+block on epochs,32,a2,0.966588,32,32,1.04918
+block on epochs,32,l2,0.966665,32,32,1.04918
+segment,64,a1,1,64,64,71.5386
+segment,64,l1,1,64,64,71.5386
+segment,64,a2,1,64,64,71.5386
+segment,64,l2,1,64,64,71.5386
+block on epochs,64,a1,0.995857,64,64,1.06667
+block on epochs,64,l1,0.995805,64,64,1.06667
+block on epochs,64,a2,0.991559,64,64,1.06667
+block on epochs,64,l2,0.991546,64,64,1.06667
+segment,128,a1,1,128,128,241.351
+segment,128,l1,1,128,128,241.351
+segment,128,a2,1,128,128,241.351
+segment,128,l2,1,128,128,241.351
+block on epochs,128,a1,0.998964,128,128,1.13333
+block on epochs,128,l1,0.99895,128,128,1.13333
+block on epochs,128,a2,0.99787,128,128,1.13333
+block on epochs,128,l2,0.997862,128,128,1.13333

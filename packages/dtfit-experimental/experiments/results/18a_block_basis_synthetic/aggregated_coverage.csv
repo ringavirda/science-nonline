@@ -1,0 +1,7 @@
+case,K,t_coverage_mean,normal_coverage_mean
+decay c+a*exp(-t/tau),12,0.94,0.904444
+peak a*exp(-(t-m)^2/2s^2),12,0.938889,0.914444
+cycle a*sin(w*t+ph)+c,12,0.95,0.905833
+decay c+a*exp(-t/tau),32,0.956667,0.951111
+peak a*exp(-(t-m)^2/2s^2),32,0.952222,0.94
+cycle a*sin(w*t+ph)+c,32,0.955,0.945833

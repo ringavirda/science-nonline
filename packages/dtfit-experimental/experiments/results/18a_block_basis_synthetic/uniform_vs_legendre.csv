@@ -1,0 +1,141 @@
+case,basis,K,param,ratio,cond,n_coef,rank
+trend+cycle+2 jumps,legendre,8,a,0.686019,16.8692,9,9
+trend+cycle+2 jumps,legendre,8,b,0.454961,16.8692,9,9
+trend+cycle+2 jumps,legendre,8,s1,0.0405458,16.8692,9,9
+trend+cycle+2 jumps,legendre,8,c1,0.0426649,16.8692,9,9
+trend+cycle+2 jumps,legendre,8,d1,0.522004,16.8692,9,9
+trend+cycle+2 jumps,legendre,8,d2,0.501607,16.8692,9,9
+trend+cycle+2 jumps,legendre,16,a,0.889316,32.5711,17,17
+trend+cycle+2 jumps,legendre,16,b,0.747219,32.5711,17,17
+trend+cycle+2 jumps,legendre,16,s1,0.152474,32.5711,17,17
+trend+cycle+2 jumps,legendre,16,c1,0.183202,32.5711,17,17
+trend+cycle+2 jumps,legendre,16,d1,0.785225,32.5711,17,17
+trend+cycle+2 jumps,legendre,16,d2,0.771373,32.5711,17,17
+trend+cycle+2 jumps,legendre,32,a,0.965379,64.1035,33,33
+trend+cycle+2 jumps,legendre,32,b,0.887185,64.1035,33,33
+trend+cycle+2 jumps,legendre,32,s1,0.967714,64.1035,33,33
+trend+cycle+2 jumps,legendre,32,c1,0.982705,64.1035,33,33
+trend+cycle+2 jumps,legendre,32,d1,0.897891,64.1035,33,33
+trend+cycle+2 jumps,legendre,32,d2,0.89195,64.1035,33,33
+trend+cycle+2 jumps,legendre,64,a,0.983484,128.016,65,65
+trend+cycle+2 jumps,legendre,64,b,0.942774,128.016,65,65
+trend+cycle+2 jumps,legendre,64,s1,0.999821,128.016,65,65
+trend+cycle+2 jumps,legendre,64,c1,0.999232,128.016,65,65
+trend+cycle+2 jumps,legendre,64,d1,0.948171,128.016,65,65
+trend+cycle+2 jumps,legendre,64,d2,0.945233,128.016,65,65
+trend+cycle+2 jumps,legendre,128,a,0.991971,406.473,129,129
+trend+cycle+2 jumps,legendre,128,b,0.971731,406.473,129,129
+trend+cycle+2 jumps,legendre,128,s1,0.999913,406.473,129,129
+trend+cycle+2 jumps,legendre,128,c1,0.999632,406.473,129,129
+trend+cycle+2 jumps,legendre,128,d1,0.974389,406.473,129,129
+trend+cycle+2 jumps,legendre,128,d2,0.97288,406.473,129,129
+trend+cycle+2 jumps,block,8,a,0.672202,1,8,8
+trend+cycle+2 jumps,block,8,b,0.474169,1,8,8
+trend+cycle+2 jumps,block,8,s1,0.0257888,1,8,8
+trend+cycle+2 jumps,block,8,c1,0.0261332,1,8,8
+trend+cycle+2 jumps,block,8,d1,0.471988,1,8,8
+trend+cycle+2 jumps,block,8,d2,0.515106,1,8,8
+trend+cycle+2 jumps,block,16,a,0.843068,1,16,16
+trend+cycle+2 jumps,block,16,b,0.699163,1,16,16
+trend+cycle+2 jumps,block,16,s1,0.197124,1,16,16
+trend+cycle+2 jumps,block,16,c1,0.209078,1,16,16
+trend+cycle+2 jumps,block,16,d1,0.803135,1,16,16
+trend+cycle+2 jumps,block,16,d2,0.701032,1,16,16
+trend+cycle+2 jumps,block,32,a,0.945968,1.01613,32,32
+trend+cycle+2 jumps,block,32,b,0.879336,1.01613,32,32
+trend+cycle+2 jumps,block,32,s1,0.711867,1.01613,32,32
+trend+cycle+2 jumps,block,32,c1,0.718142,1.01613,32,32
+trend+cycle+2 jumps,block,32,d1,0.932255,1.01613,32,32
+trend+cycle+2 jumps,block,32,d2,0.85474,1.01613,32,32
+trend+cycle+2 jumps,block,64,a,0.994882,1.03226,64,64
+trend+cycle+2 jumps,block,64,b,0.976914,1.03226,64,64
+trend+cycle+2 jumps,block,64,s1,0.921262,1.03226,64,64
+trend+cycle+2 jumps,block,64,c1,0.921796,1.03226,64,64
+trend+cycle+2 jumps,block,64,d1,0.973305,1.03226,64,64
+trend+cycle+2 jumps,block,64,d2,0.984083,1.03226,64,64
+trend+cycle+2 jumps,block,128,a,0.995997,1.06667,128,128
+trend+cycle+2 jumps,block,128,b,0.980291,1.06667,128,128
+trend+cycle+2 jumps,block,128,s1,0.979845,1.06667,128,128
+trend+cycle+2 jumps,block,128,c1,0.979974,1.06667,128,128
+trend+cycle+2 jumps,block,128,d1,0.97678,1.06667,128,128
+trend+cycle+2 jumps,block,128,d2,0.986038,1.06667,128,128
+two exponential regimes,legendre,8,a1,0.984963,16.8692,9,9
+two exponential regimes,legendre,8,l1,0.955886,16.8692,9,9
+two exponential regimes,legendre,8,a2,0.452177,16.8692,9,9
+two exponential regimes,legendre,8,l2,0.606062,16.8692,9,9
+two exponential regimes,legendre,16,a1,0.993858,32.5711,17,17
+two exponential regimes,legendre,16,l1,0.981643,32.5711,17,17
+two exponential regimes,legendre,16,a2,0.669322,32.5711,17,17
+two exponential regimes,legendre,16,l2,0.797513,32.5711,17,17
+two exponential regimes,legendre,32,a1,0.997425,64.1035,33,33
+two exponential regimes,legendre,32,l1,0.992253,64.1035,33,33
+two exponential regimes,legendre,32,a2,0.830353,64.1035,33,33
+two exponential regimes,legendre,32,l2,0.906883,64.1035,33,33
+two exponential regimes,legendre,64,a1,0.998809,128.016,65,65
+two exponential regimes,legendre,64,l1,0.996403,128.016,65,65
+two exponential regimes,legendre,64,a2,0.91273,128.016,65,65
+two exponential regimes,legendre,64,l2,0.954195,128.016,65,65
+two exponential regimes,legendre,128,a1,0.999424,406.473,129,129
+two exponential regimes,legendre,128,l1,0.99826,406.473,129,129
+two exponential regimes,legendre,128,a2,0.955852,406.473,129,129
+two exponential regimes,legendre,128,l2,0.977388,406.473,129,129
+two exponential regimes,block,8,a1,0.721401,1,8,8
+two exponential regimes,block,8,l1,0.676254,1,8,8
+two exponential regimes,block,8,a2,0.445035,1,8,8
+two exponential regimes,block,8,l2,0.682108,1,8,8
+two exponential regimes,block,16,a1,0.935499,1,16,16
+two exponential regimes,block,16,l1,0.934776,1,16,16
+two exponential regimes,block,16,a2,0.859236,1,16,16
+two exponential regimes,block,16,l2,0.869537,1,16,16
+two exponential regimes,block,32,a1,0.983307,1.01613,32,32
+two exponential regimes,block,32,l1,0.982637,1.01613,32,32
+two exponential regimes,block,32,a2,0.950109,1.01613,32,32
+two exponential regimes,block,32,l2,0.958798,1.01613,32,32
+two exponential regimes,block,64,a1,0.995626,1.03226,64,64
+two exponential regimes,block,64,l1,0.995103,1.03226,64,64
+two exponential regimes,block,64,a2,0.97456,1.03226,64,64
+two exponential regimes,block,64,l2,0.983129,1.03226,64,64
+two exponential regimes,block,128,a1,0.998745,1.06667,128,128
+two exponential regimes,block,128,l1,0.998286,1.06667,128,128
+two exponential regimes,block,128,a2,0.98119,1.06667,128,128
+two exponential regimes,block,128,l2,0.989518,1.06667,128,128
+12-switch telegraph,legendre,8,a,0.795141,16.8692,9,9
+12-switch telegraph,legendre,8,b,0.763424,16.8692,9,9
+12-switch telegraph,legendre,8,da,0.635722,16.8692,9,9
+12-switch telegraph,legendre,8,db,0.439613,16.8692,9,9
+12-switch telegraph,legendre,16,a,0.820046,32.5711,17,17
+12-switch telegraph,legendre,16,b,0.823562,32.5711,17,17
+12-switch telegraph,legendre,16,da,0.69589,32.5711,17,17
+12-switch telegraph,legendre,16,db,0.57765,32.5711,17,17
+12-switch telegraph,legendre,32,a,0.898946,64.1035,33,33
+12-switch telegraph,legendre,32,b,0.904907,64.1035,33,33
+12-switch telegraph,legendre,32,da,0.818227,64.1035,33,33
+12-switch telegraph,legendre,32,db,0.764074,64.1035,33,33
+12-switch telegraph,legendre,64,a,0.966264,128.016,65,65
+12-switch telegraph,legendre,64,b,0.969155,128.016,65,65
+12-switch telegraph,legendre,64,da,0.936998,128.016,65,65
+12-switch telegraph,legendre,64,db,0.909165,128.016,65,65
+12-switch telegraph,legendre,128,a,0.981892,406.473,129,129
+12-switch telegraph,legendre,128,b,0.982116,406.473,129,129
+12-switch telegraph,legendre,128,da,0.96421,406.473,129,129
+12-switch telegraph,legendre,128,db,0.942527,406.473,129,129
+12-switch telegraph,block,8,a,0.524898,1,8,8
+12-switch telegraph,block,8,b,0.541009,1,8,8
+12-switch telegraph,block,8,da,0.375807,1,8,8
+12-switch telegraph,block,8,db,0.33101,1,8,8
+12-switch telegraph,block,16,a,0.770401,1,16,16
+12-switch telegraph,block,16,b,0.778336,1,16,16
+12-switch telegraph,block,16,da,0.635011,1,16,16
+12-switch telegraph,block,16,db,0.53213,1,16,16
+12-switch telegraph,block,32,a,0.878176,1.01613,32,32
+12-switch telegraph,block,32,b,0.880948,1.01613,32,32
+12-switch telegraph,block,32,da,0.779152,1.01613,32,32
+12-switch telegraph,block,32,db,0.718853,1.01613,32,32
+12-switch telegraph,block,64,a,0.941821,1.03226,64,64
+12-switch telegraph,block,64,b,0.945142,1.03226,64,64
+12-switch telegraph,block,64,da,0.891964,1.03226,64,64
+12-switch telegraph,block,64,db,0.853719,1.03226,64,64
+12-switch telegraph,block,128,a,0.963146,1.06667,128,128
+12-switch telegraph,block,128,b,0.963183,1.06667,128,128
+12-switch telegraph,block,128,da,0.927303,1.06667,128,128
+12-switch telegraph,block,128,db,0.895089,1.06667,128,128
