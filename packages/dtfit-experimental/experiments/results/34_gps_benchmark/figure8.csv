@@ -1,0 +1,9 @@
+method,clean,dropout,dropout (whole track),glitch
+dtfit Legendre-cubic,1.13648,6.13847,2.82551,3.93712
+dtfit Legendre-turn,1.68638,14.4506,6.94131,4.07923
+dtfit block (area),1.17037,6.2465,7.70113,3.63205
+Kalman-CA,0.994197,3.50317,1.75348,4.523
+Kalman-CA (Huber),0.987415,3.44902,1.7314,1.55919
+CT-EKF (pos-only),1.24561,6.39362,2.95542,5.75359
+IMM (CV+CT),1.19875,5.47681,2.58224,5.60841
+dtfit Legendre robust,,,,2.01421
