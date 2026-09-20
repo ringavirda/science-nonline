@@ -1,21 +1,17 @@
 """Simulation and estimation infrastructure for the real-time GPS/inertial
-trajectory experiment.
-
-``realtime_gps.ipynb`` imports this module and does the presentation. What it
-provides, for a simulated maneuvering 3-D target tracked from a noisy GPS fix
-stream and a 9-DOF IMU (3-axis gyro plus accelerometer) with realistic dropouts
-and multipath glitches:
+trajectory experiment: a simulated maneuvering 3-D target tracked from a noisy
+GPS fix stream and a 9-DOF IMU (3-axis gyro plus accelerometer) with realistic
+dropouts and multipath glitches.
 
 * the trajectory and rig generators: :func:`trajectory`, :func:`random_plan`,
   :func:`build_rig`, :func:`build_imu`;
-* the dtfit integral trackers: :func:`dtfit_track` (streaming LSI/EAC) and the
+* the dtfit integral trackers: :func:`dtfit_track` (streaming LSI/block) and the
   full-IMU strapdown :func:`imu_lsi_track` (external-regressor LSI), with the
   :class:`FusedCUSUM` maneuver detector;
 * the established baselines: :func:`kalman_track` (constant-accel Kalman) and
   :func:`ekf_track` (gyro-aided coordinated-turn EKF);
 * the scoring and batch helpers: :func:`rmse3`, :func:`roll_rmse`,
-  :func:`match_onsets`, :func:`_run_batch`, and a re-exported
-  :func:`embedded_footprint` for the on-MCU budget.
+  :func:`match_onsets` and :func:`run_batch`.
 
 The GPS is modelled at the fix level, truth plus noise: a NEO-M8N puts out no
 more than that over NMEA, so the simulated stream mirrors the real rig's.
@@ -28,16 +24,16 @@ import numpy as np
 from dtfit.streaming import ImageFilter
 
 from dtfit_experimental.study import baselines as bl
-from dtfit_experimental.study.cost import embedded_footprint
+from dtfit_experimental.study import montecarlo
 
 __all__ = [
     "DURATION", "MANEUVERS", "ONSETS", "GPS_SIGMA", "GYRO_SIGMA", "IMU_GYRO_SIGMA",
     "IMU_ACC_SIGMA", "IMU_WASH_TAU", "GRAVITY", "WARMUP", "MODELS",
     "MAG_SIGMA", "MAG_GAIN", "GYRO_BIAS",
     "trajectory", "random_plan", "rmse3", "build_rig", "build_imu", "build_mag",
-    "dtfit_track", "kalman_track", "ekf_track",
+    "controls", "dtfit_track", "kalman_track", "ekf_track",
     "strapdown_basis", "imu_lsi_track", "FusedCUSUM", "roll_rmse", "match_onsets",
-    "embedded_footprint",
+    "exp_so3", "batch_trial", "run_batch",
 ]
 
 # Flight plan: coordinated turns at piecewise-constant turn-rate, speed and
@@ -93,7 +89,12 @@ def _cumtrapz(f, t):
     return out
 
 
-def _controls(t, plan=None):
+def controls(t, plan=None):
+    """The piecewise-constant turn-rate, speed and climb-rate a flight
+    ``plan`` commands at sample times ``t`` (seconds), each holding from its
+    onset to the next. ``plan`` defaults to the canonical :data:`MANEUVERS`.
+    Returns ``(turn_rate, speed, climb_rate)``, each shape ``(n,)``, in rad/s,
+    m/s and m/s."""
     plan = MANEUVERS if plan is None else plan
     t = np.asarray(t, float)
     om, v, zd = (np.zeros_like(t) for _ in range(3))
@@ -104,7 +105,7 @@ def _controls(t, plan=None):
 
 
 def trajectory(t, plan=None):
-    om, v, zd = _controls(t, plan)
+    om, v, zd = controls(t, plan)
     psi = _cumtrapz(om, t)
     x = 2.0 + _cumtrapz(v * np.cos(psi), t)
     y = 0.0 + _cumtrapz(v * np.sin(psi), t)
@@ -157,7 +158,7 @@ def build_rig(n, seed=0, *, plan=None, gps_sigma=GPS_SIGMA, gyro_sigma=GYRO_SIGM
         k = int(glitch_frac * (n - WARMUP))
         idx = rng.choice(np.arange(WARMUP, n), k, replace=False)
         fixes[idx] += rng.normal(0, glitch_mag, (k, 3))
-    om, _, _ = _controls(t, plan)
+    om, _, _ = controls(t, plan)
     gyro = om + rng.normal(0, gyro_sigma, t.shape)
     return t, truth, fixes, gyro, rng
 
@@ -181,7 +182,8 @@ MODELS = {
 }
 
 
-def _axis_filters(fixes, kind="lsi", model="poly", robust=False, off=None):
+def _axis_filters(fixes, kind="lsi", model="poly", robust=False, off=None,
+                  adaptive_window=True):
     off = off or {}
     m = MODELS[model]
     nq = len(m["rest"]) + 1
@@ -195,10 +197,10 @@ def _axis_filters(fixes, kind="lsi", model="poly", robust=False, off=None):
     # hand-tuning; this applies to both bases below.
     if kind == "lsi":   # the Legendre spectrum, right for trajectories
         return [ImageFilter(m["expr"], "t", p0=p0(ax), window_size=15, order=m["order"],
-                          q_diag=[1e-2] * nq,
+                          q_diag=[1e-2] * nq, adaptive_window=adaptive_window,
                           robust=robust, drift_reset="inflate", **off, basis="legendre") for ax in range(3)]
     return [ImageFilter(m["expr"], "t", p0=p0(ax), window_size=15,
-                      order=nq, q_diag=[1e-2] * nq,
+                      order=nq, q_diag=[1e-2] * nq, adaptive_window=adaptive_window,
                       robust=robust, drift_reset="inflate", **off, basis="block") for ax in range(3)]
 
 
@@ -234,7 +236,8 @@ class FusedCUSUM:
 
 
 def dtfit_track(t, fixes, horizons=(10,), *, kind="lsi", model="poly", robust=False,
-                fused=False, gyro=None, coast=False, coast_order=1):
+                fused=False, gyro=None, coast=False, coast_order=1,
+                adaptive_window=True):
     """Online per-axis tracking with rolling h-step forecasts. Missing fixes
     (NaN rows) coast: no update happens and the local model extrapolates.
     Returns ``(smoothed, pred, drift_times)``.
@@ -246,13 +249,17 @@ def dtfit_track(t, fixes, horizons=(10,), *, kind="lsi", model="poly", robust=Fa
     :meth:`the Legendre filter.coast`, constant-velocity at order 1 by default and
     constant-acceleration at order 2. Only the off-support branch changes,
     since in-window smoothing is identical either way, so this is a clean
-    matched control for the dropout and forecast regime."""
+    matched control for the dropout and forecast regime.
+
+    ``adaptive_window`` is threaded straight into the underlying
+    :class:`ImageFilter`: ``True`` (the default) sizes the window from the
+    data, ``False`` holds it fixed at ``window_size``."""
     n = t.size
     sm = np.zeros((n, 3))
     pred = {h: np.full((n, 3), np.nan) for h in horizons}
     drift: set[float] = set()
     off = dict(alpha=1e-12, cusum_h=float("inf")) if fused else {}
-    flts = _axis_filters(fixes, kind, model, robust, off)
+    flts = _axis_filters(fixes, kind, model, robust, off, adaptive_window)
     det = FusedCUSUM(3 + (gyro is not None)) if fused else None
     g_prev = None
 
@@ -354,7 +361,8 @@ def ekf_track(t, fixes, gyro, horizons=(10,), *, adaptive=False):
 # turns and climb included.
 def _euler_R(psi, th, phi):
     """Body->world rotation from yaw/pitch/roll (ZYX)."""
-    cz, sz = np.cos(psi), np.sin(psi); cy, sy = np.cos(th), np.sin(th)
+    cz, sz = np.cos(psi), np.sin(psi)
+    cy, sy = np.cos(th), np.sin(th)
     cx, sx = np.cos(phi), np.sin(phi)
     Rz = np.array([[cz, -sz, 0], [sz, cz, 0], [0, 0, 1]])
     Ry = np.array([[cy, 0, sy], [0, 1, 0], [-sy, 0, cy]])
@@ -362,9 +370,13 @@ def _euler_R(psi, th, phi):
     return Rz @ Ry @ Rx
 
 
-def _exp_so3(w, dt):
-    """Rodrigues exponential of a body-rate increment -> a proper rotation."""
-    th = w * dt; a = float(np.linalg.norm(th))
+def exp_so3(w, dt):
+    """Rodrigues exponential of a body-rate increment ``w`` (rad/s, shape
+    ``(3,)``) over ``dt`` seconds. Returns the ``(3, 3)`` rotation matrix a
+    constant rate ``w`` integrates to; the identity below a 1e-12 rad rotation
+    angle."""
+    th = w * dt
+    a = float(np.linalg.norm(th))
     if a < 1e-12:
         return np.eye(3)
     k = th / a
@@ -374,8 +386,9 @@ def _exp_so3(w, dt):
 
 def _log_so3(dR, dt):
     """Body rate that integrates ``dR`` over ``dt`` (the exact inverse of
-    :func:`_exp_so3`), so the simulated gyro re-integrates to the true attitude."""
-    c = np.clip((np.trace(dR) - 1.0) / 2.0, -1.0, 1.0); a = float(np.arccos(c))
+    :func:`exp_so3`), so the simulated gyro re-integrates to the true attitude."""
+    c = np.clip((np.trace(dR) - 1.0) / 2.0, -1.0, 1.0)
+    a = float(np.arccos(c))
     if a < 1e-9:
         return np.zeros(3)
     v = np.array([dR[2, 1] - dR[1, 2], dR[0, 2] - dR[2, 0], dR[1, 0] - dR[0, 1]])
@@ -390,7 +403,8 @@ def build_mag(t, truth, *, mag_sigma=MAG_SIGMA, bias=0.0, seed=0):
     honest output of a calibrated magnetometer, and the one channel a gyro-only
     strapdown lacks: an attitude reference that does not drift. Returns
     ``mag_heading`` of shape ``(n,)`` in radians."""
-    rng = np.random.default_rng(seed); dt = float(t[1] - t[0])
+    rng = np.random.default_rng(seed)
+    dt = float(t[1] - t[0])
     vel = np.gradient(truth, dt, axis=0)
     psi = np.arctan2(vel[:, 1], vel[:, 0])
     return psi + bias + rng.normal(0, mag_sigma, psi.shape)
@@ -415,7 +429,9 @@ def build_imu(t, truth, *, gyro_sigma=IMU_GYRO_SIGMA, acc_sigma=IMU_ACC_SIGMA,
     heading drift through a GPS dropout and that the compass bounds. Returns
     ``(R0, gyro, accel, mag_heading)``, where ``R0`` is the initial attitude,
     the alignment a real rig gets at start-up."""
-    rng = np.random.default_rng(seed); dt = float(t[1] - t[0]); m = t.size
+    rng = np.random.default_rng(seed)
+    dt = float(t[1] - t[0])
+    m = t.size
     vel = np.gradient(truth, dt, axis=0)
     acc = np.gradient(vel, dt, axis=0)
     vh = np.hypot(vel[:, 0], vel[:, 1]) + 1e-9
@@ -467,12 +483,17 @@ def strapdown_basis(t, gyro, accel, R0, *, tau=IMU_WASH_TAU,
     its slow yaw drift. This runs independently of the GPS, so it keeps the
     dead-reckoned heading honest through a GPS dropout, where a gyro bias would
     otherwise curve the coast off-course."""
-    dt = float(t[1] - t[0]); R = R0.copy(); m = t.size
-    S = np.zeros((m, 3)); v = np.zeros(3); s = np.zeros(3); a = dt / tau
+    dt = float(t[1] - t[0])
+    R = R0.copy()
+    m = t.size
+    S = np.zeros((m, 3))
+    v = np.zeros(3)
+    s = np.zeros(3)
+    a = dt / tau
     use_mag = mag_heading is not None and mag_gain > 0.0
     for i in range(m):
         aw = R @ accel[i] + GRAVITY
-        R = R @ _exp_so3(gyro[i], dt)
+        R = R @ exp_so3(gyro[i], dt)
         if use_mag:
             e = _wrap(float(mag_heading[i]) - _yaw_of(R)) * mag_gain
             c, sn = np.cos(e), np.sin(e)
@@ -484,7 +505,8 @@ def strapdown_basis(t, gyro, accel, R0, *, tau=IMU_WASH_TAU,
 
 
 def imu_lsi_track(t, fixes, gyro, accel, R0, horizons=(10,), *, window=28,
-                  drift="c2*tt**2", mag_heading=None, mag_gain=MAG_GAIN, S=None):
+                  drift="c2*tt**2", mag_heading=None, mag_gain=MAG_GAIN, S=None,
+                  adaptive_window=True):
     """Full-IMU GPS fusion, run per axis entirely through dtfit's LSI filter.
 
     The strapdown basis ``S`` (gyro attitude plus accelerometer, washed out) is
@@ -509,8 +531,14 @@ def imu_lsi_track(t, fixes, gyro, accel, R0, horizons=(10,), *, window=28,
     both more accurate on clean smoothing and far more stable during dropouts.
     Paired with a slightly wider ``window`` of 28, which the order-6 projection
     wants room for, the per-axis LSI leads the coordinated-turn EKF on
-    smoothing, coasting and robustness alike."""
-    n = t.size; sm = np.zeros((n, 3)); ax = ["Sx", "Sy", "Sz"]
+    smoothing, coasting and robustness alike.
+
+    ``adaptive_window`` is threaded straight into the underlying
+    :class:`ImageFilter`: ``True`` (the default) sizes the window from the
+    data, ``False`` holds it fixed at ``window``."""
+    n = t.size
+    sm = np.zeros((n, 3))
+    ax = ["Sx", "Sy", "Sz"]
     # ``S`` may arrive precomputed, e.g. from a rest-aided real-IMU strapdown
     # that estimates bias online; otherwise build the clean-IMU basis as the
     # sim does.
@@ -525,7 +553,7 @@ def imu_lsi_track(t, fixes, gyro, accel, R0, horizons=(10,), *, window=28,
 
     flts = [ImageFilter(expr(a), "tt", regressors=ax[a],
                       p0=[float(fixes[0, a])] + [0.0] * (nq - 1), window_size=window,
-                      order=6, q_diag=[1e-2] * nq,
+                      order=6, q_diag=[1e-2] * nq, adaptive_window=adaptive_window,
                       drift_reset="inflate", basis="legendre") for a in range(3)]
     pred = {h: np.full((n, 3), np.nan) for h in horizons}
     for i in range(n):
@@ -566,10 +594,12 @@ def match_onsets(flags):
     return caught, fa, (float(np.median(lat)) if lat else float("nan"))
 
 
-def _batch_one(arg):
-    """One random-trajectory trial for the E6 batch, at module level so a
-    process pool can pickle it. Returns
-    ``(j, {method: smoothing RMSE}, sample-or-None)``.
+def batch_trial(arg):
+    """One random-trajectory trial for the random-plan batch test, at module
+    level so a process pool can pickle it. ``arg`` is ``(trial_index, n)``,
+    ``n`` the number of simulated GPS epochs. Returns
+    ``(trial_index, {method: smoothing RMSE}, sample-trajectory-or-None)``,
+    the sample trajectory carried for the first six trials only.
 
     The plan, GPS-noise and IMU-noise seeds are drawn as three independent
     children of a per-trial :class:`numpy.random.SeedSequence`, so they are
@@ -584,7 +614,8 @@ def _batch_one(arg):
     plan = random_plan(seed=s_plan)
     t, truth, fixes, gyro, _ = build_rig(n, seed=s_rig, plan=plan)
     R0, gy3, ac3, mg3 = build_imu(t, truth, seed=s_imu)
-    msk = np.ones(n, bool); msk[:WARMUP] = False
+    msk = np.ones(n, bool)
+    msk[:WARMUP] = False
     out = {
         "raw": rmse3(fixes[msk], truth[msk]),
         "lsi": rmse3(dtfit_track(t, fixes, (1,), kind="lsi")[0][msk], truth[msk]),
@@ -596,15 +627,10 @@ def _batch_one(arg):
     return j, out, (truth if j < 6 else None)
 
 
-def _run_batch(n_traj, n):
-    """Run the E6 batch's independent trials across processes, falling back to
-    serial when that is impossible, as inside a non-forking pool worker."""
+def run_batch(n_traj, n):
+    """Run ``n_traj`` independent :func:`batch_trial` calls, each simulating
+    ``n`` GPS epochs, through
+    :func:`dtfit_experimental.study.montecarlo.pool_map` (one BLAS thread a
+    worker). Returns the trials' results in trial order."""
     args = [(j, n) for j in range(n_traj)]
-    try:
-        import os
-        from concurrent.futures import ProcessPoolExecutor
-        workers = min(8, (os.cpu_count() or 4))
-        with ProcessPoolExecutor(max_workers=workers) as ex:
-            return list(ex.map(_batch_one, args))
-    except Exception:
-        return [_batch_one(a) for a in args]   # daemonic worker / no fork: serial
+    return montecarlo.pool_map(batch_trial, args)

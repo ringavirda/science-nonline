@@ -56,7 +56,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from dtfit_experimental.experiments.domains.realtime_gps import backend as G
+from dtfit_experimental.study import gps as G
 
 SIGMA = G.GPS_SIGMA      # per-axis noise (m): the sim's NEO-M8N-grade 1.5 m
 WARM = G.WARMUP          # warm-up samples excluded from scoring
@@ -85,7 +85,7 @@ def ct_benchmark(seed=0, *, sigma=SIGMA, plan=None, n=N):
     ``"cv"`` on a straight leg or ``"turn"`` inside a turn."""
     plan = plan or CT_PLAN
     t, truth, fixes, _, _ = G.build_rig(n, seed=seed, plan=plan, gps_sigma=sigma)
-    om, _, _ = G._controls(t, plan)
+    om, _, _ = G.controls(t, plan)
     return t, truth, fixes, np.where(np.abs(om) > 1e-9, "turn", "cv")
 
 
@@ -114,24 +114,35 @@ class _CT5:
     the turn-rate slew across the onsets."""
 
     def __init__(self, dt, r, q_acc=8.0, q_w=0.30):
-        self.dt = float(dt); self.r = float(r)
+        self.dt = float(dt)
+        self.r = float(r)
         qb = np.array([[dt ** 4 / 4, dt ** 3 / 2], [dt ** 3 / 2, dt ** 2]]) * float(q_acc)
-        Q = np.zeros((5, 5)); Q[0:2, 0:2] = qb; Q[2:4, 2:4] = qb; Q[4, 4] = float(q_w) * dt
+        Q = np.zeros((5, 5))
+        Q[0:2, 0:2] = qb
+        Q[2:4, 2:4] = qb
+        Q[4, 4] = float(q_w) * dt
         self.Q = Q
-        self.x = np.zeros(5); self.P = np.eye(5)
+        self.x = np.zeros(5)
+        self.P = np.eye(5)
 
     def _prop(self, s):
-        x, vx, y, vy, w = s; dt = self.dt; th = w * dt
+        x, vx, y, vy, w = s
+        dt = self.dt
+        th = w * dt
         if abs(w) < 1e-6:                                  # constant-velocity limit
             return np.array([x + vx * dt, vx, y + vy * dt, vy, w])
-        sn, cs = np.sin(th), np.cos(th); a, b = sn / w, (1.0 - cs) / w
+        sn, cs = np.sin(th), np.cos(th)
+        a, b = sn / w, (1.0 - cs) / w
         return np.array([x + a * vx - b * vy, cs * vx - sn * vy,
                          y + b * vx + a * vy, sn * vx + cs * vy, w])
 
     def _F(self, s):
-        F = np.zeros((5, 5)); f0 = self._prop(s)
+        F = np.zeros((5, 5))
+        f0 = self._prop(s)
         for j in range(5):
-            sp = s.copy(); h = 1e-6 * max(1.0, abs(s[j])); sp[j] += h
+            sp = s.copy()
+            h = 1e-6 * max(1.0, abs(s[j]))
+            sp[j] += h
             F[:, j] = (self._prop(sp) - f0) / h
         return F
 
@@ -143,7 +154,8 @@ class _CT5:
     _H = np.array([[1.0, 0, 0, 0, 0], [0, 0, 1.0, 0, 0]])
 
     def update(self, z):
-        H = self._H; R = np.eye(2) * self.r
+        H = self._H
+        R = np.eye(2) * self.r
         yk = np.asarray(z, float) - H @ self.x
         S = H @ self.P @ H.T + R
         K = self.P @ H.T @ np.linalg.inv(S)
@@ -162,7 +174,8 @@ def ctekf_pos_track(t, meas, *, sigma=SIGMA, q_acc=8.0, q_w=0.30):
     """A single coordinated-turn EKF with the turn-rate estimated from position
     and no gyro. Missing fixes (NaN rows) coast predict-only on the CT
     dynamics, which is the fair dropout dead-reckon."""
-    n = len(t); f = _CT5(t[1] - t[0], sigma ** 2, q_acc, q_w)
+    n = len(t)
+    f = _CT5(t[1] - t[0], sigma ** 2, q_acc, q_w)
     out = np.zeros((n, 3))
     for i in range(n):
         z = meas[i, :2]
@@ -171,7 +184,8 @@ def ctekf_pos_track(t, meas, *, sigma=SIGMA, q_acc=8.0, q_w=0.30):
         elif not np.isfinite(z).all():
             f.predict()                        # coast through the gap
         else:
-            f.predict(); f.update(z)
+            f.predict()
+            f.update(z)
         out[i, :2] = [f.x[0], f.x[2]]
     return out
 
@@ -239,12 +253,14 @@ class IMM2:
 
 
 def imm_track(t, meas, *, sigma=SIGMA, q_acc=8.0):
-    n = len(t); imm = IMM2(t[1] - t[0], sigma=sigma, q_acc=q_acc)
+    n = len(t)
+    imm = IMM2(t[1] - t[0], sigma=sigma, q_acc=q_acc)
     out = np.zeros((n, 3))
     for i in range(n):
         z = meas[i, :2]
         if i == 0:
-            imm.init_state(z if np.isfinite(z).all() else np.zeros(2)); out[i, :2] = z
+            imm.init_state(z if np.isfinite(z).all() else np.zeros(2))
+            out[i, :2] = z
         elif not np.isfinite(z).all():
             out[i, :2] = imm.coast()           # dead-reckon through the gap
         else:
@@ -269,16 +285,20 @@ class _CA1:
         self.F = np.array([[1, dt, dt * dt / 2], [0, 1, dt], [0, 0, 1.0]])
         g = np.array([dt * dt / 2, dt, 1.0])
         self.Q = np.outer(g, g) * float(q)
-        self.x = np.zeros(3); self.P = np.eye(3)
+        self.x = np.zeros(3)
+        self.P = np.eye(3)
 
     def init(self, z):
-        self.x = np.array([z, 0.0, 0.0]); self.P = np.diag([self.r, 100.0, 100.0])
+        self.x = np.array([z, 0.0, 0.0])
+        self.P = np.diag([self.r, 100.0, 100.0])
 
     def predict(self):
-        self.x = self.F @ self.x; self.P = self.F @ self.P @ self.F.T + self.Q
+        self.x = self.F @ self.x
+        self.P = self.F @ self.P @ self.F.T + self.Q
 
     def update(self, z, huber=None):
-        S = self.P[0, 0] + self.r; y = z - self.x[0]
+        S = self.P[0, 0] + self.r
+        y = z - self.x[0]
         if huber is not None:
             nu = abs(y) / np.sqrt(S)
             if nu > huber:
@@ -296,7 +316,8 @@ def kalman_ca_track(t, meas, *, sigma=SIGMA, q=5e-2, r=0.5, huber=None):
     of clean accuracy for lag. The plain run therefore matches the deployed
     ``Kalman-CA`` baseline, and the Huber run is a fair, symmetric hardening of
     that same filter."""
-    n = len(t); dt = t[1] - t[0]
+    n = len(t)
+    dt = t[1] - t[0]
     fl = [_CA1(dt, r, q) for _ in range(2)]
     out = np.zeros((n, 3))
     for i in range(n):
@@ -307,7 +328,8 @@ def kalman_ca_track(t, meas, *, sigma=SIGMA, q=5e-2, r=0.5, huber=None):
             elif not np.isfinite(z[ax]):
                 fl[ax].predict()
             else:
-                fl[ax].predict(); fl[ax].update(z[ax], huber=huber)
+                fl[ax].predict()
+                fl[ax].update(z[ax], huber=huber)
             out[i, ax] = fl[ax].x[0]
     return out
 
@@ -336,7 +358,8 @@ def run_methods_realdata(t, meas, *, window=5, q_acc=20.0, kalman_q=5e-2, huber=
     CA/CT baselines take a regime-appropriate process noise. Both dtfit and the
     Kalman carry a robust variant, keeping the multipath column hardened
     against hardened. NaN rows coast predict-only."""
-    md = G.MODELS["poly"]; n = len(t)
+    md = G.MODELS["poly"]
+    n = len(t)
 
     def dtfit(robust):
         fl = [G.ImageFilter(md["expr"], "t", p0=[float(meas[0, ax])] + list(md["rest"]),
@@ -366,7 +389,8 @@ def pos_stats(est, truth, *, warm=WARM):
     """(RMSE, median, p95) of the 2-D position error past warm-up. The median
     and p95 expose spike rejection that a mean RMSE, dominated by a few huge
     multipath jumps, hides."""
-    base = np.ones(len(truth), bool); base[:warm] = False
+    base = np.ones(len(truth), bool)
+    base[:warm] = False
     e = np.linalg.norm(est[base, :2] - truth[base, :2], axis=1)
     return float(np.sqrt(np.mean(e ** 2))), float(np.median(e)), float(np.percentile(e, 95))
 
@@ -378,7 +402,9 @@ def _pos_rmse(est, truth, mask):
 
 def score(res, truth, labels, *, warm=WARM):
     """Per-method overall + per-segment-type position RMSE (warm-up excluded)."""
-    n = len(truth); base = np.ones(n, bool); base[:warm] = False
+    n = len(truth)
+    base = np.ones(n, bool)
+    base[:warm] = False
     seg_types = list(dict.fromkeys(labels.tolist()))
     out = {}
     for name, est in res.items():
@@ -418,7 +444,10 @@ def dropout_score(t, truth, meas, *, gap=20, sigma=SIGMA):
     """Blank out ``gap``-sample GPS dropouts, let each tracker coast, and score
     the coast against true position at the blanked samples. That is the real
     dead-reckoning error, not a held-out-fix proxy for it."""
-    n = len(t); gm = _gap_mask(n, gap); mg = meas.copy(); mg[gm] = np.nan
+    n = len(t)
+    gm = _gap_mask(n, gap)
+    mg = meas.copy()
+    mg[gm] = np.nan
     res = run_methods(t, mg, sigma=sigma)
     return {nm: _pos_rmse(est, truth, gm) for nm, est in res.items()}
 
@@ -435,9 +464,11 @@ def glitch_score(t, truth, meas, *, frac=0.06, mag=12.0, seed=0, sigma=SIGMA):
     ``bench_fn`` drew from the same ``seed``; an offset could alias the two."""
     n = len(t)
     rng = np.random.default_rng(np.random.SeedSequence(seed).spawn(1)[0])
-    gl = np.zeros(n, bool); idx = np.arange(WARM + 10, n)
+    gl = np.zeros(n, bool)
+    idx = np.arange(WARM + 10, n)
     gl[rng.choice(idx, size=int(frac * idx.size), replace=False)] = True
-    mgl = meas.copy(); mgl[gl, :2] += rng.normal(0.0, mag, (int(gl.sum()), 2))
+    mgl = meas.copy()
+    mgl[gl, :2] += rng.normal(0.0, mag, (int(gl.sum()), 2))
     res = run_methods(t, mgl, sigma=sigma)
     res["dtfit Legendre robust"] = G.dtfit_track(t, mgl, (1,), kind="lsi", model="poly",
                                             robust=True)[0]
@@ -488,7 +519,8 @@ def load_external(path, *, lat="lat", lon="lon", truth_lat="truth_lat",
     def g(r, k):
         return float(r[k])
     lat0, lon0 = g(rows[0], truth_lat), g(rows[0], truth_lon)
-    cl = np.cos(np.radians(lat0)); md = 111320.0
+    cl = np.cos(np.radians(lat0))
+    md = 111320.0
     n = len(rows)
     t = (np.array([g(r, t_col) for r in rows]) if t_col in rows[0] else np.arange(n, dtype=float))
     t = t - t[0]
@@ -507,9 +539,12 @@ def load_external(path, *, lat="lat", lon="lon", truth_lat="truth_lat",
 def _ecef_to_geodetic(x, y, z):
     """WGS84 ECEF (m) -> (lat deg, lon deg, alt m), vectorized, by Bowring's
     closed form."""
-    a = 6378137.0; e2 = 6.69437999014e-3
-    b = a * np.sqrt(1.0 - e2); ep2 = (a * a - b * b) / (b * b)
-    p = np.sqrt(x * x + y * y); th = np.arctan2(a * z, b * p)
+    a = 6378137.0
+    e2 = 6.69437999014e-3
+    b = a * np.sqrt(1.0 - e2)
+    ep2 = (a * a - b * b) / (b * b)
+    p = np.sqrt(x * x + y * y)
+    th = np.arctan2(a * z, b * p)
     lon = np.arctan2(y, x)
     lat = np.arctan2(z + ep2 * b * np.sin(th) ** 3, p - e2 * a * np.cos(th) ** 3)
     n = a / np.sqrt(1.0 - e2 * np.sin(lat) ** 2)

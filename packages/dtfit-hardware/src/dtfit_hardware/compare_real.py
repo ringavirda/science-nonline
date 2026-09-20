@@ -29,7 +29,7 @@ import sys
 
 import numpy as np
 
-from dtfit_experimental.experiments.domains.realtime_gps import backend as G
+from dtfit_experimental.study import gps as G
 
 WARM = G.WARMUP
 DEG2RAD = math.pi / 180.0
@@ -238,7 +238,7 @@ def strapdown_real(t, gyro, accel, R0, rest, gbias0, abias0, *, tau=20.0,
             v[:] = 0.0                                             # ZUPT
         w = gyro[i] - gb
         aw = R @ (accel[i] - ab) + grav
-        R = R @ G._exp_so3(w, dt)
+        R = R @ G.exp_so3(w, dt)
         if not rest[i]:
             v = (1 - dt / tau) * v + aw * dt
         s = (1 - dt / tau) * s + v * dt

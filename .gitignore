@@ -30,7 +30,6 @@ packages/dtfit/site/
 # datasets: re-downloadable public sets, and the private rig logs
 # (kept in the private thesis repo)
 **/experiments/data/
-packages/dtfit-experimental/src/dtfit_experimental/experiments/domains/realtime_gps/data
 packages/dtfit-hardware/src/dtfit_hardware/data
 
 # Editor config

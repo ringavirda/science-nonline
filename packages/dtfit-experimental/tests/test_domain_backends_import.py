@@ -27,7 +27,6 @@ _BACKENDS = {
     "embedded_control": ("clean_accuracy", "sweep_perr_all", "exp_model_mismatch"),
     "stochastic_series": ("exp_ar_discrimination", "exp_ar_order_recovery",
                           "exp_fracdiff_whitening", "exp_student_t"),
-    "realtime_gps": (),
     "image_showcase": ("reduce_station", "reduce_to_file",
                        "reduce_station_year", "day_batch", "station_rows",
                        "exactness_rows", "year_rows", "normals_rows",
