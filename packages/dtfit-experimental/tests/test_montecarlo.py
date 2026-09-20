@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 import threadpoolctl
 
+from dtfit_experimental.blocks import EdgeBlockBasis
 from dtfit_experimental.study.montecarlo import (
     contaminate,
     generators,
@@ -160,6 +161,27 @@ def test_image_efficiency_deficient_rank_exceeds_one():
     # unidentified fit is reported as more precise than least squares
     assert eff.ratio == pytest.approx([6.20335821, 74.25373134], abs=1e-6)
     assert (eff.ratio > 1.0).all()
+
+
+def test_image_efficiency_basis_instance_matches_name_and_order():
+    x = np.linspace(0.0, 1.0, 200)
+    jac = np.stack([np.ones(200), x], axis=1)
+    by_name = image_efficiency(jac, x, basis="block", order=8)
+    edges = np.linspace(-1.0, 1.0, 9)
+    # fails if the instance path re-derives the basis from its name
+    # instead of evaluating the given instance
+    by_instance = image_efficiency(jac, x, basis=EdgeBlockBasis(edges))
+    assert by_instance.ratio == pytest.approx(by_name.ratio, abs=1e-12)
+    assert by_instance.rank == by_name.rank
+    assert by_instance.n_coef == by_name.n_coef
+
+
+def test_image_efficiency_rejects_instance_with_order():
+    x = np.linspace(0.0, 1.0, 200)
+    jac = np.stack([np.ones(200), x], axis=1)
+    edges = np.linspace(-1.0, 1.0, 9)
+    with pytest.raises(ValueError, match="order"):
+        image_efficiency(jac, x, basis=EdgeBlockBasis(edges), order=8)
 
 
 def test_summarize_counts_nonfinite_instead_of_dropping_silently():

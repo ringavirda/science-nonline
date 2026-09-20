@@ -11,7 +11,7 @@ from typing import Callable, Iterable, Sequence
 
 import numpy as np
 import threadpoolctl
-from dtfit.image.bases import make_basis, u_of
+from dtfit.image.bases import Basis, make_basis, u_of
 
 # Held by _pool_worker_init so the BLAS thread cap it applies outlives the
 # initializer call for the life of the worker process.
@@ -235,8 +235,8 @@ def image_efficiency(
     jac: np.ndarray,
     x: np.ndarray,
     *,
-    basis: str,
-    order: int,
+    basis: str | Basis,
+    order: int | None = None,
     domain: tuple[float, float] | None = None,
 ) -> Efficiency:
     """Efficiency of the image-restricted estimator, exact and noise-free.
@@ -252,9 +252,11 @@ def image_efficiency(
             ``(len(x), n_params)``.
         x: Sample positions matching ``jac``'s rows.
         basis: Name accepted by ``dtfit.image.bases.make_basis`` (for
-            example ``"legendre"`` or ``"block"``).
+            example ``"legendre"`` or ``"block"``), or a :class:`Basis`
+            instance evaluated as it is, ``EdgeBlockBasis`` and
+            ``SegmentBasis`` included.
         order: Basis order: polynomial degree for Legendre, window count
-            for block.
+            for block. Must be ``None`` when ``basis`` is an instance.
         domain: ``(x0, x1)`` the basis variable is mapped from;
             ``(min(x), max(x))`` when ``None``.
 
@@ -262,9 +264,15 @@ def image_efficiency(
         An :class:`Efficiency`.
 
     Raises:
-        ValueError: ``domain`` is degenerate (``x0 == x1``), or ``order``
-            is not a valid order for ``basis``.
+        ValueError: ``domain`` is degenerate (``x0 == x1``); ``order`` is
+            not a valid order for ``basis``; or ``basis`` is a
+            :class:`Basis` instance and ``order`` is not ``None``.
     """
+    if isinstance(basis, Basis) and order is not None:
+        raise ValueError(
+            f"order must be None when basis is a Basis instance, got "
+            f"basis={basis!r} order={order!r}"
+        )
     if domain is None:
         domain = (float(np.min(x)), float(np.max(x)))
     phi = make_basis(basis, order).evaluate(u_of(x, *domain))
