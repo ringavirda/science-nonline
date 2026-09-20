@@ -13,6 +13,7 @@ beyond what `python -m dtfit_experimental.study.download_data` fetches.
 
 | Notebook | Claim | Runtime | Data |
 |---|---|---|---|
+| 11_source_forms | The three source criteria (spectrum balance, monomial integral, equal areas) against the current image route: the balance's adequacy indicators part ways past a best degree, the monomial weight matrix loses definiteness by order 12, the integral criterion fails past one period, the truncated equal-areas form is biased outside the small-angle range, and its variance trade holds only inside the polynomial base | under 10 seconds | none |
 | 13_two_bases | h versus p refinement: Legendre wins a smooth target, block is exact on a step only where a window boundary falls on the jump and at parity with Legendre otherwise, the Gram conditioning by order and grid, the cost of restricting a linear fit to either basis | a few seconds | none |
 
 ## Writing a notebook
