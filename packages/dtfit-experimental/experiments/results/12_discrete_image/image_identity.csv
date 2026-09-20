@@ -1,0 +1,4 @@
+grid,order,n,max_abs_G_diff,max_abs_S_diff
+uniform,8,200,2.4869e-14,0
+clustered,8,200,1.77636e-14,0
+random,8,200,2.84217e-14,0

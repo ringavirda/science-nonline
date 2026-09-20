@@ -1,0 +1,13 @@
+grid,route,param,ratio_to_pointwise,relative_bias_pct
+uniform,image,a,1,0.0167374
+uniform,image,b,1,0.0215123
+uniform,quadrature,a,1.30787,0.348438
+uniform,quadrature,b,1.83193,1.18477
+clustered,image,a,1,0.0046411
+clustered,image,b,1,0.0829012
+clustered,quadrature,a,655.688,176.948
+clustered,quadrature,b,358.034,291.536
+random,image,a,1,0.00487142
+random,image,b,1,0.0815986
+random,quadrature,a,50.9672,11.0103
+random,quadrature,b,40.7359,8.35844

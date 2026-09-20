@@ -1,0 +1,73 @@
+family,grid,order,order_for,param,ratio_to_pointwise,coverage
+a*exp(b*x),uniform,4,3,a,1.00005,0.946667
+a*exp(b*x),uniform,4,3,b,1.00002,0.986667
+a*exp(b*x),uniform,8,3,a,1,0.946667
+a*exp(b*x),uniform,8,3,b,1,0.986667
+a*exp(b*x),uniform,16,3,a,1,0.946667
+a*exp(b*x),uniform,16,3,b,1,0.986667
+a*exp(b*x),uniform,24,3,a,1,0.946667
+a*exp(b*x),uniform,24,3,b,1,0.986667
+a*exp(b*x),uniform,48,3,a,1,0.946667
+a*exp(b*x),uniform,48,3,b,1,0.986667
+a*exp(b*x),uniform,96,3,a,0.999998,0.946667
+a*exp(b*x),uniform,96,3,b,1,0.986667
+a*exp(b*x),clustered,4,3,a,0.999978,0.913333
+a*exp(b*x),clustered,4,3,b,1.00005,0.98
+a*exp(b*x),clustered,8,3,a,1,0.913333
+a*exp(b*x),clustered,8,3,b,1,0.98
+a*exp(b*x),clustered,16,3,a,1,0.913333
+a*exp(b*x),clustered,16,3,b,1,0.98
+a*exp(b*x),clustered,24,3,a,1,0.913333
+a*exp(b*x),clustered,24,3,b,1,0.98
+a*exp(b*x),clustered,48,3,a,1,0.913333
+a*exp(b*x),clustered,48,3,b,0.999999,0.973333
+a*exp(b*x),clustered,96,3,a,1,0.913333
+a*exp(b*x),clustered,96,3,b,1,0.98
+a*exp(b*x),random,4,3,a,0.999944,0.953333
+a*exp(b*x),random,4,3,b,0.999885,0.986667
+a*exp(b*x),random,8,3,a,1,0.953333
+a*exp(b*x),random,8,3,b,1,0.986667
+a*exp(b*x),random,16,3,a,1,0.953333
+a*exp(b*x),random,16,3,b,1,0.986667
+a*exp(b*x),random,24,3,a,1,0.953333
+a*exp(b*x),random,24,3,b,1,0.986667
+a*exp(b*x),random,48,3,a,1,0.953333
+a*exp(b*x),random,48,3,b,1,0.986667
+a*exp(b*x),random,96,3,a,1,0.953333
+a*exp(b*x),random,96,3,b,1,0.986667
+a*sin(w*x) decay,uniform,4,8,a,1.00697,1
+a*sin(w*x) decay,uniform,4,8,w,1.05457,1
+a*sin(w*x) decay,uniform,8,8,a,1.00003,0.98
+a*sin(w*x) decay,uniform,8,8,w,1.00047,0.946667
+a*sin(w*x) decay,uniform,16,8,a,1,0.98
+a*sin(w*x) decay,uniform,16,8,w,1,0.946667
+a*sin(w*x) decay,uniform,24,8,a,1,0.98
+a*sin(w*x) decay,uniform,24,8,w,1,0.946667
+a*sin(w*x) decay,uniform,48,8,a,1,0.98
+a*sin(w*x) decay,uniform,48,8,w,1,0.946667
+a*sin(w*x) decay,uniform,96,8,a,1,0.98
+a*sin(w*x) decay,uniform,96,8,w,0.999999,0.946667
+a*sin(w*x) decay,clustered,4,8,a,1.01741,1
+a*sin(w*x) decay,clustered,4,8,w,1.06806,1
+a*sin(w*x) decay,clustered,8,8,a,0.99998,0.926667
+a*sin(w*x) decay,clustered,8,8,w,1.0001,0.933333
+a*sin(w*x) decay,clustered,16,8,a,1,0.926667
+a*sin(w*x) decay,clustered,16,8,w,1,0.926667
+a*sin(w*x) decay,clustered,24,8,a,1,0.926667
+a*sin(w*x) decay,clustered,24,8,w,1,0.926667
+a*sin(w*x) decay,clustered,48,8,a,1,0.926667
+a*sin(w*x) decay,clustered,48,8,w,1,0.926667
+a*sin(w*x) decay,clustered,96,8,a,1,0.926667
+a*sin(w*x) decay,clustered,96,8,w,1,0.926667
+a*sin(w*x) decay,random,4,8,a,1.00518,1
+a*sin(w*x) decay,random,4,8,w,1.07558,1
+a*sin(w*x) decay,random,8,8,a,0.999881,0.96
+a*sin(w*x) decay,random,8,8,w,1.00021,0.953333
+a*sin(w*x) decay,random,16,8,a,1,0.96
+a*sin(w*x) decay,random,16,8,w,1,0.953333
+a*sin(w*x) decay,random,24,8,a,1,0.96
+a*sin(w*x) decay,random,24,8,w,1,0.953333
+a*sin(w*x) decay,random,48,8,a,1,0.96
+a*sin(w*x) decay,random,48,8,w,1,0.953333
+a*sin(w*x) decay,random,96,8,a,1,0.96
+a*sin(w*x) decay,random,96,8,w,0.999998,0.953333
