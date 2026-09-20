@@ -190,13 +190,13 @@ def numeric_jacobian(
         Array of shape ``(x.size, len(params))``, column ``i`` the
         derivative of ``f`` with respect to ``params[i]``.
     """
-    params = np.asarray(params, dtype=float)
+    p = np.asarray(params, dtype=float)
     cols = []
-    for i in range(params.size):
-        d = np.zeros_like(params)
-        d[i] = step * max(1.0, abs(params[i]))
-        hi = f(x, *(params + d))
-        lo = f(x, *(params - d))
+    for i in range(p.size):
+        d = np.zeros_like(p)
+        d[i] = step * max(1.0, abs(p[i]))
+        hi = f(x, *(p + d))
+        lo = f(x, *(p - d))
         cols.append((np.asarray(hi, dtype=float) -
                       np.asarray(lo, dtype=float)) / (2.0 * d[i]))
     return np.stack(cols, axis=1)

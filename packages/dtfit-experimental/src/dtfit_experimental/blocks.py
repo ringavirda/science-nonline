@@ -663,20 +663,20 @@ def detect_jumps(
             z = z / max(scale, 1.0)
     found: list[tuple[int, float, float, float]] = []
     zz = np.abs(z).copy()
-    for b in exclude:
-        zz[max(0, int(b) - 1): int(b) + 2] = 0.0
+    for skip in exclude:
+        zz[max(0, int(skip) - 1): int(skip) + 2] = 0.0
     while True:
-        b = int(np.argmax(zz))
-        if zz[b] < threshold:
+        top = int(np.argmax(zz))
+        if zz[top] < threshold:
             break
-        vl, vr = lvl[b]
+        vl, vr = lvl[top]
         frac = (
-            float(np.clip((m[b] - vl) / (vr - vl), 0.0, 1.0))
+            float(np.clip((m[top] - vl) / (vr - vl), 0.0, 1.0))
             if vr != vl else 0.5
         )
-        epoch = e[b] + (1.0 - frac) * (e[b + 1] - e[b])
-        found.append((b, float(epoch), float(amp[b]), float(z[b])))
-        zz[max(0, b - span): b + span + 1] = 0.0
+        epoch = e[top] + (1.0 - frac) * (e[top + 1] - e[top])
+        found.append((top, float(epoch), float(amp[top]), float(z[top])))
+        zz[max(0, top - span): top + span + 1] = 0.0
     return found
 
 
