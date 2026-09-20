@@ -21,8 +21,6 @@ _BACKENDS = {
     "parameter_estimation": ("MODELS", "gen", "est_eac", "est_lsi", "est_nlls",
                              "param_err", "FAMILY_REASON", "load_puromycin",
                              "real_puromycin", "exp_model_mismatch"),
-    "big_data": (),
-    "embedded_control": ("clean_accuracy", "sweep_perr_all", "exp_model_mismatch"),
 }
 
 

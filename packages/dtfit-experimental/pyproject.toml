@@ -32,8 +32,7 @@ dependencies = [
 # baseline methods compared against (deep nets via torch, classical TS via
 # statsmodels). joblib (parallel fitting) ships with scikit-learn.
 bench = ["dtfit-legacy", "matplotlib>=3.7", "torch>=2.2", "statsmodels>=0.14", "pandas>=2.0", "nbclient>=0.10", "ipykernel>=6"]
-# Optional GPU backend for the GEMM-batched projection (batched.py /
-# experiments .../cases/08_gpu_batched_projection). CuPy is a NumPy-API drop-in
+# Optional GPU backend for the GEMM-batched projection (batched.py). CuPy is a NumPy-API drop-in
 # on cuBLAS; pick the wheel matching your CUDA driver -- cupy-cuda13x for CUDA 13
 # (e.g. a Blackwell / RTX 50-series box), cupy-cuda12x for CUDA 12. Install
 # explicitly, e.g. `pip install cupy-cuda13x`; not pinned here.
