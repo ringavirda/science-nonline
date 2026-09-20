@@ -55,8 +55,7 @@ def test_u_outside_the_unit_interval_is_clamped():
 
 
 def test_a_dropped_interval_gives_a_zero_row():
-    # Fails if evaluate() maps a dropped interval onto a kept column
-    # instead of leaving the row empty.
+    # Fails if evaluate() maps a dropped interval onto a kept column.
     b = EdgeBlockBasis([-1.0, -0.5, 0.5, 1.0], keep=[True, False, True])
     assert b.n_coef == 2
     phi = b.evaluate([-0.75, 0.0, 0.75])
@@ -154,8 +153,8 @@ def _cycle_windows(n=4800, k=12):
 
 
 def test_aggregated_image_carries_the_window_sum_least_squares():
-    # Fails if S, G or sumsq is built from the means instead of the totals
-    # and the counts: the image fit is then not the window-sum fit.
+    # Fails if S, G or sumsq is built from the window means instead of
+    # the totals and the counts.
     x, edges, idx, counts = _cycle_windows()
     rng = np.random.default_rng(1)
     y = _cycle(x, *CYCLE_TRUTH) + 0.5 * rng.standard_normal(x.size)
@@ -295,8 +294,7 @@ def _align_series(rng, epochs=(), steps=(), outliers=0.0):
 
 
 def test_fit_aligned_finds_two_jumps_and_their_amplitudes():
-    # Fails if the detector ranks z rather than |z|: the negative jump is
-    # then never reached.
+    # Fails if the detector ranks z rather than |z|.
     rng = np.random.default_rng(11)
     epochs, steps = (2.37, 6.81), (10.0, -10.0)
     x, y = _align_series(rng, epochs, steps)
@@ -346,10 +344,9 @@ def test_clip_keeps_gross_outliers_out_of_the_image():
 
 
 def test_detect_jumps_reads_the_amplitude_and_the_epoch():
-    # Fails without the non-maximum suppression around a detection (one
-    # jump would be reported by every window near it) and if the amplitude
-    # is read from the flagged window's own mean rather than from the two
-    # extrapolations.
+    # Fails without the non-maximum suppression around a detection, and
+    # if the amplitude is read from the flagged window's own mean rather
+    # than from the two extrapolations.
     kf = 64
     edges = np.linspace(0.0, 10.0, kf + 1)
     centres = 0.5 * (edges[:-1] + edges[1:])
@@ -396,8 +393,7 @@ def test_detect_jumps_needs_a_positive_noise_scale():
 
 
 def test_coarsen_never_spans_a_flagged_window():
-    # Fails if the flagged windows are merged into their neighbours: the
-    # coarse edges would no longer sit on the epochs.
+    # Fails if coarsen merges across a flagged window.
     lab = coarsen(64, 8, [20, 21, 45])
     assert lab.tolist()[20:22] == [-1, -1]
     assert lab[45] == -1
