@@ -30,6 +30,7 @@ import urllib.request
 from datetime import datetime
 from pathlib import Path
 
+from . import reference
 from .paths import data_dir
 
 DATA_DIR = data_dir()
@@ -139,16 +140,40 @@ def download_ltsf() -> None:
               f"{AUTOFORMER_CANONICAL})")
 
 
+NIST_DIR = DATA_DIR / "nist"
+NIST_URL = "https://www.itl.nist.gov/div898/strd/nls/data/LINKS/DATA/{}.dat"
+
+
+def nist() -> None:
+    """Fetch the ten NIST StRD nonlinear-regression datasets
+    :mod:`dtfit_experimental.study.reference` catalogues, into
+    ``data_dir()/"nist"``, skipping any file already present."""
+    NIST_DIR.mkdir(parents=True, exist_ok=True)
+    print("NIST StRD datasets:")
+    for name, _ in reference.datasets():
+        path = NIST_DIR / f"{name}.dat"
+        if path.exists():
+            print(f"  {name}: present")
+            continue
+        try:
+            data = _get(NIST_URL.format(name))
+            path.write_bytes(data)
+            print(f"  {name}: {len(data)} B -> {path.relative_to(DATA_DIR.parent)}")
+        except Exception as exc:  # noqa: BLE001 - best-effort, report and continue
+            print(f"  {name}: FAILED ({type(exc).__name__})")
+
+
 def main() -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     print(f"Downloading datasets into {DATA_DIR} ...")
-    for fn in (download_usd_uah, download_covid_ukraine, download_ltsf):
+    for fn in (download_usd_uah, download_covid_ukraine, download_ltsf, nist):
         try:
             fn()
         except Exception as exc:  # noqa: BLE001
             print(f"  {fn.__name__}: FAILED ({type(exc).__name__}: {exc})")
     print("Done. (sunspots / CO2 for the forecasting experiment come from "
-          "statsmodels.datasets at run time -- no download needed.)")
+          "statsmodels.datasets at run time -- no download needed. Puromycin "
+          "is vendored in study.reference, not downloaded.)")
 
 
 if __name__ == "__main__":
