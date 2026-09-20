@@ -52,14 +52,27 @@ def test_fit_kind_chirp_recovers_sweep():
 
 
 # Fails when the torch guard is removed: baseline_preds then raises
-# RuntimeError("torch not available") instead of returning.
-def test_baseline_preds_omits_lstm_without_torch():
+# whatever bl.lstm_forecast raises on a stand-in module instead of omitting
+# the key.
+def test_baseline_preds_omits_lstm_without_torch(monkeypatch):
+    monkeypatch.setattr(F.notebook, "optional_import", lambda name: None)
     y = np.sin(np.linspace(0, 10, 60))
     out = F.baseline_preds(y, 5, dict(seasonal=False, period=None), quick=False)
     for key in ("random walk", "drift", "poly extrap", "ETS (Holt-Winters)",
                 "Theta", "ARIMA", "MLP"):
         assert key in out
     assert "LSTM" not in out
+
+
+# Fails when the torch guard is removed: with torch present, LSTM would be
+# skipped even though optional_import returns a module.
+def test_baseline_preds_includes_lstm_with_torch(monkeypatch):
+    monkeypatch.setattr(F.notebook, "optional_import", lambda name: object())
+    monkeypatch.setattr(
+        F.bl, "lstm_forecast", lambda y_tr, h, lookback, epochs: np.zeros(h))
+    y = np.sin(np.linspace(0, 10, 60))
+    out = F.baseline_preds(y, 5, dict(seasonal=False, period=None), quick=False)
+    assert "LSTM" in out
 
 
 # _w0_from finds the daily angular frequency of a 24-sample cycle within 1

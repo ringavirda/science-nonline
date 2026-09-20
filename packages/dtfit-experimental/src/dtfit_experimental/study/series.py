@@ -67,8 +67,9 @@ def load_sunspots() -> np.ndarray:
 
 
 def load_co2() -> np.ndarray:
-    """Mauna Loa atmospheric CO2, weekly (every 4th sample of the bundled
-    series). Measured, from ``statsmodels.datasets``."""
+    """Mauna Loa atmospheric CO2, 4-weekly (every 4th sample of the bundled
+    weekly series, so 28 days apart). Measured, from
+    ``statsmodels.datasets``."""
     import statsmodels.api as sm
     s = sm.datasets.co2.load_pandas().data["co2"]
     return s.interpolate().bfill().ffill().to_numpy(float)[::4]

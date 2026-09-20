@@ -147,8 +147,13 @@ NIST_URL = "https://www.itl.nist.gov/div898/strd/nls/data/LINKS/DATA/{}.dat"
 def nist() -> None:
     """Fetch the ten NIST StRD nonlinear-regression datasets
     :mod:`dtfit_experimental.study.reference` catalogues, into
-    ``data_dir()/"nist"``, skipping any file already present."""
-    NIST_DIR.mkdir(parents=True, exist_ok=True)
+    ``data_dir()/"nist"``, skipping any file already present.
+
+    ``data_dir()/"nist"`` is created only once a file has actually landed,
+    so a test suite that keys its skip condition on the directory's
+    existence does not see a present but empty directory after every fetch
+    fails.
+    """
     print("NIST StRD datasets:")
     for name, _ in reference.datasets():
         path = NIST_DIR / f"{name}.dat"
@@ -157,6 +162,7 @@ def nist() -> None:
             continue
         try:
             data = _get(NIST_URL.format(name))
+            NIST_DIR.mkdir(parents=True, exist_ok=True)
             path.write_bytes(data)
             print(f"  {name}: {len(data)} B -> {path.relative_to(DATA_DIR.parent)}")
         except Exception as exc:  # noqa: BLE001 - best-effort, report and continue

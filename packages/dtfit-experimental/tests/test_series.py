@@ -15,20 +15,23 @@ def test_series_catalogue_has_twelve_entries():
     assert len(S.SERIES) == 12
 
 
-# Fails when a loader's seed or sample count drifts.
-@pytest.mark.parametrize("loader, n, period", [
-    (S.load_rlc_transient, 360, 90.0),
-    (S.load_ac_harmonics, 360, 60.0),
-    (S.load_am_signal, 400, 400 / 9.0),
-    (S.load_chirp, 400, 400 / 11.0),
+# Fails when a loader's seed or sample count drifts. The golden first sample
+# pins the seed: a reproducibility check across two calls of the same loader
+# passes for any seed, so it alone would miss a drifted seed.
+@pytest.mark.parametrize("loader, n, period, y0", [
+    (S.load_rlc_transient, 360, 90.0, 0.0006838553450636834),
+    (S.load_ac_harmonics, 360, 60.0, -0.00020480339596569536),
+    (S.load_am_signal, 400, 400 / 9.0, 0.05480269679872269),
+    (S.load_chirp, 400, 400 / 11.0, 0.020865593101145056),
 ])
-def test_generated_waveforms_reproducible(loader, n, period):
+def test_generated_waveforms_reproducible(loader, n, period, y0):
     from dtfit._signal import dominant_period
 
     y1 = loader()
     y2 = loader()
     assert y1.size == n
     np.testing.assert_array_equal(y1, y2)
+    assert y1[0] == pytest.approx(y0)
     period_samp, strength = dominant_period(y1)
     assert strength > 0.05
     assert period_samp == pytest.approx(period, rel=0.05)
