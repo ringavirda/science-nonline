@@ -3,6 +3,7 @@ writes. No network call and no real file."""
 
 from __future__ import annotations
 
+import gzip
 import io
 
 import numpy as np
@@ -125,6 +126,41 @@ def test_station_files_filters_and_truncates(tmp_path):
         "72278023183.csv", "72278023185.csv",
     ]
     assert len(isd.station_files(tmp_path, limit=2)) == 2
+
+
+def test_station_files_finds_gzipped_and_prefers_them(tmp_path):
+    (tmp_path / "72278023183.csv").write_text(HEAD)
+    (tmp_path / "72278023184.csv.gz").write_bytes(
+        gzip.compress(HEAD.encode())
+    )
+    (tmp_path / "72278023185.csv").write_text(HEAD)
+    (tmp_path / "72278023185.csv.gz").write_bytes(
+        gzip.compress(HEAD.encode())
+    )
+    assert [p.name for p in isd.station_files(tmp_path)] == [
+        "72278023183.csv", "72278023184.csv.gz", "72278023185.csv.gz",
+    ]
+    filtered = isd.station_files(
+        tmp_path, stations=["72278023185", "72278023184"]
+    )
+    assert [p.name for p in filtered] == [
+        "72278023184.csv.gz", "72278023185.csv.gz",
+    ]
+
+
+def test_read_isd_reads_a_gzipped_file_as_the_plain_one(tmp_path):
+    rows = [
+        ("2024-01-01T00:00:00", "-0070,1", "10132,1", "1.0", "2.0", "3.0"),
+        ("2024-01-01T06:00:00", "-0050,1", "10130,1", "1.0", "2.0", "3.0"),
+    ]
+    plain = write_isd(tmp_path / "p.csv", rows)
+    gz = tmp_path / "p.csv.gz"
+    gz.write_bytes(gzip.compress(plain.read_bytes()))
+    want = list(isd.read_isd(plain))
+    got = list(isd.read_isd(gz))
+    assert len(got) == len(want) == 1
+    np.testing.assert_allclose(got[0].t, want[0].t)
+    np.testing.assert_allclose(got[0].y, want[0].y)
 
 
 def test_station_year_returns_the_series_and_its_counts(tmp_path):

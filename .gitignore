@@ -35,3 +35,6 @@ packages/dtfit-hardware/src/dtfit_hardware/data
 
 # Editor config
 .vscode/
+
+# Private thesis documents
+thesis/

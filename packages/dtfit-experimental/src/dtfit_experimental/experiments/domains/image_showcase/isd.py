@@ -2,15 +2,20 @@
 CSV (one file per station-year), and the hourly normals the annual and
 diurnal amplitudes are checked against.
 
-The reader streams with the ``csv`` module: a year directory is 49 GB and
-a station-year up to a few tens of thousands of rows, so nothing here ever
-holds more than one chunk. Values are tenths with a quality code; codes
-0, 1, 4, 5 and 9 are kept and 2, 3, 6 and 7 dropped, each drop counted.
+The reader streams with the ``csv`` module: a year of stations decompresses
+to about 49 GB and a station-year runs to a few tens of thousands of rows,
+so nothing here ever holds more than one chunk. Values are tenths with a
+quality code; codes 0, 1, 4, 5 and 9 are kept and 2, 3, 6 and 7 dropped,
+each drop counted.
+
+Station-year files are read either as plain ``.csv`` or as ``.csv.gz``;
+the two forms are interchangeable everywhere a path is taken.
 """
 
 from __future__ import annotations
 
 import csv
+import gzip
 import re
 import urllib.request
 from dataclasses import dataclass
@@ -39,6 +44,15 @@ _CUM = {
     True: (0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335),
 }
 _HREF = re.compile(r'href="([A-Z]{2}W[0-9]{8})\.csv"')
+
+
+def _open_csv(path: Any) -> Any:
+    """A text-mode handle on a CSV that may be gzipped, chosen by the
+    ``.gz`` suffix rather than by sniffing. Newline translation is off, as
+    the ``csv`` module requires."""
+    if str(path).endswith(".gz"):
+        return gzip.open(path, "rt", newline="")
+    return open(path, newline="")
 
 
 def days_in_year(year: int) -> int:
@@ -138,7 +152,7 @@ def read_isd(
             f"field must be one of {sorted(ISD_FIELDS)}, got {field!r}"
         )
     missing = ISD_FIELDS[field][0]
-    with open(path, newline="") as fh:
+    with _open_csv(path) as fh:
         reader = csv.reader(fh)
         header = next(reader, None)
         if header is None:
@@ -219,7 +233,7 @@ def read_isd(
 def station_header(path: Any) -> tuple[str, int]:
     """The station id and the year of a station-year file, read from its
     first data row; ``("", 0)`` for a file with no data row."""
-    with open(path, newline="") as fh:
+    with _open_csv(path) as fh:
         reader = csv.reader(fh)
         header = next(reader, None)
         first = next(reader, None)
@@ -281,7 +295,7 @@ def dropped_times(
     missing = ISD_FIELDS[field][0]
     bad: list[float] = []
     gone: list[float] = []
-    with open(path, newline="") as fh:
+    with _open_csv(path) as fh:
         reader = csv.reader(fh)
         header = next(reader, None)
         if header is None:
@@ -382,13 +396,25 @@ def station_files(
     limit: int | None = None,
 ) -> list[Path]:
     """The station CSVs of one year directory, sorted by station id;
-    ``stations`` keeps only those ids, ``limit`` truncates."""
+    ``stations`` keeps only those ids, ``limit`` truncates.
+
+    Plain ``.csv`` and gzipped ``.csv.gz`` are both found. A station
+    present in both forms yields the gzipped one only, so a half-finished
+    compression pass never reads a station twice.
+    """
     root = Path(year_dir)
     if stations is not None:
-        found = [root / f"{s}.csv" for s in sorted(set(stations))]
-        out = [p for p in found if p.exists()]
+        ids = sorted(set(stations))
     else:
-        out = sorted(root.glob("*.csv"))
+        seen = set(root.glob("*.csv")) | set(root.glob("*.csv.gz"))
+        ids = sorted({p.name.split(".", 1)[0] for p in seen})
+    out: list[Path] = []
+    for s in ids:
+        for name in (f"{s}.csv.gz", f"{s}.csv"):
+            p = root / name
+            if p.exists():
+                out.append(p)
+                break
     return out[:limit] if limit is not None else out
 
 
@@ -508,7 +534,7 @@ def read_normals(path: Any) -> dict[str, np.ndarray]:
     hour: list[int] = []
     temp: list[float] = []
     pres: list[float] = []
-    with open(path, newline="") as fh:
+    with _open_csv(path) as fh:
         reader = csv.DictReader(fh)
         for row in reader:
             month.append(int(row["month"]))
