@@ -638,8 +638,8 @@ def fit_aligned(
     left out, and the model with its shifts is refitted on the samples
     outside the flagged windows in the resulting :class:`EdgeBlockBasis`.
     Detection then repeats on the new residual until it finds nothing new.
-    Leaving the flagged window out is what makes the error of the epoch
-    harmless.
+    A flagged window holds a jump inside it, so its mean belongs to neither
+    level; no window of the refit spans an epoch.
 
     Args:
         model: A callable ``f(x, *params)``; its parameter names are
