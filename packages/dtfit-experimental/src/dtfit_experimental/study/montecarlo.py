@@ -5,6 +5,8 @@ replicate summaries, and a process pool for the sweeps that need one.
 
 from __future__ import annotations
 
+import multiprocessing
+import sys
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from typing import Callable, Iterable, Sequence
@@ -374,14 +376,34 @@ def pool_map(
     threads the caller's own process also uses.
 
     Args:
-        fn: Picklable callable of one argument.
+        fn: Picklable callable of one argument, importable by name from a
+            module. Under the ``forkserver`` and ``spawn`` start methods a
+            worker process imports it, which it cannot do for a function
+            defined in a notebook cell, in ``python -c`` or on stdin.
         items: Picklable arguments, consumed once.
         workers: Worker process count; ``ProcessPoolExecutor``'s default
             (the machine's CPU count) when ``None``.
 
     Returns:
         Results in the same order as ``items``.
+
+    Raises:
+        ValueError: ``fn`` is defined in the ``__main__`` of a session with
+            no file behind it and the start method is not ``fork``.
     """
+    main = sys.modules.get("__main__")
+    method = multiprocessing.get_start_method()
+    if (
+        getattr(fn, "__module__", None) == "__main__"
+        and getattr(main, "__file__", None) is None
+        and method != "fork"
+    ):
+        raise ValueError(
+            f"{getattr(fn, '__qualname__', fn)!s} is defined in an "
+            f"interactive __main__ (a notebook cell, -c or stdin), which a "
+            f"worker process cannot import under the {method!r} start "
+            f"method; move it into a module"
+        )
     items = list(items)
     with ProcessPoolExecutor(
         max_workers=workers, initializer=_pool_worker_init

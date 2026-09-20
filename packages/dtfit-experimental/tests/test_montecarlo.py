@@ -246,3 +246,22 @@ def test_pool_map_keeps_order_and_caps_blas_threads(monkeypatch):
     assert xs == items
     # fails if the BLAS thread cap were not held for the worker's life
     assert all(o[1] for o in out)
+
+
+def _identity(v):
+    return v
+
+
+def test_pool_map_refuses_a_worker_from_an_interactive_main(monkeypatch):
+    # Fails if the guard is dropped: the pool then starts and dies on a
+    # pickling or broken-pool error instead of this ValueError.
+    import multiprocessing
+    import sys
+    import types
+
+    if multiprocessing.get_start_method() == "fork":
+        pytest.skip("a forked worker inherits __main__")
+    monkeypatch.setitem(sys.modules, "__main__", types.ModuleType("__main__"))
+    monkeypatch.setattr(_identity, "__module__", "__main__")
+    with pytest.raises(ValueError, match="interactive __main__"):
+        pool_map(_identity, [1, 2], workers=1)
