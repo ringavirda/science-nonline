@@ -2,42 +2,23 @@
 
 Every function in the domain takes its paths as arguments; these are the
 defaults only, read from the environment so that no machine's directory
-layout is written into the package. ``SHOWCASE_DATA`` (default
-``~/data/showcase``) holds the NGL copy, the reduced images and the
-normals; ``SHOWCASE_ISD`` (default ``<SHOWCASE_DATA>/isd``) holds the NOAA
-year directories.
+layout is written into the package. ``data_root``, ``ngl_dir``, ``isd_dir``
+and ``normals_dir`` are forwards to ``dtfit_experimental.study.paths``,
+which owns the archive locations; ``images_dir``, ``domain_dir``,
+``results_dir`` and ``figures_dir`` are repository-relative and stay here.
 """
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
-DEFAULT_DATA = "~/data/showcase"
+from dtfit_experimental.study.paths import isd_dir, normals_dir, ngl_dir
+from dtfit_experimental.study.paths import showcase_root as data_root
 
-
-def data_root() -> Path:
-    """The data root from ``SHOWCASE_DATA``; not created here."""
-    return Path(os.environ.get("SHOWCASE_DATA", DEFAULT_DATA)).expanduser()
-
-
-def ngl_dir(root: Path | None = None) -> Path:
-    """The NGL copy ``<root>/ngl``: ``tenv3/``, ``steps.txt``,
-    ``midas.IGS20.txt``, ``DataHoldings.txt``."""
-    return (data_root() if root is None else Path(root)) / "ngl"
-
-
-def isd_dir(year: int | None = None) -> Path:
-    """The NOAA copy from ``SHOWCASE_ISD``, or ``<data_root()>/isd``; with
-    ``year``, that year's directory of one CSV per station."""
-    env = os.environ.get("SHOWCASE_ISD")
-    base = Path(env).expanduser() if env else data_root() / "isd"
-    return base if year is None else base / str(year)
-
-
-def normals_dir(root: Path | None = None) -> Path:
-    """Where the reduced NOAA hourly normals are stored."""
-    return (data_root() if root is None else Path(root)) / "normals"
+__all__ = [
+    "data_root", "ngl_dir", "isd_dir", "normals_dir",
+    "images_dir", "domain_dir", "results_dir", "figures_dir",
+]
 
 
 def images_dir(root: Path | None = None) -> Path:

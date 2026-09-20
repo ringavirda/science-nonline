@@ -10,8 +10,10 @@ implementation (``ngl``, ``ngl_reduce``, ``ngl_fits``, ``isd``,
 
 from __future__ import annotations
 
+from dtfit_experimental.study import isd, ngl  # noqa: F401  (re-exported for the notebook)
+
 from . import (  # noqa: F401  (re-exported for the notebook)
-    compare, filters, isd, isd_fits, isd_reduce, ngl, ngl_fits,
+    compare, filters, isd_fits, isd_reduce, ngl_fits,
     ngl_reduce, paths, store, stream, throughput,
 )
 from .compare import (

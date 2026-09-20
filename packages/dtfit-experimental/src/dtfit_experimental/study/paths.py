@@ -38,3 +38,31 @@ def data_dir() -> Path:
     if legacy.is_dir():
         return legacy
     return Path(dtfit_experimental.__file__).resolve().parents[2] / "experiments" / "data"
+
+
+DEFAULT_SHOWCASE = "~/data/showcase"
+
+
+def showcase_root() -> Path:
+    """The showcase archive root from ``$SHOWCASE_DATA`` (default
+    ``~/data/showcase``); not created here."""
+    return Path(os.environ.get("SHOWCASE_DATA", DEFAULT_SHOWCASE)).expanduser()
+
+
+def ngl_dir(root: Path | None = None) -> Path:
+    """The NGL copy ``<root>/ngl``: ``tenv3/``, ``steps.txt``,
+    ``midas.IGS20.txt``, ``DataHoldings.txt``."""
+    return (showcase_root() if root is None else Path(root)) / "ngl"
+
+
+def isd_dir(year: int | None = None) -> Path:
+    """The NOAA copy from ``$SHOWCASE_ISD``, or ``<showcase_root()>/isd``; with
+    ``year``, that year's directory of one CSV per station."""
+    env = os.environ.get("SHOWCASE_ISD")
+    base = Path(env).expanduser() if env else showcase_root() / "isd"
+    return base if year is None else base / str(year)
+
+
+def normals_dir(root: Path | None = None) -> Path:
+    """Where the reduced NOAA hourly normals are stored."""
+    return (showcase_root() if root is None else Path(root)) / "normals"

@@ -9,7 +9,7 @@ import io
 import numpy as np
 import pytest
 
-from dtfit_experimental.experiments.domains.image_showcase import isd
+from dtfit_experimental.study import isd
 
 HEAD = ('"STATION","DATE","SOURCE","LATITUDE","LONGITUDE","ELEVATION",'
         '"NAME","REPORT_TYPE","CALL_SIGN","QUALITY_CONTROL","WND","CIG",'

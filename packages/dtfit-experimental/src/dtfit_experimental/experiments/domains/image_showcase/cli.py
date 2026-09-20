@@ -31,8 +31,10 @@ from threadpoolctl import threadpool_limits
 from dtfit.image import ImageStream, assemble
 from dtfit.streaming import ImageFilter
 
+from dtfit_experimental.study import isd, ngl
+
 from . import (
-    compare, filters, isd, isd_fits, isd_reduce, ngl, ngl_fits,
+    compare, filters, isd_fits, isd_reduce, ngl_fits,
     ngl_reduce, paths, stream, throughput,
 )
 from .store import load_images, write_table, read_table

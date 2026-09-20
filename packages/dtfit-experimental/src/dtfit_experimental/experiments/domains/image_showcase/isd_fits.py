@@ -17,7 +17,7 @@ import numpy as np
 
 from dtfit.image import coverage
 
-from . import isd
+from dtfit_experimental.study import isd
 from .compare import (
     COVERAGE_TOL, DENSITY_PER_COEF, EXACTNESS_TOL, attainable,
     design_condition, fit_from_image, gram_condition, param_score,

@@ -17,8 +17,9 @@ import pytest
 from dtfit.image import assemble
 
 from dtfit_experimental.experiments.domains.image_showcase import (
-    cli, filters, ngl, ngl_reduce, paths, store, stream,
+    cli, filters, ngl_reduce, paths, store, stream,
 )
+from dtfit_experimental.study import ngl
 
 HEADER = (
     "site YYMMMDD yyyy.yyyy __MJD week d reflon _e0 _e _n0 _n _u0 _u"
@@ -78,9 +79,8 @@ def make_isd_year(path, sta, year=2024, seed=3):
     """A full hourly station-year (the module's own annual design plus a
     diurnal cycle and noise), the same shape
     ``tests/test_showcase_isd_reduce.py`` fits against."""
-    from dtfit_experimental.experiments.domains.image_showcase import (
-        isd, isd_reduce,
-    )
+    from dtfit_experimental.experiments.domains.image_showcase import isd_reduce
+    from dtfit_experimental.study import isd
 
     rng = np.random.default_rng(seed)
     days = isd.days_in_year(year)
@@ -493,7 +493,7 @@ def test_cli_isd_reduce_then_exact_gates_a_small_dataset(tmp_path,
 def test_cli_normals_fetch_then_isd_normals_uses_the_injected_opener(
     tmp_path, monkeypatch
 ):
-    from dtfit_experimental.experiments.domains.image_showcase import isd
+    from dtfit_experimental.study import isd
 
     root = tmp_path / "data"
     year_dir = root / "isd" / "2024"

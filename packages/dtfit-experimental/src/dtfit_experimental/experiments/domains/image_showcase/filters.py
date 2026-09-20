@@ -20,7 +20,7 @@ import numpy as np
 
 from dtfit.streaming import ImageFilter
 
-from . import isd, ngl
+from dtfit_experimental.study import isd, ngl
 
 DAYS_PER_YEAR = 365.25
 # ImageFilter builds its DriftDetector with warmup=3 and, by its default

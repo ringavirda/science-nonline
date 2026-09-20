@@ -20,7 +20,7 @@ import numpy as np
 
 from dtfit.image import Image, ImageStream
 
-from . import isd
+from dtfit_experimental.study import isd
 from .store import image_nbytes, save_images
 
 ANNUAL_OMEGA = 2.0 * np.pi / 365.25

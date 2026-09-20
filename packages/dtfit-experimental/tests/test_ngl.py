@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from dtfit_experimental.experiments.domains.image_showcase import ngl
+from dtfit_experimental.study import ngl
 
 HEADER = (
     "site YYMMMDD yyyy.yyyy __MJD week d reflon _e0(m) __east(m) ____n0(m)"

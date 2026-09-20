@@ -18,7 +18,7 @@ import numpy as np
 
 from dtfit.image import Image, coverage
 
-from . import ngl
+from dtfit_experimental.study import ngl
 from .compare import (
     COVERAGE_TOL, attainable, design_condition, fit_from_image,
     gram_condition, gram_rebuild_error, param_scores, raw_bic,

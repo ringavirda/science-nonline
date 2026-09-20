@@ -5,8 +5,9 @@ from __future__ import annotations
 import numpy as np
 
 from dtfit_experimental.experiments.domains.image_showcase import (
-    compare, isd, isd_reduce, store,
+    compare, isd_reduce, store,
 )
+from dtfit_experimental.study import isd
 
 HEAD = ('"STATION","DATE","SOURCE","LATITUDE","LONGITUDE","ELEVATION",'
         '"NAME","REPORT_TYPE","CALL_SIGN","QUALITY_CONTROL","WND","CIG",'

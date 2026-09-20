@@ -21,7 +21,7 @@ import numpy as np
 
 from dtfit.image import Image, ImageStream
 
-from . import ngl
+from dtfit_experimental.study import ngl
 from .compare import legendre_order
 from .store import image_nbytes, save_images
 
