@@ -2,18 +2,20 @@
 
 Each test names the mutation of blocks.py it fails under. The Monte Carlo
 tests are seeded and sized for a couple of seconds, not for a measurement
-report; the measured numbers live in the module docstring of blocks.py.
+report.
 """
 
 import warnings
 
 import numpy as np
 import pytest
+from scipy import stats
 from scipy.optimize import least_squares
 
 import dtfit
+from dtfit._stats import information_criteria
 from dtfit.image import Original
-from dtfit.image.bases import BlockBasis
+from dtfit.image.bases import BlockBasis, u_of
 from dtfit_experimental import (
     AlignedFit,
     EdgeBlockBasis,
@@ -43,6 +45,21 @@ def test_windows_are_half_open_at_an_interior_edge():
     assert phi[0].tolist() == [1.0, 0.0]
     assert phi[1].tolist() == [0.0, 1.0]
     assert phi[2].tolist() == [0.0, 1.0]
+
+
+def test_interior_edges_go_to_the_window_on_their_right():
+    # Fails under searchsorted(side="left"), and under a floor-based
+    # index: at K = 6 and K = 12 the block basis rounds some of these u to
+    # the window on their left.
+    disagree = 0
+    for k in (3, 6, 12):
+        e = np.linspace(-1.0, 1.0, k + 1)
+        u = e[1:-1]
+        phi = EdgeBlockBasis(e).evaluate(u)
+        assert phi.sum() == k - 1
+        assert np.argmax(phi, axis=1).tolist() == list(range(1, k))
+        disagree += int(not np.array_equal(phi, BlockBasis(k).evaluate(u)))
+    assert disagree == 2
 
 
 def test_u_outside_the_unit_interval_is_clamped():
@@ -172,9 +189,9 @@ def test_aggregated_image_carries_the_window_sum_least_squares():
 
 
 def test_the_area_fit_is_unbiased_where_the_midpoint_reading_is_not():
-    # Fails if aggregated_image puts every sample of a window at the
-    # window's centre: the fit is then the midpoint reading, whose bias on
-    # this cycle is what the test measures.
+    # Fails if the image carries the window means (S = totals / counts)
+    # instead of the totals: what is solved is then no longer the
+    # equal-areas least squares, and the bias on this cycle returns.
     x, edges, idx, counts = _cycle_windows()
     midpoints = 0.5 * (edges[:-1] + edges[1:])
     rng = np.random.default_rng(1)
@@ -194,6 +211,52 @@ def test_the_area_fit_is_unbiased_where_the_midpoint_reading_is_not():
     assert abs(area_bias) < 0.005
 
 
+def test_without_positions_the_window_means_are_read_as_areas():
+    # Fails if the grid of the x=None path puts every sample of a window at
+    # the window centre: the fit is then the midpoint reading, whose bias on
+    # this cycle is what the test measures.
+    x, edges, idx, counts = _cycle_windows()
+    midpoints = 0.5 * (edges[:-1] + edges[1:])
+    rng = np.random.default_rng(1)
+    blind, known, mid = [], [], []
+    for _ in range(30):
+        y = _cycle(x, *CYCLE_TRUTH) + 0.5 * rng.standard_normal(x.size)
+        totals = np.bincount(idx, weights=y, minlength=counts.size)
+        blind.append(fit_aggregated(
+            _cycle, edges, totals, counts, p0=CYCLE_TRUTH,
+            param_names=CYCLE_NAMES).coeffs)
+        known.append(fit_aggregated(
+            _cycle, edges, totals, counts, x=x, p0=CYCLE_TRUTH,
+            param_names=CYCLE_NAMES).coeffs)
+        mid.append(least_squares(
+            lambda p: _cycle(midpoints, *p) - totals / counts,
+            CYCLE_TRUTH).x)
+    blind_bias = np.mean(np.asarray(blind)[:, 0]) / CYCLE_TRUTH[0] - 1.0
+    known_bias = np.mean(np.asarray(known)[:, 0]) / CYCLE_TRUTH[0] - 1.0
+    mid_bias = np.mean(np.asarray(mid)[:, 0]) / CYCLE_TRUTH[0] - 1.0
+    assert mid_bias < -0.03
+    assert abs(blind_bias) < 0.005
+    assert blind_bias == pytest.approx(known_bias, abs=1e-3)
+    image = aggregated_image([0.0, 1.0, 3.0], [1.0, 2.0], [2, 3])
+    assert image.grid.positions() == pytest.approx(
+        [0.25, 0.75, 1.0 + 1.0 / 3.0, 2.0, 2.0 + 2.0 / 3.0])
+
+
+def test_aggregated_result_counts_windows_not_samples():
+    # Fails if n_obs is left on the sample count: aic and bic would then
+    # read a window-scale rss against the samples the caller never saw.
+    x, edges, idx, counts = _cycle_windows()
+    rng = np.random.default_rng(2)
+    y = _cycle(x, *CYCLE_TRUTH) + 0.5 * rng.standard_normal(x.size)
+    totals = np.bincount(idx, weights=y, minlength=counts.size)
+    r = fit_aggregated(_cycle, edges, totals, counts, x=x, p0=CYCLE_TRUTH,
+                       param_names=CYCLE_NAMES)
+    aic, bic = information_criteria(r.rss, counts.size, len(CYCLE_NAMES))
+    assert r.n_obs == counts.size
+    assert r.aic == pytest.approx(aic)
+    assert r.bic == pytest.approx(bic)
+
+
 DECAY_DOMAIN = (0.0, 6.0)
 DECAY_NAMES = ["a", "c", "tau"]
 DECAY_TRUTH = np.array([5.0, 1.0, 1.5])
@@ -203,35 +266,73 @@ def _decay(t, a, c, tau):
     return c + a * np.exp(-t / tau)
 
 
-def test_aggregated_covariance_is_on_the_window_scale():
-    # Fails if fit_aggregated drops the (n - p) / (K - p) rescale: the
-    # covariance is then the sample-count one, whose coverage collapses.
-    n, k = 1200, 32
+def _decay_windows(n, k):
     span = DECAY_DOMAIN[1] - DECAY_DOMAIN[0]
     x = (np.linspace(DECAY_DOMAIN[0], DECAY_DOMAIN[1], n, endpoint=False)
          + 0.5 * span / n)
     edges = np.linspace(DECAY_DOMAIN[0], DECAY_DOMAIN[1], k + 1)
     idx = np.minimum(((x - DECAY_DOMAIN[0]) / span * k).astype(int), k - 1)
-    counts = np.bincount(idx, minlength=k)
+    return x, edges, idx, np.bincount(idx, minlength=k)
+
+
+def test_aggregated_covariance_is_on_the_window_scale():
+    # Fails if fit_aggregated drops the (n - p) / (K - p) rescale: the
+    # covariance is then the sample-count one, whose coverage collapses.
+    n, k, reps = 1200, 32, 1000
+    p = len(DECAY_TRUTH)
+    x, edges, idx, counts = _decay_windows(n, k)
     rng = np.random.default_rng(5)
-    hit, hit_raw = 0, 0
-    reps = 300
+    t_q = float(stats.t.ppf(0.975, k - p))
+    hit, hit_raw = np.zeros(p), np.zeros(p)
     for _ in range(reps):
         y = _decay(x, *DECAY_TRUTH) + 0.5 * rng.standard_normal(n)
         totals = np.bincount(idx, weights=y, minlength=k)
         r = fit_aggregated(_decay, edges, totals, counts, x=x,
                            p0=DECAY_TRUTH, param_names=DECAY_NAMES)
-        raw = dtfit.fit(_decay, aggregated_image(edges, totals, counts, x=x),
-                        p0=DECAY_TRUTH, param_names=DECAY_NAMES)
-        for res, tally in ((r, "hit"), (raw, "raw")):
-            se = float(np.sqrt(np.diag(res.cov))[2])
-            covered = abs(res.coeffs[2] - DECAY_TRUTH[2]) <= 1.96 * se
-            if tally == "hit":
-                hit += covered
-            else:
-                hit_raw += covered
-    assert 0.90 <= hit / reps <= 0.98
-    assert hit_raw / reps < 0.5
+        se = np.sqrt(np.diag(r.cov))
+        miss = np.abs(r.coeffs - DECAY_TRUTH)
+        hit += miss <= t_q * se
+        hit_raw += miss <= t_q * se * np.sqrt((k - p) / (n - p))
+    sem = np.sqrt(0.95 * 0.05 / reps)
+    assert np.all(np.abs(hit / reps - 0.95) <= 3.0 * sem)
+    assert np.all(hit_raw / reps < 0.5)
+
+
+def test_aggregated_covariance_is_the_window_least_squares_one():
+    # Fails under (n - p) / K in place of (n - p) / (K - p): at K = 8 with
+    # three parameters that is a factor 0.625 on every variance.
+    k, p = 8, len(DECAY_TRUTH)
+    x, edges, idx, counts = _decay_windows(480, k)
+    rng = np.random.default_rng(4)
+    y = _decay(x, *DECAY_TRUTH) + 0.5 * rng.standard_normal(x.size)
+    totals = np.bincount(idx, weights=y, minlength=k)
+    r = fit_aggregated(_decay, edges, totals, counts, x=x, p0=DECAY_TRUTH,
+                       param_names=DECAY_NAMES)
+    a, c, tau = r.coeffs
+    d = np.stack([np.exp(-x / tau), np.ones_like(x),
+                  a * x / tau ** 2 * np.exp(-x / tau)], axis=1)
+    jac = np.stack([np.bincount(idx, weights=d[:, j], minlength=k)
+                    for j in range(p)], axis=1)
+    exact = (r.rss / (k - p)) * np.linalg.inv(
+        jac.T @ np.diag(1.0 / counts) @ jac)
+    assert np.diag(r.cov) == pytest.approx(np.diag(exact), rel=1e-3)
+
+
+def test_aggregated_covariance_is_none_with_a_window_per_parameter():
+    # Fails if the K == p case is not turned into cov None: the rescale
+    # divides by zero, or a floored (K - p) reports finite standard errors
+    # for a fit with no residual freedom left.
+    p = len(DECAY_TRUTH)
+    x, edges, idx, counts = _decay_windows(300, p)
+    rng = np.random.default_rng(0)
+    y = _decay(x, *DECAY_TRUTH) + 0.5 * rng.standard_normal(x.size)
+    totals = np.bincount(idx, weights=y, minlength=p)
+    r = fit_aggregated(_decay, edges, totals, counts, x=x, p0=DECAY_TRUTH,
+                       param_names=DECAY_NAMES)
+    assert r.cov is None
+    assert r.n_obs == p
+    with pytest.raises(ValueError, match="no covariance"):
+        r.stderr()
 
 
 def test_aggregated_guards_reject_their_own_input():
@@ -245,6 +346,10 @@ def test_aggregated_guards_reject_their_own_input():
         aggregated_image(edges, [1.0, 1.0, 1.0], [1, 1, 1])
     with pytest.raises(ValueError, match="non-negative"):
         aggregated_image(edges, [1.0, 1.0], [2, -1])
+    with pytest.raises(ValueError, match=r"window 1 has 1\.5"):
+        aggregated_image(edges, [1.0, 1.0], [2, 1.5])
+    with pytest.raises(ValueError, match="finite where the count"):
+        aggregated_image(edges, [1.0, np.nan], [2, 1])
     with pytest.raises(ValueError, match="every window is empty"):
         aggregated_image(edges, [0.0, 0.0], [0, 0])
     with pytest.raises(ValueError, match="counts sum to"):
@@ -258,15 +363,18 @@ def test_aggregated_guards_reject_their_own_input():
 
 
 def test_empty_windows_are_dropped_from_the_basis():
-    # Fails if keep is not passed to the basis: a zero-count window would
-    # put a zero row and column in the Gram.
+    # Fails if keep is not passed to the basis, which would put a zero row
+    # and column in the Gram, and if sumy is summed over every window
+    # rather than the kept ones: here that carries the nan of the empty
+    # window into tss.
     image = aggregated_image(
-        [0.0, 1.0, 2.0, 3.0], [4.0, 0.0, 6.0], [2, 0, 3])
+        [0.0, 1.0, 2.0, 3.0], [4.0, np.nan, 6.0], [2, 0, 3])
     assert image.n_coef == 2
     assert image.basis.keep.tolist() == [True, False, True]
     assert image.S.tolist() == [4.0, 6.0]
     assert image.G.tolist() == [[2.0, 0.0], [0.0, 3.0]]
     assert image.n == 5
+    assert image.sumy == 10.0
     assert image.sumsq == pytest.approx(4.0 ** 2 / 2 + 6.0 ** 2 / 3)
     assert image.grid.positions().size == 5
 
@@ -343,24 +451,141 @@ def test_clip_keeps_gross_outliers_out_of_the_image():
     assert clipped.epochs.size == 0
 
 
+SH5_DOMAIN = (0.0, 2000.0)
+SH5_EPOCH = 290.0
+
+
+def _line(t, a, b):
+    return a + b * t
+
+
+def test_no_sample_of_a_flagged_window_enters_the_refit():
+    # On this integer-timed record the two window rules disagree at seven
+    # samples, x = 290 among them. Fails if the sample index in fit_aligned
+    # is not the basis's own rule (a truncation index leaves x = 290 in the
+    # fit while the basis drops it with the rest of window 29), and if the
+    # flagged windows are kept in the fit at all (sel = all True).
+    n = 2001
+    x = np.arange(n, dtype=float)
+    rng = np.random.default_rng(31)
+    y = (10.0 + 0.01 * x + 8.0 * (x >= SH5_EPOCH)
+         + rng.standard_normal(n))
+    out = fit_aligned(_line, Original(x, y, domain=SH5_DOMAIN),
+                      n_windows=25, fine=8, param_names=["a", "b"],
+                      p0=[0.0, 0.0])
+    fine_width = (SH5_DOMAIN[1] - SH5_DOMAIN[0]) / (8 * 25)
+    assert out.epochs.size == 1
+    assert abs(out.epochs[0] - SH5_EPOCH) < fine_width
+    in_basis = out.basis.evaluate(u_of(x, *SH5_DOMAIN)).any(axis=1)
+    assert int((~in_basis).sum()) == 10
+    assert out.result.n_obs == int(in_basis.sum())
+    assert out.n_dropped == 0
+
+
+def test_fit_aligned_passes_n_min_to_the_detector():
+    # Fails if n_min is not wired through to detect_jumps: with no fine
+    # window holding a million samples the detector has nothing to work on
+    # and the jump in this series must go unfound.
+    rng = np.random.default_rng(17)
+    x, y = _align_series(rng, (4.13,), (10.0,))
+    data = Original(x, y, domain=ALIGN_DOMAIN)
+    assert fit_aligned(_smooth, data, n_windows=32,
+                       param_names=ALIGN_NAMES,
+                       p0=np.zeros(4)).epochs.size == 1
+    assert fit_aligned(_smooth, data, n_windows=32, n_min=10 ** 6,
+                       param_names=ALIGN_NAMES,
+                       p0=np.zeros(4)).epochs.size == 0
+
+
+def test_fit_aligned_guards_reject_their_own_input():
+    # One input per guard, each passing every earlier guard; fails if a
+    # guard is dropped or its order is changed.
+    rng = np.random.default_rng(15)
+    x, y = _align_series(rng)
+    data = Original(x, y, domain=ALIGN_DOMAIN)
+    with pytest.raises(ValueError, match="n_windows and fine"):
+        fit_aligned(_smooth, data, n_windows=0, param_names=ALIGN_NAMES,
+                    p0=np.zeros(4))
+    with pytest.raises(ValueError, match="max_iter"):
+        fit_aligned(_smooth, data, n_windows=32, max_iter=0,
+                    param_names=ALIGN_NAMES, p0=np.zeros(4))
+    with pytest.raises(ValueError, match="too few for"):
+        fit_aligned(_smooth, data, n_windows=32, clip=0.05,
+                    param_names=ALIGN_NAMES, p0=np.zeros(4))
+
+
 def test_detect_jumps_reads_the_amplitude_and_the_epoch():
-    # Fails without the non-maximum suppression around a detection, and
-    # if the amplitude is read from the flagged window's own mean rather
-    # than from the two extrapolations.
-    kf = 64
+    # The step sits a fifth into window 40, whose mean is therefore 3.2.
+    # Fails without the non-maximum suppression around a detection, if the
+    # amplitude is read from that mean rather than from the two
+    # extrapolations, and if the epoch is placed at the window centre or at
+    # frac instead of 1 - frac (four fifths in).
+    kf, b0 = 64, 40
     edges = np.linspace(0.0, 10.0, kf + 1)
+    width = edges[1] - edges[0]
     centres = 0.5 * (edges[:-1] + edges[1:])
     counts = np.full(kf, 20.0)
-    sums_x = counts * centres
     rng = np.random.default_rng(7)
-    resid = 4.0 * (centres >= 6.28) + rng.standard_normal(kf) * 0.05
-    found = detect_jumps(counts, sums_x, resid * counts, edges)
+    resid = 4.0 * (np.arange(kf) > b0) + 0.02 * rng.standard_normal(kf)
+    resid[b0] = 0.8 * 4.0 + 0.02 * rng.standard_normal()
+    found = detect_jumps(counts, counts * centres, resid * counts, edges)
     assert len(found) == 1
     window, epoch, amplitude, z = found[0]
-    assert edges[window] <= 6.28 <= edges[window + 1]
-    assert abs(epoch - 6.28) < edges[1] - edges[0]
-    assert amplitude == pytest.approx(4.0, abs=0.2)
+    assert window == b0
+    assert epoch == pytest.approx(edges[b0] + 0.2 * width, abs=0.02 * width)
+    assert amplitude == pytest.approx(4.0, abs=0.05)
     assert abs(z) > 5.0
+
+
+def _ar1(rng, kf, phi=0.9):
+    e = rng.standard_normal(kf)
+    r = np.empty(kf)
+    r[0] = e[0]
+    for i in range(1, kf):
+        r[i] = phi * r[i - 1] + e[i]
+    return r
+
+
+def test_self_scale_absorbs_the_colour_of_the_noise():
+    # Fails if self_scale does not divide the statistic by its own spread:
+    # these jump-free AR(1) residuals give three detections at threshold 5
+    # without it.
+    kf = 256
+    edges = np.linspace(0.0, 10.0, kf + 1)
+    centres = 0.5 * (edges[:-1] + edges[1:])
+    counts = np.full(kf, 8.0)
+    for seed in (2, 4, 5):
+        r = _ar1(np.random.default_rng(seed), kf)
+        args = (counts, counts * centres, r * counts, edges)
+        assert len(detect_jumps(*args)) >= 1
+        assert detect_jumps(*args, self_scale=True) == []
+
+
+def test_self_scale_never_makes_a_detection_easier():
+    # Fails if the divisor is not floored at 1: the spread of the statistic
+    # on this white-noise record is 0.54, which would multiply every |z| by
+    # 1.8 and turn the largest of them into a detection.
+    kf = 96
+    edges = np.linspace(0.0, 10.0, kf + 1)
+    centres = 0.5 * (edges[:-1] + edges[1:])
+    counts = np.full(kf, 16.0)
+    r = np.random.default_rng(33).standard_normal(kf) / 4.0
+    args = (counts, counts * centres, r * counts, edges)
+    plain = detect_jumps(*args, threshold=1.4)
+    assert plain
+    assert detect_jumps(*args, threshold=1.4, self_scale=True) == plain
+    assert detect_jumps(*args, threshold=2.0, self_scale=True) == []
+
+
+def test_detect_jumps_needs_a_positive_threshold():
+    # Fails if the guard is dropped: at threshold 0 the suppression loop
+    # never reaches its break and the call does not return.
+    kf = 16
+    edges = np.linspace(0.0, 10.0, kf + 1)
+    counts = np.full(kf, 5.0)
+    with pytest.raises(ValueError, match="threshold must be > 0"):
+        detect_jumps(counts, counts * 0.5 * (edges[:-1] + edges[1:]),
+                     np.zeros(kf), edges, threshold=0.0)
 
 
 def test_detect_jumps_returns_nothing_from_too_few_windows():
@@ -402,3 +627,12 @@ def test_coarsen_never_spans_a_flagged_window():
         assert lab[b - 1] != lab[b + 1]
     assert 6 <= len(set(lab[lab >= 0].tolist())) <= 10
     assert (coarsen(16, 4, []) == np.repeat(np.arange(4), 4)).all()
+
+
+def test_coarsen_rejects_a_degenerate_shape():
+    # One input per clause of the guard; fails if the guard is dropped,
+    # which returns one coarse window and an empty labelling instead.
+    with pytest.raises(ValueError, match="must be >= 1"):
+        coarsen(64, 0)
+    with pytest.raises(ValueError, match="must be >= 1"):
+        coarsen(0, 4)
