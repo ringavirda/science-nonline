@@ -11,9 +11,9 @@
 # leg is a peer on another physical machine connecting in, which a
 # container-internal port cannot serve.
 #
-# The measurements in results/leg5_stream.csv and results/leg5_replay.csv
-# were taken without this file; it exists to reproduce the leg on another
-# pair of machines.
+# The measurements in ../../../../experiments/results/35_archive_showcase/
+# leg5_stream.csv and leg5_replay.csv were taken without this file; it exists
+# to reproduce the leg on another pair of machines.
 services:
   consumer:
     image: python:3.12-slim
@@ -39,8 +39,8 @@ services:
       # stream-serve writes its table into the tracked notebook results
       # directory, so that one directory is mounted writable over the
       # read-only repository.
-      - ${OUT:-./results}:/repo/packages/dtfit-experimental/experiments/results/35_archive_showcase
-      - ${OUT:-./results}:/out
+      - ${OUT:-../../../../experiments/results/35_archive_showcase}:/repo/packages/dtfit-experimental/experiments/results/35_archive_showcase
+      - ${OUT:-../../../../experiments/results/35_archive_showcase}:/out
 
   producer:
     image: python:3.12-slim

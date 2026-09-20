@@ -27,7 +27,13 @@ def images_dir(root: Path | None = None) -> Path:
 
 
 def results_dir() -> Path:
-    """The tracked CSV output directory, created if missing."""
+    """The tracked CSV output directory, created if missing.
+
+    Returns ``<experiments>/results/35_archive_showcase``. Raises
+    ``FileNotFoundError`` naming the path when the ``experiments/`` tree does
+    not exist, which is the case in an installed wheel: the showcase CLI
+    needs a source checkout to write its tables.
+    """
     p = experiments_dir() / "results" / "35_archive_showcase"
     p.mkdir(parents=True, exist_ok=True)
     return p

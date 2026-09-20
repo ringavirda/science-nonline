@@ -87,7 +87,9 @@ files = ["src/dtfit_experimental"]
 # The experiment suite (numeric-prefixed folders like ``01_control_systems`` are
 # imported by string via the runner, not as importable package names) is a
 # research/script tree and is not type-checked; only the adaptation modules are.
-exclude = "/experiments/"
+# study/showcase/ is the same kind of script tree (a domain's CLI and notebook
+# backing moved under study/ by path, not by kind) and stays excluded with it.
+exclude = "/experiments/|/study/showcase/"
 ignore_missing_imports = true
 
 [tool.pyright]
@@ -95,7 +97,7 @@ ignore_missing_imports = true
 # folders imported by string via the runner) is a research/script tree, excluded
 # here exactly as it is from mypy.
 include = ["src"]
-exclude = ["src/dtfit_experimental/experiments"]
+exclude = ["src/dtfit_experimental/experiments", "src/dtfit_experimental/study/showcase"]
 pythonVersion = "3.10"
 typeCheckingMode = "standard"
 
