@@ -12,6 +12,7 @@ from dtfit.stochastic import (
 from dtfit.stochastic.forecast import (
     make_seasonal_fc, make_seasonal_fc_anchored,
 )
+from dtfit.stochastic.gates import _fisher_g_crit
 from stochastic.processes import (
     gen_ar1, gen_ar2, gen_ar2_cycle, gen_arfima, gen_garch, gen_trend_cycle,
 )
@@ -385,3 +386,62 @@ def test_unit_root_series_forecast_is_indexed():
     fc = ms.forecast(12)
     assert isinstance(fc, pd.Series) and len(fc) == 12
     assert np.array_equal(fc.to_numpy(), fit_stochastic(y).forecast(12))
+
+
+def test_fisher_g_crit_matches_the_hand_computed_values():
+    """fisher_g_crit(n) solves m (1 - g)^(m - 1) = 0.05 for m = n // 2;
+    fails under a wrong exponent or a wrong m."""
+    assert _fisher_g_crit(88) == pytest.approx(0.1459, abs=1e-4)
+    assert _fisher_g_crit(2284) == pytest.approx(0.0088, abs=1e-4)
+    # tiny n floors m at 2 and the critical value approaches 1, so a cycle
+    # can in effect never clear it there
+    assert _fisher_g_crit(1) == pytest.approx(0.975)
+    assert _fisher_g_crit(4) == _fisher_g_crit(1)
+
+
+def test_short_white_noise_peak_below_fisher_g_is_not_a_cycle():
+    """A short record whose largest ordinate clears the 0.08 effect-size
+    floor but not Fisher's g at its length is not a cycle: at n=88, seed 0,
+    strength is 0.1028 against a floor of 0.08 and a critical value of
+    0.1459. Fails if the Fisher term is dropped from the gate."""
+    y = np.random.default_rng(0).standard_normal(88)
+    m = fit_stochastic(y)
+    assert not m.has_cycle
+
+
+def test_weak_but_significant_long_record_cycle_still_needs_the_floor():
+    """A record long enough that Fisher's g is tiny still needs the 0.08
+    effect-size floor: at n=2284 an A=0.30 sine buried in noise has
+    strength 0.0328 against a critical value of 0.0088, well clear of
+    Fisher's g but under the floor. Fails if the 0.08 floor is dropped."""
+    n = 2284
+    rng = np.random.default_rng(7)
+    t = np.arange(n, dtype=float)
+    y = 0.30 * np.sin(2 * np.pi * t / 52.0) + rng.standard_normal(n)
+    m = fit_stochastic(y)
+    assert not m.has_cycle
+
+
+def test_a_real_cycle_still_clears_both_guards():
+    """A genuine cycle clears the floor and Fisher's g by a wide margin: at
+    n=120, period 12, A/sigma=1, strength is 0.3374 against a critical
+    value of 0.1132. Fails if the strength/crit comparison is inverted;
+    computing the critical value with m = n instead of n // 2 gives 0.0633
+    here, which does not flip the call."""
+    _, y = gen_trend_cycle(120, 0.0, 12.0, 1.0, 1.0, np.random.default_rng(5))
+    m = fit_stochastic(y)
+    assert m.has_cycle
+    assert m.cycle_period == pytest.approx(12.0, rel=0.05)
+
+
+def test_cycle_gate_false_positive_rate_on_short_white_noise():
+    """Over 200 seeded draws of white noise at n=88 the cycle gate should
+    open well under the unguarded 40-45 percent rate; measured 6.5 percent
+    with Fisher's g stacked on, against 15 percent as the test bound. Fails
+    if the Fisher term is dropped from the gate."""
+    n = 88
+    opens = sum(
+        bool(fit_stochastic(
+            np.random.default_rng(s).standard_normal(n)).has_cycle)
+        for s in range(200))
+    assert opens / 200 < 0.15
