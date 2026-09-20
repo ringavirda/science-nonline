@@ -15,7 +15,7 @@ Feeds the per-method documentation (the wiki ``Methods`` pages):
     the naive random walk. Both model data (synthetic, known ground truth) and
     real data (COVID-19, USD/UAH) are covered.
 
-Run (after ``python -m dtfit_experimental.experiments.download_data``):
+Run (after ``python -m dtfit_experimental.study.download_data``):
 
     python -m dtfit_experimental.experiments.benchmark
 
@@ -695,7 +695,7 @@ def fig_auto_forecast() -> None:
 
 def main() -> None:
     if not (DATA_DIR / "covid_ukraine_confirmed.csv").exists():
-        raise SystemExit("Datasets missing -- run: python -m dtfit_experimental.experiments.download_data")
+        raise SystemExit("Datasets missing -- run: python -m dtfit_experimental.study.download_data")
 
     print("Generating figures into", FIG_DIR)
     fig_lsi()

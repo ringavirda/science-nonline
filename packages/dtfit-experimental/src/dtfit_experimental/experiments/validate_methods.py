@@ -1,6 +1,6 @@
 """Validate the dtfit methods against the downloaded real datasets.
 
-Run experiments/download_data.py first, then:
+Run ``python -m dtfit_experimental.study.download_data`` first, then:
 
     python -m dtfit_experimental.experiments.validate_methods
 
@@ -198,7 +198,7 @@ def experiment_currency_streaming() -> None:
 
 def main() -> None:
     if not (DATA_DIR / "covid_ukraine_confirmed.csv").exists():
-        raise SystemExit("Datasets missing -- run: python -m dtfit_experimental.experiments.download_data")
+        raise SystemExit("Datasets missing -- run: python -m dtfit_experimental.study.download_data")
     experiment_covid()
     experiment_covid_sklearn()
     experiment_currency_batch()

@@ -181,7 +181,7 @@ jobs:
           pip install -e "packages/dtfit-legacy[dev]"
           # The notebook harness (tests/test_notebooks.py) executes each
           # committed notebook in a real kernel.
-          pip install nbclient ipykernel
+          pip install nbclient ipykernel pandas
 
       - name: Lint (ruff)
         run: ruff check packages/dtfit-experimental packages/dtfit-hardware packages/dtfit-legacy

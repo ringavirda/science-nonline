@@ -38,7 +38,7 @@ jupyter nbconvert --to notebook --execute --inplace \
 ## Root CLI tools
 
 ```bash
-python -m dtfit_experimental.experiments.download_data   # fetch datasets into data/
+python -m dtfit_experimental.study.download_data          # fetch datasets into data/
 python -m dtfit_experimental.experiments.benchmark       # method docs: wiki/figures + comparison tables
 python -m dtfit_experimental.experiments.accuracy_explore # recovery-accuracy sweep over the test SCENARIOS
 python -m dtfit_experimental.experiments.validate_methods # quick real-data smoke test (COVID/FX)

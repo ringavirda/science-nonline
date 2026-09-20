@@ -18,11 +18,17 @@ published ones. CSVs live in ``experiments/data/ltsf/``, fetched by
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import numpy as np
 
-LTSF_DIR = Path(__file__).resolve().parent.parent / "data" / "ltsf"
+from .paths import data_dir
+
+
+def _ltsf_dir():
+    """Directory holding the LTSF CSVs, resolved fresh on every use so that
+    ``DTFIT_DATA`` and the legacy/current layout switch in :func:`data_dir`
+    are honoured."""
+    return data_dir() / "ltsf"
+
 
 FILES = {
     "ETTh1": "ETTh1.csv", "ETTh2": "ETTh2.csv",
@@ -34,14 +40,14 @@ FILES = {
 
 def available() -> list[str]:
     """Dataset keys whose CSV is present locally."""
-    return [k for k, f in FILES.items() if (LTSF_DIR / f).exists()]
+    return [k for k, f in FILES.items() if (_ltsf_dir() / f).exists()]
 
 
 def load(name: str) -> np.ndarray:
     """Load a dataset's numeric channels as ``(T, C)`` (drops the date column)."""
     import pandas as pd
 
-    df = pd.read_csv(LTSF_DIR / FILES[name])
+    df = pd.read_csv(_ltsf_dir() / FILES[name])
     cols = [c for c in df.columns if c.lower() not in ("date", "datetime")]
     return df[cols].to_numpy(dtype=float)
 
