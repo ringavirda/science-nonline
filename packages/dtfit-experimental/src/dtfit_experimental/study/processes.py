@@ -257,14 +257,19 @@ def load_series(name: str, col: int = 1) -> np.ndarray:
     Args:
         name: Path relative to :func:`study.paths.data_dir`, e.g.
             ``"usd_uah_2014_2015.csv"`` or ``"ltsf/exchange_rate.csv"``.
-        col: Zero-based column index to read.
+        col: Zero-based column index to read; negative counts from the
+            last column (``-1`` is the last, as the ``fx_ltsf`` catalogue
+            entry uses).
 
     Returns:
         A 1-D ``float`` array of the column's values, blank and ``"NA"``
-        cells dropped.
+        cells dropped. Length 0 for a header-only or empty file.
 
     Raises:
         FileNotFoundError: No such file under ``data_dir()``.
+        IndexError: ``col`` is outside the file's columns.
+        ValueError: A non-blank, non-``"NA"`` cell in ``col`` is not a
+            valid ``float``.
     """
     import csv
 

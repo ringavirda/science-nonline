@@ -130,6 +130,20 @@ def test_real_series_entries_load_or_return_none_with_one_line(capsys):
             assert np.all(np.isfinite(arr))
 
 
+def test_guarded_loader_returns_none_with_one_line_when_data_dir_is_missing(
+    monkeypatch, capsys,
+):
+    # fails if the try/except is stripped out of _guarded: load_series'
+    # FileNotFoundError would propagate instead of the entry returning
+    # None with one printed line
+    monkeypatch.setenv("DTFIT_DATA", "/no/such/dtfit-data-dir")
+    entry = next(e for e in REAL_SERIES if e.key == "usd_uah")
+    y = entry.load()
+    out = capsys.readouterr().out
+    assert y is None
+    assert out.count("\n") == 1
+
+
 def test_suite_horizon_clamps_both_ends():
     # fails if the clamp's min/max are inverted
     assert suite_horizon(100) == 12
