@@ -194,6 +194,29 @@ def is_nonstationary(data: Any, *, alpha: float = 0.05) -> bool:
     return adf_pvalue(img.dickey_fuller()) > alpha
 
 
+def _fisher_g_crit(n: int, alpha: float = 0.05) -> float:
+    """Fisher's g critical value: the fundamental energy share a white-noise
+    periodogram's largest of ``m = n // 2`` ordinates exceeds with
+    probability ``alpha``, the textbook "is the largest ordinate a cycle"
+    test.
+
+    Solves ``m (1 - g)^(m - 1) = alpha`` for ``g`` in closed form. Assumes a
+    white-noise null; it does not correct for autocorrelated (red) noise,
+    where the true false-positive rate stays higher than ``alpha``. Meant
+    for ``n`` from a few dozen up; below that ``m`` is floored at 2 and the
+    critical value approaches 1, in effect refusing to call a cycle at all.
+
+    Args:
+        n: record length in samples the periodogram was taken over.
+        alpha: significance level, above 0 and below 1.
+
+    Returns:
+        The critical fundamental energy share, in (0, 1).
+    """
+    m = max(int(n) // 2, 2)
+    return float(1.0 - (alpha / m) ** (1.0 / (m - 1)))
+
+
 def excess_squared_acf(g2: np.ndarray, rho: np.ndarray) -> np.ndarray:
     """Autocorrelation of a squared series with the contribution of the
     series it squares removed.
@@ -484,7 +507,10 @@ def fit_stochastic(
             spectrum to call a periodic cycle. The unit-root gate's own
             cyclical exemption (a spectral peak strong enough to route to
             the stationary branch instead of a random walk) uses a fixed
-            0.12 threshold, not this argument.
+            0.12 threshold, not this argument. The peak must also clear
+            Fisher's g critical value at the 5 percent level for the
+            record length (:func:`_fisher_g_crit`), so a short record
+            needs a stronger peak than this floor alone to call a cycle.
         min_cycles: minimum number of cycles the record must span,
             ``n / period >= min_cycles``, above 0.
         lm_hurst: minimum Hurst exponent (0.5-1) to call long memory.
@@ -598,8 +624,9 @@ def fit_stochastic(
         has_cycle = 4 <= per <= n / 2.0
     else:
         per = float(seas["period"])
-        has_cycle = (seas["strength"] > cycle_strength and np.isfinite(per)
-                     and 4 <= per <= n / min_cycles)
+        has_cycle = (seas["strength"] > cycle_strength
+                     and seas["strength"] > _fisher_g_crit(n)
+                     and np.isfinite(per) and 4 <= per <= n / min_cycles)
     cyc_amp = float(seas["amp"]) if has_cycle else float("nan")
     n_harm = int(seas["n_harmonics"]) if has_cycle else 0
     coef = np.asarray(seas["coef"], dtype=float) if has_cycle else np.zeros(0)
