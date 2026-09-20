@@ -48,9 +48,23 @@ def test_kalman_and_ekf_recover_a_noise_free_constant_velocity_path():
     sm_e, *_ = gps.ekf_track(t, fixes, gyro, (1,))
     warm = gps.WARMUP
     # fails under a wrong dt or transition (e.g. a hardcoded sample period
-    # rather than one derived from t)
+    # shorter than the one in t)
     assert float(np.max(np.abs(sm_k[warm:] - truth[warm:]))) < 0.02
     assert float(np.max(np.abs(sm_e[warm:] - truth[warm:]))) < 0.02
+
+
+def test_kalman_track_carries_its_state_through_a_gap():
+    plan = [(0.0, 0.0, 10.0, 0.0)]
+    t, truth, fixes, gyro, rng = gps.build_rig(200, seed=2, plan=plan,
+                                               gps_sigma=0.0, gyro_sigma=0.0)
+    gapped = fixes.copy()
+    gapped[100:120] = np.nan
+    sm, pred, _ = gps.kalman_track(t, gapped, (1,))
+    # fails if a missed fix only extrapolates for display and leaves the
+    # filter state at the last fix: the first update after the gap then
+    # starts 20 samples behind and lands tens of metres off
+    assert float(np.max(np.abs(sm[100:125] - truth[100:125]))) < 0.05
+    assert float(np.max(np.abs(pred[1][101:125] - truth[101:125]))) < 0.05
 
 
 def test_run_batch_is_finite_and_reproducible_per_trial_index():

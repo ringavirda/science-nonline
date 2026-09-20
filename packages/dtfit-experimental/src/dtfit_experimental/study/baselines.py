@@ -302,6 +302,18 @@ class KalmanCA:
         self.last_nis_ = float(nis)
         return self.position()
 
+    def coast(self):
+        """Time update with no measurement: one step of ``dt`` through a
+        dropout, state and covariance both. Before the first measurement it
+        leaves the filter untouched. Returns the new position (length
+        ``dim``)."""
+        if not self._init:
+            return self.position()
+        for d in range(self.dim):
+            self.x[d] = self.F @ self.x[d]
+            self.P[d] = self.F @ self.P[d] @ self.F.T + self.Q
+        return self.position()
+
     def inflate(self, factor):
         """Inflate every axis' covariance: the adaptive re-arming hook, mirror
         of the dtfit filter's ``inflate``."""

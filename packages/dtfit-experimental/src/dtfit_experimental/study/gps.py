@@ -300,22 +300,18 @@ def kalman_track(t, fixes, horizons=(10,), *, q=5e-2, adaptive=False):
     sm = np.zeros((n, 3))
     pred = {h: np.full((n, 3), np.nan) for h in horizons}
     drift: set[float] = set()
-    since = 0
     for i in range(n):
-        miss = np.any(np.isnan(fixes[i]))
-        if miss:
-            since += 1
-            sm[i] = kf.forecast(since)[-1]          # coast: extrapolate the CA state
+        if np.any(np.isnan(fixes[i])):
+            sm[i] = kf.coast()
         else:
-            since = 0
             sm[i] = kf.update(fixes[i])
             if det is not None and det.update(kf.last_residuals_):
                 drift.add(round(float(t[i]), 2))
                 kf.inflate(3.0)
-        fc = kf.forecast(max(horizons) + since)
+        fc = kf.forecast(max(horizons))
         for h in horizons:
             if i + h < n:
-                pred[h][i + h] = fc[h - 1 + since]
+                pred[h][i + h] = fc[h - 1]
     return sm, pred, sorted(drift)
 
 
