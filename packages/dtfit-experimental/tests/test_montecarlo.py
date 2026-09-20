@@ -98,9 +98,8 @@ def test_contaminate_burst_leaves_runs_of_five():
 
 
 def test_contaminate_undercounts_trailing_short_block():
-    # n=197 does not divide by burst=5, so the last block has only 2
-    # samples; fails if a drawn short block is not made up for elsewhere,
-    # leaving fewer than round(fraction*n) indices covered
+    # n=197 does not divide by burst=5: the last block holds 2 samples,
+    # not 5; fails if that short block ever leaves idx.size < 20
     short_seeds = 0
     for seed in range(200):
         rng = np.random.default_rng(seed)
@@ -115,9 +114,8 @@ def test_contaminate_trim_keeps_earlier_runs_whole():
     rng = np.random.default_rng(0)
     y = np.zeros(200)
     _, idx = contaminate(y, rng=rng, fraction=0.07, sigma=1.0, burst=5)
-    # round(0.07 * 200) == 14, not a multiple of burst=5, so one run is
-    # trimmed short; fails if the trim scattered indices out of the runs
-    # instead of shortening the last-drawn block from its tail
+    # round(0.07 * 200) == 14 is not a multiple of burst=5; fails if the
+    # trim scatters indices out of the runs instead of shortening one
     assert idx.size == 14
     runs = np.split(idx, np.where(np.diff(idx) != 1)[0] + 1)
     sizes = sorted(run.size for run in runs)
