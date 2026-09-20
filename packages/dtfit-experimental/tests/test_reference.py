@@ -196,8 +196,8 @@ def test_parse_raises_on_missing_line_span():
         reference._parse("no header lines at all", "X", "b1*x", "lower")
 
 
-# Fails if _parse stops raising when the "Residual Sum of Squares" line is
-# absent (for example, defaulting rss to 0 instead of erroring).
+# Fails if _parse defaults the residual sum of squares instead of raising
+# when its line is absent.
 def test_parse_raises_on_missing_residual_sum_of_squares():
     text = (
         "Starting Values   (lines 3 to 3)\n\n\n"

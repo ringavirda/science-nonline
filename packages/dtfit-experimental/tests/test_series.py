@@ -44,8 +44,8 @@ def test_loader_returns_none_when_file_missing(tmp_path, monkeypatch):
     assert S.load_covid() is None
 
 
-# Fails if load_ltsf swallows the bad-name lookup instead of letting it
-# propagate as documented.
+# Fails if load_ltsf catches the bad-name KeyError instead of letting it
+# propagate.
 def test_load_ltsf_unknown_name_raises_key_error():
     with pytest.raises(KeyError):
         S.load_ltsf("not-a-dataset")

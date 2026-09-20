@@ -77,9 +77,9 @@ def test_baseline_preds_includes_lstm_with_torch(monkeypatch):
     assert "LSTM" in out
 
 
-# Fails when the try/except around the LSTM call is removed: a raising
-# lstm_forecast then propagates out of baseline_preds instead of leaving
-# every other baseline in place with LSTM all-NaN.
+# Fails when the try/except around the LSTM call is removed: an
+# lstm_forecast exception propagates out of baseline_preds rather than
+# landing in out["LSTM"] as NaN.
 def test_baseline_preds_lstm_failure_is_nan_others_survive(monkeypatch):
     monkeypatch.setattr(F, "_have_torch", None)
     monkeypatch.setattr(F.notebook, "optional_import", lambda name: object())
@@ -97,8 +97,8 @@ def test_baseline_preds_lstm_failure_is_nan_others_survive(monkeypatch):
         assert not np.all(np.isnan(out[key]))
 
 
-# Fails when the torch probe is not cached: two calls of baseline_preds with
-# torch reported missing would print the skip line twice instead of once.
+# Fails when the torch probe is not cached: baseline_preds prints the torch
+# skip line once per call rather than once per process.
 def test_baseline_preds_probes_torch_once(monkeypatch, capsys):
     monkeypatch.setattr(F, "_have_torch", None)
     calls = []
