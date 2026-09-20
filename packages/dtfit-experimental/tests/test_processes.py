@@ -1,6 +1,5 @@
 """study.processes: the ground-truth generators, the router's applicability
-map and the real-series catalogue, decoupled from the retired
-``stochastic_series`` domain harness.
+map and the real-series catalogue.
 """
 
 import numpy as np
@@ -38,9 +37,13 @@ def test_gen_ar1_and_gen_arfima_are_driven_by_their_parameter():
 
 
 def test_gen_garch_persistence_matches_alpha_plus_beta():
-    # fails if omega, alpha and beta are swapped in the call signature
-    r = gen_garch(4000, 0.05, 0.08, 0.90, np.random.default_rng(0))
-    assert garch_mle_persistence(r) == pytest.approx(0.98, abs=0.05)
+    # fails if omega, alpha and beta are swapped in the call signature:
+    # both parameter settings must recover alpha + beta, since a rotated
+    # signature only breaks one of the two
+    for omega, alpha, beta, persistence in [(0.05, 0.08, 0.90, 0.98),
+                                             (0.05, 0.20, 0.60, 0.80)]:
+        r = gen_garch(4000, omega, alpha, beta, np.random.default_rng(0))
+        assert garch_mle_persistence(r) == pytest.approx(persistence, abs=0.05)
 
 
 def test_gen_ar2_cycle_peaks_near_its_period():
@@ -82,9 +85,8 @@ class _FakeModel:
 
 
 def test_regime_matches_accepts_the_true_label_and_rejects_a_wrong_one():
-    # fails if a regime string is renamed in dtfit.stochastic (e.g.
-    # "cyclical" -> "cyclic"), which would silently drop the router's
-    # reported accuracy without any test going red elsewhere
+    # fails on regime_matches' own rejection logic, e.g. a missing
+    # "not-a-real-regime" branch falling through to True
     labels = {
         "white noise": "white noise",
         "random walk": "random walk (unit root)",
@@ -100,6 +102,18 @@ def test_regime_matches_accepts_the_true_label_and_rejects_a_wrong_one():
                           "vol-clustering")
     assert not regime_matches(_FakeModel("x", has_vol_clustering=False),
                               "vol-clustering")
+
+
+def test_regime_matches_tracks_dtfits_actual_regime_labels():
+    # fails if a regime string is renamed in dtfit.stochastic (e.g.
+    # gates.py's "cyclical" -> "cyclicX", "seasonal" -> "seasonalX"),
+    # since this fits real StochasticModel objects instead of the
+    # _FakeModel strings the test above writes itself
+    from dtfit.stochastic import fit_stochastic
+
+    for _, expect, gen in ROUTER_CASES:
+        model = fit_stochastic(gen(0))
+        assert regime_matches(model, expect), (expect, model.regime)
 
 
 def test_real_series_entries_load_or_return_none_with_one_line(capsys):

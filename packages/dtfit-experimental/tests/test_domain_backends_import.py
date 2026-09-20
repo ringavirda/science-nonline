@@ -25,8 +25,6 @@ _BACKENDS = {
                              "real_puromycin", "exp_model_mismatch"),
     "big_data": (),
     "embedded_control": ("clean_accuracy", "sweep_perr_all", "exp_model_mismatch"),
-    "stochastic_series": ("exp_ar_discrimination", "exp_ar_order_recovery",
-                          "exp_fracdiff_whitening", "exp_student_t"),
     "image_showcase": ("reduce_station", "reduce_to_file",
                        "reduce_station_year", "day_batch", "station_rows",
                        "exactness_rows", "year_rows", "normals_rows",

@@ -188,7 +188,11 @@ def gen_arp(n: int, phi: tuple[float, ...], rng: np.random.Generator,
     return x[burn:]
 
 
-# the router's applicability map: one process class per regime it detects
+# the router's applicability map: one process class per regime it detects.
+# each element is (process name, expected regime, generator(seed)->series):
+# the process name labels the row in a report, the expected regime is fed
+# to regime_matches as its `expected` argument, and the generator draws one
+# realization for a given integer seed, reproducibly.
 ROUTER_CASES: list[tuple[str, str, Callable[[int], np.ndarray]]] = [
     ("white noise", "white noise",
      lambda s: np.random.default_rng(s).standard_normal(1500)),
