@@ -58,11 +58,14 @@ def test_notebook_runs_quick(notebook, monkeypatch):
 
 
 def test_discovery_root_is_the_new_experiments_tree():
+    import dtfit_experimental
+
     root = paths.experiments_dir()
     # fails if the glob pointed at the old src/.../experiments tree
     assert root == Path(__file__).resolve().parents[1] / "experiments"
+    old_root = Path(dtfit_experimental.__file__).resolve().parent / "experiments"
     for nb in discover_notebooks():
-        assert "src" not in nb.parts
+        assert old_root not in nb.parents
 
 
 def test_package_resolves_inside_this_checkout():
