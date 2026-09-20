@@ -2,9 +2,7 @@
 
 Each test simulates a process whose parameter is known and asserts that the
 dtfit-based estimator, which fits a deterministic functional of the process,
-gets the truth back within a tolerance. This is the CI-checkable core of the
-``stochastic_series`` domain experiment; the full VIABLE / MARGINAL / NOT
-VIABLE verdict table lives there.
+gets the truth back within a tolerance.
 """
 
 import numpy as np
@@ -21,8 +19,17 @@ from dtfit.stochastic import (
     fit_stochastic,
     StochasticModel,
 )
-from dtfit_experimental.experiments.domains.stochastic_series import backend as B
+from dtfit_experimental.study import baselines as bl
+from dtfit_experimental.study import processes as B
 from dtfit_experimental.study.paths import data_dir
+from dtfit_experimental.study.processes import (
+    REAL_SERIES,
+    ROUTER_CASES,
+    forecast_skill,
+    hurst_comparison,
+    regime_matches,
+    suite_horizon,
+)
 
 
 def _mean(fn, seeds):
@@ -90,19 +97,6 @@ def test_decompose_recovers_trend_and_cycle():
     assert fc.shape == (20,) and np.all(np.isfinite(fc))
 
 
-# the domain harness
-def test_domain_experiments_run_and_are_viable():
-    rows = [
-        B.exp_ar1(2, n=1000),
-        B.exp_cycle(2, n=1000),
-        B.exp_garch(2, n=2500),
-    ]
-    for r in rows:
-        assert r["verdict"] in {"VIABLE", "MARGINAL", "NOT VIABLE"}
-        assert r["verdict"] != "NOT VIABLE"
-    assert "verdict" in B.summary(rows)
-
-
 # the merged solution: fit_stochastic
 def test_merged_white_noise_reports_no_structure():
     m = fit_stochastic(np.random.default_rng(0).standard_normal(1500))
@@ -145,9 +139,13 @@ def test_merged_trend_cycle_detected_and_forecasts():
 
 
 def test_merged_router_accuracy_is_high():
-    r = B.exp_merged_router(seeds=3)
-    assert r["accuracy"] >= 80.0
-    assert r["verdict"] in {"VIABLE", "MARGINAL"}
+    correct = total = 0
+    for _, expect, gen in ROUTER_CASES:
+        for s in range(3):
+            total += 1
+            if regime_matches(fit_stochastic(gen(700 + s)), expect):
+                correct += 1
+    assert 100.0 * correct / total >= 80.0
 
 
 def test_seasonal_multiharmonic_detected_and_beats_rw():
@@ -162,7 +160,7 @@ def test_seasonal_multiharmonic_detected_and_beats_rw():
     h = 48
     tr, te = y[:-h], y[-h:]
     fc = fit_stochastic(tr).forecast(h)
-    rw = B.bl.random_walk_forecast(tr, h)
+    rw = bl.random_walk_forecast(tr, h)
     assert np.sqrt(np.mean((fc - te) ** 2)) < np.sqrt(np.mean((rw - te) ** 2))
 
 
@@ -352,14 +350,6 @@ def test_filter_low_false_alarm_on_stationary_stream():
     assert np.mean(counts) <= 1.5      # a stray flag is fine, a stream is not
 
 
-def test_filter_experiment_is_viable():
-    r = B.exp_online_filter(seeds=3)
-    assert r["verdict"] in {"VIABLE", "MARGINAL"}
-    assert r["break_hit_rate"] >= 75.0
-    tr = B.filter_trace(B.gen_ar1(1000, 0.7, np.random.default_rng(0)))
-    assert tr["phi"].shape == (1000,) and np.isfinite(tr["phi"][-1])
-
-
 # real economic data (USD/UAH, bundled CSV)
 # experiments/data is gitignored; the CSV is simply absent in CI.
 needs_usd_uah = pytest.mark.skipif(
@@ -370,17 +360,21 @@ needs_usd_uah = pytest.mark.skipif(
 
 @needs_usd_uah
 def test_real_usd_uah_level_is_random_walk_and_ties_rw():
-    rd = B.exp_real_data()
+    rate = B.load_series("usd_uah_2014_2015.csv")
+    logret = np.diff(np.log(rate))
+    m_level = fit_stochastic(rate)
+    skill, _ = forecast_skill(rate, 20)
+    absr = np.abs(logret - logret.mean())
+    hurst_abs = hurst_comparison(absr)
     # the FX level is a near-random walk; the router has to call it one
-    assert rd["level_regime"].startswith("random walk")
+    assert m_level.regime.startswith("random walk")
     # and tie the random-walk benchmark on the holdout, within 2 percent
-    rmse = rd["forecast_rmse"]
-    assert rmse["dtfit merged"] <= rmse["random walk"] * 1.02
+    assert skill["dtfit merged"] <= skill["random walk"] * 1.02
     # the stylized fact: the long memory lives in the volatility, not the
     # level. The squared returns' excess autocorrelation on this record sits
     # just under the white-noise band, so the clustering shows in the Hurst of
     # the absolute returns rather than in the gate.
-    assert rd["abs_returns_hurst"]["dtfit spectral"] > 0.55
+    assert hurst_abs["dtfit spectral"] > 0.55
 
 
 # real data from statsmodels: reproducing the textbook results
@@ -393,18 +387,26 @@ except Exception:
 sm_only = pytest.mark.skipif(not HAS_SM, reason="statsmodels not installed")
 
 
+def _real(key: str) -> np.ndarray:
+    entry = next(e for e in REAL_SERIES if e.key == key)
+    y = entry.load()
+    if y is None:
+        pytest.skip(f"{key} unavailable")
+    return y
+
+
 @sm_only
 def test_real_gdp_is_random_walk_with_drift():
     # Nelson-Plosser (1982): US real GDP is a random walk with drift. The drift
     # is a stochastic trend, not the deterministic one has_trend flags.
-    m = fit_stochastic(B._sm_series("gdp"))
+    m = fit_stochastic(_real("gdp"))
     assert "random walk" in m.regime and m.has_trend is False
 
 
 @sm_only
 def test_real_sunspots_is_cyclical_near_11_years():
     # the canonical ~11-year solar cycle
-    m = fit_stochastic(B._sm_series("sunspots"))
+    m = fit_stochastic(_real("sunspots"))
     assert "cyclical" in m.regime
     assert 8.0 <= m.cycle_period <= 14.0
 
@@ -412,7 +414,7 @@ def test_real_sunspots_is_cyclical_near_11_years():
 @sm_only
 def test_real_nile_has_long_memory():
     # Hurst's (1951) canonical long-memory series, H ~ 0.9 in the literature
-    h = B.hurst_comparison(B._sm_series("nile"))
+    h = hurst_comparison(_real("nile"))
     assert h["dtfit spectral"] > 0.70
     assert h["R/S"] > 0.65   # the classic estimator has to agree
 
@@ -420,8 +422,20 @@ def test_real_nile_has_long_memory():
 @sm_only
 def test_real_suite_never_forecasts_much_worse_than_random_walk():
     # the merged solution beats the random walk where structure extrapolates,
-    # ties it where there is none, and never loses by more than 5 percent
-    for r in B.exp_real_suite()["rows"]:
-        ratio = r["merged/RW"]
-        if r["n"] > 0 and ratio == ratio:  # not NaN
+    # ties it where there is none, and never loses by more than 5 percent.
+    # Fails under the mutation of dropping the cycle gate's Fisher-g critical
+    # value (dtfit/stochastic/gates.py:628), which sends the Nile's ratio
+    # from 0.9150 to 1.5435.
+    for entry in REAL_SERIES:
+        y = entry.load()
+        if y is None:
+            continue
+        h = suite_horizon(y.size)
+        if y.size <= h + 60:
+            continue
+        skill, _ = forecast_skill(y, h)
+        rw = skill.get("random walk", float("nan"))
+        ratio = (skill.get("dtfit merged", float("nan")) / rw
+                 if rw else float("nan"))
+        if ratio == ratio:  # not NaN
             assert ratio <= 1.05

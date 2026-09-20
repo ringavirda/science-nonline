@@ -8,6 +8,7 @@ textbook baseline.
 
 import numpy as np
 import pytest
+from dtfit.stochastic import fit_stochastic
 
 from dtfit_experimental.study.classical_stochastic import (
     ols_ar1,
@@ -15,9 +16,8 @@ from dtfit_experimental.study.classical_stochastic import (
     classical_decompose,
     fit_classical_stochastic,
 )
-from dtfit_experimental.experiments.domains.stochastic_series.backend import (
+from dtfit_experimental.study.processes import (
     gen_ar1, gen_arfima, gen_garch, gen_ar2_cycle, gen_trend_cycle,
-    exp_model_comparison, exp_garch, exp_decompose, exp_merged_router,
 )
 from dtfit_experimental.study.metrics import metrics
 from dtfit_experimental.study.baselines import random_walk_forecast
@@ -69,20 +69,13 @@ def test_classical_forecast_beats_random_walk_on_structure():
 
 
 # the head-to-head wiring
-def test_model_comparison_runs_and_is_finite():
-    cmp = exp_model_comparison(seeds=3)
-    assert cmp["rows"] and cmp["n_cases"] == len(cmp["rows"])
-    for row in cmp["rows"]:
-        assert np.isfinite(row["dtfit/RW"]) and np.isfinite(row["classical/RW"])
-        assert row["winner"] in ("dtfit", "classical")
-
-
-def test_filled_baselines_are_present():
-    # every head-to-head reports a classical foil: a baseline error from E4
-    # (GARCH) and E6 (decompose), a router accuracy from E7.
-    e4 = exp_garch(seeds=2, n=2500)
-    e6 = exp_decompose(seeds=2)
-    e7 = exp_merged_router(seeds=2)
-    assert np.isfinite(e4["base_err"])
-    assert np.isfinite(e6["base_err"])
-    assert np.isfinite(e7["classical_accuracy"])
+def test_dtfit_and_classical_both_return_a_finite_forecast_ratio_on_structure():
+    t, y = gen_trend_cycle(400, 0.03, 40.0, 3.0, 1.0, np.random.default_rng(0))
+    h = 40
+    train, test = y[:-h], y[-h:]
+    rw = metrics(test, random_walk_forecast(train, h))["RMSE"] + 1e-12
+    dt_ratio = metrics(test, fit_stochastic(train).forecast(h))["RMSE"] / rw
+    cl_ratio = (metrics(test, fit_classical_stochastic(train).forecast(h))["RMSE"]
+                / rw)
+    assert np.isfinite(dt_ratio)
+    assert np.isfinite(cl_ratio)
