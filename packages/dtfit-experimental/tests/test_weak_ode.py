@@ -9,6 +9,7 @@ from dtfit_experimental.weak_ode import (
     fit_logistic,
     fit_lotka_volterra_prey,
     fit_michaelis_menten,
+    seed_nlls,
     weak_operators,
 )
 
@@ -132,3 +133,93 @@ def test_weak_form_beats_finite_difference_under_noise():
                             -0.5 * np.gradient(y * y, t), rcond=None)[0]
         ef.append(abs(c[1] / vm - 1))
     assert np.median(ew) < np.median(ef)
+
+
+def test_seed_nlls_recovers_logistic_from_a_poor_start():
+    # a noiseless logistic from a 3x start: fails if the solver is skipped
+    # and p0 is echoed back unchanged.
+    r, k, y0 = 1.4, 5.0, 0.4
+    t = np.linspace(0.0, 8.0, 500)
+    y = solve_ivp(lambda _t, yy: r * yy * (1 - yy / k), (0, 8), [y0],
+                  t_eval=t, rtol=1e-9, atol=1e-11).y[0]
+    p0 = np.array([r, k]) * 3.0
+
+    def rhs(_t, state, rr, kk):
+        return [rr * state[0] * (1 - state[0] / kk)]
+
+    p = seed_nlls(rhs, [y0], t, y, p0, names=["r", "K"])
+    assert p != {"r": p0[0], "K": p0[1]}
+    assert p["r"] == pytest.approx(r, abs=1e-6)
+    assert p["K"] == pytest.approx(k, abs=1e-6)
+
+
+def test_seed_nlls_rejects_mismatched_names():
+    # fails if the len(p0) != len(names) guard is dropped.
+    def rhs(_t, state, rr, kk):
+        return [rr * state[0] * (1 - state[0] / kk)]
+
+    t = np.linspace(0.0, 8.0, 50)
+    y = np.ones_like(t)
+    with pytest.raises(ValueError):
+        seed_nlls(rhs, [0.4], t, y, [1.4, 5.0], names=["r"])
+
+
+def test_seed_nlls_raises_on_divergent_integration():
+    # y' = y**2 from y(0) = 1 blows up before t = 2; fails if a bare
+    # except turns the integration failure into a nan-filled dict.
+    def rhs(_t, state, _a):
+        return [state[0] ** 2]
+
+    t = np.linspace(0.0, 2.0, 50)
+    y = np.ones_like(t)
+    with pytest.raises(RuntimeError):
+        seed_nlls(rhs, [1.0], t, y, [1.0], names=["a"])
+
+
+def test_seed_nlls_rejects_empty_t():
+    # fails if the t.size < 2 guard is dropped or moved below the length
+    # check: t and y agree in length here, so only that guard rejects it.
+    def rhs(_t, state, rr, kk):
+        return [rr * state[0] * (1 - state[0] / kk)]
+
+    with pytest.raises(ValueError):
+        seed_nlls(rhs, [0.4], [], [], [1.4, 5.0], names=["r", "K"])
+
+
+def test_seed_nlls_rejects_a_single_sample():
+    # a lone (t, y) pair gives solve_ivp a zero-length span, which raises a
+    # bare IndexError from inside the solver; fails if the guard is
+    # narrowed to t.size == 0.
+    def rhs(_t, state, rr, kk):
+        return [rr * state[0] * (1 - state[0] / kk)]
+
+    with pytest.raises(ValueError):
+        seed_nlls(rhs, [0.4], [0.0], [0.4], [1.4, 5.0], names=["r", "K"])
+
+
+def test_seed_nlls_rejects_mismatched_t_and_y_length():
+    # y has size 1, which numpy broadcasts against the size-50 residual
+    # without error; only the t.size != y.size guard rejects this input.
+    def rhs(_t, state, rr, kk):
+        return [rr * state[0] * (1 - state[0] / kk)]
+
+    t = np.linspace(0.0, 8.0, 50)
+    y = np.ones(1)
+    with pytest.raises(ValueError):
+        seed_nlls(rhs, [0.4], t, y, [1.4, 5.0], names=["r", "K"])
+
+
+def test_seed_nlls_raises_when_the_fit_does_not_converge():
+    # a noiseless logistic recovered exactly with an unbounded solver;
+    # fails if the `if not result.success: raise RuntimeError` guard is
+    # dropped, since max_nfev=1 stops least_squares before convergence.
+    r, k, y0 = 1.4, 5.0, 0.4
+    t = np.linspace(0.0, 8.0, 50)
+    y = solve_ivp(lambda _t, yy: r * yy * (1 - yy / k), (0, 8), [y0],
+                  t_eval=t, rtol=1e-9, atol=1e-11).y[0]
+
+    def rhs(_t, state, rr, kk):
+        return [rr * state[0] * (1 - state[0] / kk)]
+
+    with pytest.raises(RuntimeError):
+        seed_nlls(rhs, [y0], t, y, [r, k], names=["r", "K"], max_nfev=1)

@@ -73,6 +73,7 @@ from .weak_ode import (
     fit_damped_oscillator,
     fit_lotka_volterra_prey,
     fit_michaelis_menten,
+    seed_nlls,
     weak_operators,
 )
 from .joint import fit_joint, JointResult
@@ -104,4 +105,5 @@ __all__ = [
     "fit_michaelis_menten",
     "fit_lotka_volterra_prey",
     "fit_damped_oscillator",
+    "seed_nlls",
 ]

@@ -35,10 +35,12 @@ prey-only Lotka-Volterra is structurally unidentifiable and is not returned.
 
 from __future__ import annotations
 
-from typing import Callable
+from typing import Callable, Sequence
 
 import numpy as np
 from numpy.polynomial import legendre as _L
+from scipy.integrate import solve_ivp
+from scipy.optimize import least_squares
 
 WeakOps = tuple[
     Callable[[np.ndarray], np.ndarray],
@@ -291,3 +293,78 @@ def fit_lotka_volterra_prey(
         "gamma": float(gamma),
         "delta": float(delta),
     }
+
+
+def seed_nlls(
+    rhs: Callable[..., Sequence[float]],
+    y0: Sequence[float],
+    t: np.ndarray,
+    y: np.ndarray,
+    p0: np.ndarray,
+    *,
+    names: list[str] | None = None,
+    rtol: float = 1e-8,
+    atol: float = 1e-10,
+    max_nfev: int = 400,
+) -> dict[str, float]:
+    """Nonlinear least squares on the integrated law, started from ``p0``.
+
+    Integrates ``rhs`` with :func:`scipy.integrate.solve_ivp` at each trial
+    parameter set and fits the FIRST state component against the observed
+    series ``y``. This is the "solved fit" the module's docstring measures
+    the weak estimate against, not a replacement for it: the weak fit is what
+    supplies ``p0`` here, so the caller does not hand-pick a starting guess.
+
+    Args:
+        rhs: the law ``rhs(t, state, *params) -> array-like``, called exactly
+            as :func:`scipy.integrate.solve_ivp` calls its right-hand side;
+            ``state`` has shape ``(n_states,)``.
+        y0: the initial state, shape ``(n_states,)``, held fixed and not fit.
+        t: sample times, shape ``(n,)``, strictly increasing; must hold at
+            least 2 samples.
+        y: the observed first state component, shape ``(n,)``, same length
+            as ``t``.
+        p0: initial parameter guess, shape ``(p,)``, in the order of
+            ``names``.
+        names: parameter names, in the order of ``p0``; defaults to ``p0``'s
+            indices as strings (``"0"``, ``"1"``, ...).
+        rtol: relative tolerance passed to ``solve_ivp``.
+        atol: absolute tolerance passed to ``solve_ivp``.
+        max_nfev: maximum residual evaluations passed to
+            :func:`scipy.optimize.least_squares`.
+
+    Returns:
+        The fitted parameters, name to value, in the order of ``names``.
+
+    Raises:
+        ValueError: ``len(p0) != len(names)``, ``t`` and ``y`` differ in
+            length, or ``t`` has fewer than 2 samples.
+        RuntimeError: the integration fails for some trial parameter set, or
+            the least-squares fit does not converge; the message is the
+            solver's own.
+    """
+    t = np.asarray(t, dtype=float)
+    y = np.asarray(y, dtype=float)
+    p0 = np.asarray(p0, dtype=float)
+    y0_arr = np.asarray(y0, dtype=float)
+    if names is None:
+        names = [str(i) for i in range(p0.size)]
+    if len(p0) != len(names):
+        raise ValueError(
+            f"p0 has {len(p0)} values but names has {len(names)}")
+    if t.size < 2:
+        raise ValueError(f"t must hold at least 2 samples, got {t.size}")
+    if t.size != y.size:
+        raise ValueError(f"t has length {t.size} but y has length {y.size}")
+
+    def residual(params):
+        sol = solve_ivp(lambda tt, state: rhs(tt, state, *params),
+                        (t[0], t[-1]), y0_arr, t_eval=t, rtol=rtol, atol=atol)
+        if not sol.success:
+            raise RuntimeError(f"integration failed: {sol.message}")
+        return sol.y[0] - y
+
+    result = least_squares(residual, p0, max_nfev=max_nfev)
+    if not result.success:
+        raise RuntimeError(f"fit did not converge: {result.message}")
+    return dict(zip(names, (float(v) for v in result.x)))
