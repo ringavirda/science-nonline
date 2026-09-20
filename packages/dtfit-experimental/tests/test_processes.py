@@ -133,9 +133,7 @@ def test_real_series_entries_load_or_return_none_with_one_line(capsys):
 def test_guarded_loader_returns_none_with_one_line_when_data_dir_is_missing(
     monkeypatch, capsys,
 ):
-    # fails if the try/except is stripped out of _guarded: load_series'
-    # FileNotFoundError would propagate instead of the entry returning
-    # None with one printed line
+    # fails if _guarded's try/except is removed, or catches nothing
     monkeypatch.setenv("DTFIT_DATA", "/no/such/dtfit-data-dir")
     entry = next(e for e in REAL_SERIES if e.key == "usd_uah")
     y = entry.load()
