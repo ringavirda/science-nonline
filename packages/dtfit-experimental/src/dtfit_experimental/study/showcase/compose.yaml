@@ -60,4 +60,4 @@ services:
     volumes:
       - ${REPO:-../../../../../..}:/repo:ro
       - ${SHOWCASE_DATA:-${HOME}/data/showcase}:/data/showcase:ro
-      - ${OUT:-./results}:/out
+      - ${OUT:-../../../../experiments/results/35_archive_showcase}:/out

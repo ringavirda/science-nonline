@@ -1,6 +1,6 @@
 """Default locations of the showcase's inputs and outputs.
 
-Every function in the domain takes its paths as arguments; these are the
+Every function in the showcase takes its paths as arguments; these are the
 defaults only, read from the environment so that no machine's directory
 layout is written into the package. ``data_root``, ``ngl_dir``, ``isd_dir``
 and ``normals_dir`` live in ``dtfit_experimental.study.paths``, which owns
@@ -11,7 +11,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dtfit_experimental.study.paths import experiments_dir, isd_dir, ngl_dir, normals_dir
+from dtfit_experimental.study.paths import (
+    experiments_dir, isd_dir, ngl_dir, normals_dir,
+)
 from dtfit_experimental.study.paths import showcase_root as data_root
 
 __all__ = [

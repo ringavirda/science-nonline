@@ -25,14 +25,6 @@ _BACKENDS = {
                              "real_puromycin", "exp_model_mismatch"),
     "big_data": (),
     "embedded_control": ("clean_accuracy", "sweep_perr_all", "exp_model_mismatch"),
-    "image_showcase": ("reduce_station", "reduce_to_file",
-                       "reduce_station_year", "day_batch", "station_rows",
-                       "exactness_rows", "year_rows", "normals_rows",
-                       "run_filter", "match_flags", "reachable_events",
-                       "event_window_share", "send_image", "recv_frame",
-                       "replay", "track", "gpu_probe", "reduce_rate",
-                       "peak_rss_mib", "save_images", "load_images",
-                       "write_table"),
 }
 
 

@@ -59,7 +59,7 @@ RESULTS = {
     "leg5-tables": "leg5_tables",
 }
 
-# One entry per leg-5 run this domain has produced: the JSON summary's
+# One entry per leg-5 run the showcase has produced: the JSON summary's
 # stem under results/leg5/, its optional producer-side sibling, the
 # direction and block length the table reports it under, and the image
 # subtree its groups reassemble from (see task 18's brief). A source

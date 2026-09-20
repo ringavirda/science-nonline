@@ -64,7 +64,13 @@ def test_paths_follow_the_environment(monkeypatch, tmp_path):
     assert str(paths.results_dir()).endswith(
         "experiments/results/35_archive_showcase"
     )
-    assert paths.results_dir().is_dir()
+
+
+def test_results_dir_is_created_if_missing(monkeypatch, tmp_path):
+    monkeypatch.setattr(paths, "experiments_dir", lambda: tmp_path)
+    out = paths.results_dir()
+    assert out == tmp_path / "results" / "35_archive_showcase"
+    assert out.is_dir()
 
 
 def test_images_round_trip_through_the_npz_container(tmp_path):
