@@ -1,5 +1,7 @@
 """Monte-Carlo scaffolding: seeded draws, grids, contamination, image
 efficiency, replicate summaries and the process pool.
+
+Each test names the mutation of montecarlo.py it fails under.
 """
 
 import numpy as np
@@ -21,11 +23,11 @@ from dtfit_experimental.study.montecarlo import (
 def test_generators_draw_independent_reproducible_streams():
     a = generators(0, 2)
     assert len(a) == 2
-    # two spawned generators differ: fails if generators() reused one stream
+    # fails if generators() reused one stream for every replicate
     x0 = a[0].standard_normal(5)
     x1 = a[1].standard_normal(5)
     assert not np.allclose(x0, x1)
-    # the same seed reproduces both draws: fails if seeding were nondeterministic
+    # fails under a non-reproducible seed source
     b = generators(0, 2)
     assert np.array_equal(x0, b[0].standard_normal(5))
     assert np.array_equal(x1, b[1].standard_normal(5))
@@ -41,11 +43,11 @@ def test_grid_uniform_pins_endpoints():
 def test_grid_clustered_puts_half_in_first_fifth():
     rng = np.random.default_rng(1)
     x = grid("clustered", 100, span=10.0, rng=rng)
-    # both endpoints pinned: fails if the clip x[0], x[-1] = 0, span were dropped
+    # fails if the endpoint clip were dropped
     assert x[0] == 0.0
     assert x[-1] == 10.0
     in_first_fifth = np.sum(x <= 2.0)
-    # half the points fall below span/5: fails under any other split fraction
+    # fails under any split fraction other than half
     assert in_first_fifth == 50
 
 
@@ -68,7 +70,7 @@ def test_noisy_scales_sigma_to_signal_range():
     y, sigma = noisy(clean, 0.1, rng)
     assert sigma == pytest.approx(0.4)
     assert y.shape == clean.shape
-    # noise actually perturbs the signal: fails if noisy() returned clean unchanged
+    # fails if noisy() returned clean unchanged
     assert not np.allclose(y, clean)
 
 
@@ -76,8 +78,7 @@ def test_contaminate_replaces_exactly_rounded_count():
     rng = np.random.default_rng(4)
     y = np.zeros(197)
     y_out, idx = contaminate(y, rng=rng, fraction=0.1, sigma=1.0)
-    # round(0.1 * 197) == round(19.7) == 20: fails under int()/floor() (19)
-    # or ceil() when the fraction lands the other side of the rounding
+    # round(0.1 * 197) == 20; fails under int()/floor() truncation (19)
     assert idx.size == 20
     assert np.all(y_out[idx] != 0.0)
     untouched = np.setdiff1d(np.arange(197), idx)
@@ -90,8 +91,7 @@ def test_contaminate_burst_leaves_runs_of_five():
     _, idx = contaminate(y, rng=rng, fraction=0.1, sigma=1.0, burst=5)
     assert idx.size == 20
     runs = np.split(idx, np.where(np.diff(idx) != 1)[0] + 1)
-    # every contiguous run is exactly burst long: fails if burst were ignored
-    # and the 20 indices were scattered singly
+    # fails if burst were ignored and the indices scattered singly
     assert all(run.size == 5 for run in runs)
 
 
@@ -102,7 +102,7 @@ def test_numeric_jacobian_matches_known_derivative():
     x = np.linspace(0.0, 1.0, 20)
     jac = numeric_jacobian(f, x, [2.0, 3.0])
     assert jac.shape == (20, 2)
-    # d/da = x, d/db = 1: fails under a step formula that biases the estimate
+    # d/da = x, d/db = 1; fails under a biased step formula
     assert jac[:, 0] == pytest.approx(x, abs=1e-4)
     assert jac[:, 1] == pytest.approx(np.ones(20), abs=1e-4)
 
@@ -118,9 +118,7 @@ def test_image_efficiency_coarse_basis_matches_measured_ratio():
     x = np.linspace(0.0, 1.0, 200)
     jac = np.stack([np.ones(200), x], axis=1)
     eff = image_efficiency(jac, x, basis="block", order=8)
-    # the ratio measured in the plan for this exact case: fails under a
-    # projector built from the wrong grid (unrestricted P) or a swapped
-    # full/restricted covariance
+    # fails under a projector from the wrong grid or a swapped covariance
     assert eff.ratio == pytest.approx([0.98828299, 0.98439961], abs=1e-6)
     assert eff.ratio[0] < 1.0
 
@@ -134,12 +132,11 @@ def test_summarize_counts_nonfinite_instead_of_dropping_silently():
     ])
     truth = np.array([1.0, 2.0])
     s = summarize(estimates, truth)
-    # one row is non-finite: fails if summarize dropped it without reporting
+    # fails if summarize dropped the non-finite row without reporting it
     assert s.n_nonfinite == 1
     assert s.bias.shape == (2,)
     assert s.rmse.shape == (2,)
-    # stats computed only over the three finite rows: fails if the NaN row
-    # leaked into the mean and turned bias/rmse into NaN
+    # fails if the NaN row leaked into bias/rmse
     assert np.all(np.isfinite(s.bias))
     assert np.all(np.isfinite(s.rmse))
 
@@ -163,8 +160,7 @@ def test_pool_map_keeps_order_and_caps_blas_threads():
     items = list(range(8))
     out = pool_map(_one_blas_thread, items, workers=2)
     xs = [o[0] for o in out]
-    # results come back in input order: fails if pool_map used as_completed
+    # fails if pool_map used as_completed instead of map
     assert xs == items
-    # every worker limited BLAS to one thread: fails if the initializer's
-    # limit context were dropped instead of held in a module global
+    # fails if the BLAS thread cap were not held for the worker's life
     assert all(o[1] for o in out)
