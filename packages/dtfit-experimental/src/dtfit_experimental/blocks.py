@@ -19,10 +19,11 @@ windows only:
 
 They are in trial, not promoted into ``dtfit``.
 
-An image in this basis is a batch-fit object only: ``Image.from_dict``
-resolves basis names against core's ``_BASES`` and rejects ``edge_block``,
-and ``Image.transfer`` and ``Image.truncate`` refuse it as well (a
-``ValueError`` in all three cases, never a silently different basis).
+An image in either explicit-edge basis is a batch-fit object only:
+``Image.from_dict`` resolves basis names against core's ``_BASES`` and
+rejects ``edge_block`` and ``segment``, and ``Image.transfer`` and
+``Image.truncate`` refuse them as well (a ``ValueError`` in all three
+cases, never a silently different basis).
 """
 
 from __future__ import annotations
@@ -212,16 +213,15 @@ class SegmentBasis(Basis):
     """Legendre polynomials on each segment between given edges, zero
     outside it.
 
-    The form the probes call "Legendre per segment", and the one an
-    :class:`~dtfit.image.ImageStream` block image already carries per
-    window generalized from an indicator to a polynomial: a sample in
+    The block image an :class:`~dtfit.image.ImageStream` carries per
+    window, generalized from an indicator to a polynomial: a sample in
     segment ``j`` lights only segment ``j``'s columns, so the Gram matrix
-    is block diagonal and its conditioning is that of each segment's own
-    Legendre basis, never that of the segments strung together. A row for
-    a ``u`` in a segment with no sample in it is never produced by
-    ``evaluate``, but that segment's columns are still allocated: an empty
-    segment costs unused, rank-deficient coefficients rather than a
-    smaller basis.
+    is block diagonal and each diagonal block is the Gram matrix of that
+    segment's own Legendre basis over the segment's samples. The condition
+    number of the whole is the largest eigenvalue over the smallest across
+    all blocks, so it also carries the ratio of the segments' sample
+    counts. A segment with no sample in it keeps its columns: it costs
+    unused, rank-deficient coefficients rather than a smaller basis.
 
     Args:
         edges: Edges on the unit variable ``u``, strictly increasing, of
@@ -274,9 +274,13 @@ class SegmentBasis(Basis):
         """Legendre polynomials of the sample's own segment at ``u``,
         ``(len(u), n_coef)``.
 
-        ``u`` outside ``[-1, 1]`` falls into the nearest end segment
-        (clamped, not extrapolated), remapped to that segment's own unit
-        interval; every other segment's columns of that row are zero.
+        Each segment is remapped to its own unit interval. The segments
+        are half-open ``[lo, hi)`` with the last one closed at ``+1``, so a
+        ``u`` on an interior edge belongs to the segment on its right;
+        every other segment's columns of a row are zero. A ``u`` outside
+        ``[-1, 1]`` goes to the nearest end segment, whose polynomials are
+        extrapolated to it and grow without bound with the distance. An
+        empty ``u`` gives a ``(0, n_coef)`` array.
         """
         u = np.asarray(u, dtype=float).ravel()
         idx = _interval_index(self.edges, u)
@@ -749,12 +753,13 @@ class AlignedFit:
         steps: The fitted shift amplitudes, in the order of ``epochs``.
         z: The detection statistic of each epoch, same order.
         basis: The :class:`EdgeBlockBasis` the final fit ran in.
-        n_dropped: Samples left out by ``clip``; the samples of the flagged
-            windows are left out too and are not counted here.
+        n_dropped: Samples left out by ``clip``, which runs before any
+            window is flagged: a clipped sample of a flagged window is
+            counted here, the other samples of the flagged windows are
+            left out of the fit uncounted.
         flagged: The fine-window indices left out of the refit, ascending.
             They index the fine windows of ``fine * n_windows`` over the
-            original's domain; their samples are in neither the fit nor
-            ``n_dropped``.
+            original's domain.
     """
 
     result: FittingResult

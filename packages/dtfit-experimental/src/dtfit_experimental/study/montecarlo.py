@@ -264,9 +264,10 @@ def image_efficiency(
         An :class:`Efficiency`.
 
     Raises:
-        ValueError: ``domain`` is degenerate (``x0 == x1``); ``order`` is
-            not a valid order for ``basis``; or ``basis`` is a
-            :class:`Basis` instance and ``order`` is not ``None``.
+        ValueError: ``domain`` is degenerate (``x0 == x1``); ``basis`` is
+            a name and ``order`` is ``None`` or not a valid order for it;
+            or ``basis`` is a :class:`Basis` instance and ``order`` is not
+            ``None``.
     """
     if isinstance(basis, Basis) and order is not None:
         raise ValueError(

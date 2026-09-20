@@ -19,12 +19,17 @@ from dtfit.image.bases import BlockBasis, LegendreBasis, u_of
 from dtfit_experimental import (
     AlignedFit,
     EdgeBlockBasis,
+    SegmentBasis,
     aggregated_image,
     detect_jumps,
     fit_aggregated,
     fit_aligned,
 )
-from dtfit_experimental.blocks import SegmentBasis, _interval_index, coarsen
+from dtfit_experimental.blocks import _interval_index, coarsen
+from dtfit_experimental.study.montecarlo import (
+    image_efficiency,
+    numeric_jacobian,
+)
 
 
 def test_equal_edges_reproduce_the_block_basis():
@@ -148,6 +153,38 @@ def test_segment_basis_gram_is_block_diagonal():
         assert np.all(phi[np.ix_(rows, outside)] == 0.0)
 
 
+def test_each_segment_runs_on_its_own_unit_interval():
+    # Fails if evaluate() feeds a segment's polynomials the domain's u
+    # instead of the segment's own: the span is unchanged, so no fit or
+    # efficiency moves, only these values and the conditioning.
+    edges = [-1.0, -0.2, 0.5, 1.0]
+    orders = [6, 6, 6]
+    b = SegmentBasis(edges, orders)
+    u = np.linspace(-1.0, 1.0, 4000)
+    phi = b.evaluate(u)
+    idx = _interval_index(np.asarray(edges), u)
+    col = 0
+    for j, order in enumerate(orders):
+        rows = np.flatnonzero(idx == j)
+        want = LegendreBasis(order).evaluate(
+            u_of(u[rows], edges[j], edges[j + 1])
+        )
+        np.testing.assert_allclose(
+            phi[rows, col:col + order + 1], want, atol=1e-12
+        )
+        col += order + 1
+    assert np.linalg.cond(phi.T @ phi) < 100.0
+
+
+def test_a_sample_on_an_interior_edge_belongs_to_the_right_segment():
+    # Fails if the segments are closed on the right: the edge sample would
+    # then light the left segment's columns.
+    b = SegmentBasis([-1.0, -0.2, 0.5, 1.0], [2, 1, 3])
+    phi = b.evaluate(np.array([-0.2, 1.0]))
+    assert np.flatnonzero(phi[0]).tolist() == [3, 4]
+    assert np.all(np.flatnonzero(phi[1]) >= 5)
+
+
 def test_on_with_one_segment_reproduces_legendre():
     # Fails if on() skips or misapplies u_of when mapping edges to the
     # unit variable: a single segment must be exactly the plain Legendre
@@ -183,33 +220,12 @@ def _two_regime(t, a1, l1, a2, l2):
     )
 
 
-def _num_jac(f, x, c, h=1e-6):
-    c = np.asarray(c, dtype=float)
-    cols = []
-    for i in range(c.size):
-        d = np.zeros_like(c)
-        d[i] = h * max(1.0, abs(c[i]))
-        cols.append((f(x, *(c + d)) - f(x, *(c - d))) / (2 * d[i]))
-    return np.stack(cols, axis=1)
-
-
-def _exact_efficiency(phi, jac):
-    """The deterministic image-restriction ratio of probe_efficiency.py,
-    independent of any noise draw."""
-    keep = phi.any(axis=0)
-    phi = phi[:, keep]
-    q, _ = np.linalg.qr(phi)
-    restricted = np.linalg.pinv(jac.T @ (q @ (q.T @ jac)))
-    full = np.linalg.inv(jac.T @ jac)
-    return np.diag(full) / np.diag(restricted)
-
-
 def test_segment_on_the_switch_reaches_efficiency_where_legendre_does_not():
     # Fails if on() ignores the given interior edge: a2's efficiency then
     # falls to Legendre's ~0.66 instead of reaching 1.0.
     domain = (0.0, 10.0)
     x = np.linspace(*domain, 2000)
-    jac = _num_jac(_two_regime, x, _TWO_REGIME_TRUTH)
+    jac = numeric_jacobian(_two_regime, x, _TWO_REGIME_TRUTH)
     rng = np.random.default_rng(4)
     y = _two_regime(x, *_TWO_REGIME_TRUTH) + 0.01 * rng.standard_normal(x.size)
     original = Original(x, y, domain=domain)
@@ -219,12 +235,12 @@ def test_segment_on_the_switch_reaches_efficiency_where_legendre_does_not():
         param_names=["a1", "l1", "a2", "l2"],
     )
     assert np.all(np.isfinite(result.coeffs))
-    eff_seg = _exact_efficiency(seg.evaluate(u_of(x, *domain)), jac)
-    eff_leg = _exact_efficiency(
-        LegendreBasis(seg.n_coef - 1).evaluate(u_of(x, *domain)), jac
+    eff_seg = image_efficiency(jac, x, basis=seg, domain=domain)
+    eff_leg = image_efficiency(
+        jac, x, basis="legendre", order=seg.n_coef - 1, domain=domain
     )
-    assert eff_seg[2] > 0.999
-    assert eff_leg[2] < 0.7
+    assert eff_seg.ratio[2] > 0.999
+    assert eff_leg.ratio[2] < 0.7
 
 
 EPOCH = 3.4
@@ -528,8 +544,8 @@ def test_fit_aligned_finds_two_jumps_and_their_amplitudes():
 
 
 def test_no_sample_of_a_flagged_window_enters_the_refit_via_flagged():
-    # flagged holds fine-window indices dropped from the refit, one per
-    # epoch, each bracketing its epoch.
+    # Fails if flagged reports the coarse windows instead of the fine
+    # ones, or comes back in detection order instead of ascending.
     rng = np.random.default_rng(11)
     epochs, steps = (2.37, 6.81), (10.0, -10.0)
     x, y = _align_series(rng, epochs, steps)

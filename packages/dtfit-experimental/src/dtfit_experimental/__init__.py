@@ -29,6 +29,7 @@ physically rather than being re-imported from here.
         ChebyshevBasis,       # image-interface basis, fit(basis=...)
         LaguerreBasis,        # image-interface basis, fit(basis=...)
         EdgeBlockBasis,       # block basis with explicit window edges
+        SegmentBasis,         # Legendre per segment between explicit edges
         aggregated_image,     # image of data known as window totals
         fit_aggregated,       # the equal-areas fit of such data
         fit_aligned,          # windows aligned to detected jump epochs
@@ -61,6 +62,7 @@ from .bases import ChebyshevBasis, FourierBasis, LaguerreBasis
 from .blocks import (
     AlignedFit,
     EdgeBlockBasis,
+    SegmentBasis,
     aggregated_image,
     detect_jumps,
     fit_aggregated,
@@ -91,6 +93,7 @@ __all__ = [
     "ChebyshevBasis",
     "LaguerreBasis",
     "EdgeBlockBasis",
+    "SegmentBasis",
     "aggregated_image",
     "fit_aggregated",
     "fit_aligned",
