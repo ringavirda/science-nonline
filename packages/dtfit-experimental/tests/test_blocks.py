@@ -26,8 +26,8 @@ from dtfit_experimental.blocks import coarsen
 
 
 def test_equal_edges_reproduce_the_block_basis():
-    # Fails if evaluate() searches the edges on the wrong side or drops the
-    # clip: the block basis is the equal-edge case of this one.
+    # Fails if evaluate() drops the offset after the search (every window
+    # shifted by one): the block basis is the equal-edge case of this one.
     u = np.random.default_rng(0).uniform(-1.3, 1.3, 200)
     for k in (1, 4, 7):
         b = EdgeBlockBasis(np.linspace(-1.0, 1.0, k + 1))
@@ -295,9 +295,8 @@ def _align_series(rng, epochs=(), steps=(), outliers=0.0):
 
 
 def test_fit_aligned_finds_two_jumps_and_their_amplitudes():
-    # Fails if the detector ranks z rather than |z| (the negative jump is
-    # then never reached) and if the flagged windows are not excluded from
-    # the next round (the first jump is found again and again).
+    # Fails if the detector ranks z rather than |z|: the negative jump is
+    # then never reached.
     rng = np.random.default_rng(11)
     epochs, steps = (2.37, 6.81), (10.0, -10.0)
     x, y = _align_series(rng, epochs, steps)
@@ -371,13 +370,13 @@ def test_detect_jumps_returns_nothing_from_too_few_windows():
     # Fails if the guard on the number of windows holding n_min samples is
     # dropped: the noise scale is then a median of nothing, a RuntimeWarning
     # and a nan statistic.
-    counts = np.array([10.0, 10.0, 0.0, 0.0])
+    counts = np.array([10.0, 0.0, 0.0, 0.0])
     edges = np.linspace(0.0, 4.0, 5)
     sums_x = counts * 0.5 * (edges[:-1] + edges[1:])
     with warnings.catch_warnings():
         warnings.simplefilter("error")
         assert detect_jumps(
-            counts, sums_x, np.array([1.0, 30.0, 0.0, 0.0]), edges
+            counts, sums_x, np.array([30.0, 0.0, 0.0, 0.0]), edges
         ) == []
 
 
