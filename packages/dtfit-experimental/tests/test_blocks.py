@@ -528,8 +528,8 @@ def test_fit_aligned_finds_two_jumps_and_their_amplitudes():
 
 
 def test_no_sample_of_a_flagged_window_enters_the_refit_via_flagged():
-    # Fails if flagged reports the coarse windows, and if flagged is left
-    # at the detector's order rather than the windows actually dropped.
+    # flagged holds fine-window indices dropped from the refit, one per
+    # epoch, each bracketing its epoch.
     rng = np.random.default_rng(11)
     epochs, steps = (2.37, 6.81), (10.0, -10.0)
     x, y = _align_series(rng, epochs, steps)
