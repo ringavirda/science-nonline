@@ -1,0 +1,5 @@
+IMU grade,smoothing RMSE (m)
+"cheap (gyro 1.7 deg/s, acc 0.10 m/s^2)",1.08668
+"consumer (gyro 0.9 deg/s, acc 0.05 m/s^2)",1.03329
+"tactical-grade (gyro 0.5 deg/s, acc 0.02 m/s^2)",1.01989
+"good (gyro 0.2 deg/s, acc 0.01 m/s^2)",1.01537

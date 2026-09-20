@@ -1,0 +1,4 @@
+dropout fraction,full-IMU strapdown Legendre,dtfit Legendre (GPS-only),CT-EKF,Kalman-CA
+0,1.03687,1.60231,1.17175,1.68317
+0.1,1.10057,1.8185,1.23835,1.78683
+0.2,1.11507,2.07023,1.28219,1.88155

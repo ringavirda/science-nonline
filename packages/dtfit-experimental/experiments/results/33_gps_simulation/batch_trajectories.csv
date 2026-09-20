@@ -1,0 +1,6 @@
+method,median RMSE (m),IQR low (m),IQR high (m)
+raw GPS,2.59272,2.55847,2.62213
+dtfit Legendre (GPS-only),1.52411,1.476,1.57086
+full-IMU strapdown Legendre,1.00758,0.970128,1.03495
+CT-EKF,1.089,1.03421,1.14657
+Kalman-CA,1.50843,1.46077,1.67546

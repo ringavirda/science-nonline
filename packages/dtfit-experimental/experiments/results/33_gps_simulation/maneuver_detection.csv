@@ -1,0 +1,5 @@
+detector,caught,of,false alarms,median latency (s)
+dtfit fused (position),13,64,31,0.7675
+dtfit fused + gyro,50,64,24,0.065
+CT-EKF adaptive,20,64,21,0.69
+Kalman-CA adaptive,10,64,31,0.64
