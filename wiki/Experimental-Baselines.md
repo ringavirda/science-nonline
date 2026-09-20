@@ -170,7 +170,7 @@ auto-regressive + moving-average terms on differenced (and optionally seasonal)
 data. **Why chosen:** the **standard statistical** forecaster taught and deployed
 everywhere; the canonical comparison for any new forecaster.
 
-### MLP and LSTM forecasters (`mlp_forecast`, `torch_mlp_forecast`, `lstm_forecast`)
+### MLP and LSTM forecasters (`mlp_forecast`, `lstm_forecast`)
 **What:** neural-network sequence forecasters (a feed-forward net on a lookback
 window, and a recurrent LSTM). **How:** trained on sliding windows to predict the
 next value, then rolled forward recursively. **Why chosen:** the **modern

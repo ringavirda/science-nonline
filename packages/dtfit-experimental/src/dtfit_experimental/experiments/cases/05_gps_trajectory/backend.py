@@ -28,7 +28,7 @@ from dtfit.streaming import ImageFilter
 
 from dtfit_experimental.streaming import FilterBank
 
-from dtfit_experimental.experiments.common import baselines as bl
+from dtfit_experimental.study import baselines as bl
 
 __all__ = [
     "SATS", "MANEUVERS", "MANEUVER_ONSETS", "WARMUP", "INFLATE",

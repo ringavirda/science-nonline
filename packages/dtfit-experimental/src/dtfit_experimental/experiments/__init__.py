@@ -24,6 +24,6 @@ cases/01_control_systems/01_control_systems.ipynb``, or headless::
         dtfit_experimental/experiments/cases/01_control_systems/01_control_systems.ipynb
 
 ``cases/REPORTS.md`` and ``domains/DOMAINS.md`` index the notebooks. The shared
-``common`` package holds the pure-compute helpers the backends import: metrics,
-baselines, datasets, plotting.
+``dtfit_experimental.study`` package holds the pure-compute helpers the
+backends import: metrics, baselines, datasets, plotting.
 """

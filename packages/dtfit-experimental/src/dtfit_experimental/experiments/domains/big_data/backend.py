@@ -56,10 +56,10 @@ from dtfit.streaming import ImageFilter
 from dtfit_legacy.scale import (
     fit_lsi_batched, PartitionedBatchLSI, project_spectra,
 )
-from dtfit_experimental.experiments.common import fmt, metrics
-from dtfit_experimental.experiments.common import baselines as bl
-from dtfit_experimental.experiments.common import datasets as ltsf
-from dtfit_experimental.experiments.domains.common import peak_memory
+from dtfit_experimental.study.metrics import fmt, metrics
+from dtfit_experimental.study import baselines as bl
+from dtfit_experimental.study import datasets as ltsf
+from dtfit_experimental.study.cost import peak_memory
 
 __all__ = [
     "DOMAIN", "SCENARIOS", "Panel",

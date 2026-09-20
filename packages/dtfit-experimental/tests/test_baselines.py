@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 from sklearn.metrics import r2_score
 
-from dtfit_experimental.experiments.common.baselines import (
+from dtfit_experimental.study.baselines import (
     prony_fit,
     matrix_pencil_fit,
     varpro_fit,

@@ -26,8 +26,8 @@ position-only and so on the fair information set: Kalman-CA on a single
 constant-acceleration model, CT-EKF (pos-only), a coordinated-turn EKF that
 estimates the turn-rate from position, and IMM (CV+CT), the gold-standard
 interacting-multiple-model tracker. The last two are absent from
-``common/baselines.py``, which carries only the gyro-aided ``CTEKFGyro``, so
-they live here.
+``dtfit_experimental.study.baselines``, which carries only the gyro-aided
+``CTEKFGyro``, so they live here.
 
 Fairness rules, the lesson from the rig harness: dtfit's turn model is not
 handed the generating turn-rate (it estimates ``c3`` online), every tracker

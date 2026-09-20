@@ -17,7 +17,7 @@ to see whether the online filter re-adapts and flags the break;
 natural frequency, jointly and then per channel for contrast.
 
 The SciPy and sklearn baselines are imported lazily in
-:mod:`...common.baselines`, and the ``with_scipy`` / ``with_mlp`` flags let the
+:mod:`dtfit_experimental.study.baselines`, and the ``with_scipy`` / ``with_mlp`` flags let the
 notebook drop a row whose dependency is missing.
 """
 
@@ -29,8 +29,8 @@ import dtfit as dt
 from dtfit_experimental import fit_joint
 from dtfit.streaming import ImageFilter
 
-from dtfit_experimental.experiments.common import metrics, timed
-from dtfit_experimental.experiments.common import baselines as bl
+from dtfit_experimental.study.metrics import metrics, timed
+from dtfit_experimental.study import baselines as bl
 
 __all__ = [
     "DAMP_EXPR", "FO_EXPR",

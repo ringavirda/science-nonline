@@ -25,7 +25,7 @@ import numpy as np
 from scipy.optimize import curve_fit
 
 
-from dtfit_experimental.experiments.common import baselines as bl
+from dtfit_experimental.study import baselines as bl
 
 __all__ = [
     "CONFIGS", "MCUS",

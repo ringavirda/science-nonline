@@ -9,7 +9,7 @@ textbook baseline.
 import numpy as np
 import pytest
 
-from dtfit_experimental.experiments.common.classical_stochastic import (
+from dtfit_experimental.study.classical_stochastic import (
     ols_ar1,
     garch_mle_persistence,
     classical_decompose,
@@ -19,8 +19,8 @@ from dtfit_experimental.experiments.domains.stochastic_series.backend import (
     gen_ar1, gen_arfima, gen_garch, gen_ar2_cycle, gen_trend_cycle,
     exp_model_comparison, exp_garch, exp_decompose, exp_merged_router,
 )
-from dtfit_experimental.experiments.common.metrics import metrics
-from dtfit_experimental.experiments.common.baselines import random_walk_forecast
+from dtfit_experimental.study.metrics import metrics
+from dtfit_experimental.study.baselines import random_walk_forecast
 
 
 # the individual classical estimators

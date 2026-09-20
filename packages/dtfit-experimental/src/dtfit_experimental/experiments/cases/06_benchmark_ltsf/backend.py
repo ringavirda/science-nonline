@@ -9,7 +9,7 @@ splits, train-fit z-score normalization, lookback-to-horizon windows and
 MSE/MAE on the normalized values. Those papers' published MSE numbers are
 transcribed rather than re-run, since a re-implementation of someone else's
 model is a worse comparison than the number they stand behind. The data comes
-through the shared :mod:`...common.datasets` loader, which reproduces the
+through the shared :mod:`dtfit_experimental.study.datasets` loader, which reproduces the
 Informer/Autoformer pipeline all three papers use.
 
 :func:`series_extrapolate` holds three fit-then-extrapolate forecasters, each
@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from dtfit_experimental.experiments.common import datasets as ds
+from dtfit_experimental.study import datasets as ds
 
 __all__ = [
     "PUBLISHED_MSE", "HORIZONS", "LOOKBACK", "DAMP", "SEASONAL_FRAC",

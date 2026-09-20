@@ -30,7 +30,7 @@ import numpy as np
 
 from dtfit.image import Image, ImageStream, Original
 
-from dtfit_experimental.experiments.domains.common import peak_memory
+from dtfit_experimental.study.cost import peak_memory
 
 from . import isd_reduce, ngl_reduce
 from .isd_reduce import DAY_POSITIONS, DIURNAL_ORDER

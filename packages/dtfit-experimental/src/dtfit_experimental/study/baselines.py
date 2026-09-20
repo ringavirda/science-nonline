@@ -252,13 +252,6 @@ def lstm_forecast(train, horizon, *, lookback=24, epochs=200, seed=0):
                                epochs=epochs, seed=seed)
 
 
-def torch_mlp_forecast(train, horizon, *, lookback=24, epochs=300, seed=0):
-    if not HAVE_TORCH:
-        raise RuntimeError("torch not available")
-    return _torch_seq_forecast(train, horizon, lookback=lookback, kind="mlp",
-                               epochs=epochs, seed=seed)
-
-
 # the constant-acceleration Kalman filter: trajectory tracking's gold standard
 class KalmanCA:
     """Per-axis constant-acceleration Kalman filter (position measurements).

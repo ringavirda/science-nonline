@@ -27,8 +27,8 @@ import numpy as np
 
 from dtfit.streaming import ImageFilter
 
-from dtfit_experimental.experiments.common import baselines as bl
-from dtfit_experimental.experiments.domains.common import embedded_footprint
+from dtfit_experimental.study import baselines as bl
+from dtfit_experimental.study.cost import embedded_footprint
 
 __all__ = [
     "DURATION", "MANEUVERS", "ONSETS", "GPS_SIGMA", "GYRO_SIGMA", "IMU_GYRO_SIGMA",

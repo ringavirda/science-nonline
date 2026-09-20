@@ -28,8 +28,8 @@ import dtfit as dt
 from dtfit import fit_many
 from dtfit.image import FittingProblem
 
-from dtfit_experimental.experiments.common import metrics
-from dtfit_experimental.experiments.common import baselines as bl
+from dtfit_experimental.study.metrics import metrics
+from dtfit_experimental.study import baselines as bl
 
 __all__ = [
     "FAMILIES",

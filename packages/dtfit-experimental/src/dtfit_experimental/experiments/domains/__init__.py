@@ -38,7 +38,7 @@ USB/BLE host link, phone app) and depends on this package's ``realtime_gps``.
 
 Open a notebook directly (``jupyter lab forecasting/forecasting.ipynb``) or run
 it headless through ``jupyter nbconvert --execute``; ``DOMAINS.md`` indexes
-them. The backends share ``experiments/common`` (metrics, baselines, datasets,
-plotting) with the case experiments, and that shared floor keeps the two
-consistent.
+them. The backends share ``dtfit_experimental.study`` (metrics, baselines,
+datasets, plotting) with the case experiments, and that shared floor keeps the
+two consistent.
 """

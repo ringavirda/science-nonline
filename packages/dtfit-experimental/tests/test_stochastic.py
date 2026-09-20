@@ -22,6 +22,7 @@ from dtfit.stochastic import (
     StochasticModel,
 )
 from dtfit_experimental.experiments.domains.stochastic_series import backend as B
+from dtfit_experimental.study.paths import data_dir
 
 
 def _mean(fn, seeds):
@@ -362,7 +363,7 @@ def test_filter_experiment_is_viable():
 # real economic data (USD/UAH, bundled CSV)
 # experiments/data is gitignored; the CSV is simply absent in CI.
 needs_usd_uah = pytest.mark.skipif(
-    not (B.EXPERIMENTS_DIR / "data" / "usd_uah_2014_2015.csv").exists(),
+    not (data_dir() / "usd_uah_2014_2015.csv").exists(),
     reason="bundled USD/UAH CSV not available (experiments/data is gitignored)",
 )
 

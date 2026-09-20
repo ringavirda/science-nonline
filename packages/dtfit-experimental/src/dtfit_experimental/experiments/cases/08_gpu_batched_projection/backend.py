@@ -35,7 +35,7 @@ from dtfit._core._spectral import make_basis
 from dtfit_experimental import available_backends, resolve_backend
 from dtfit_legacy.scale import project_spectra
 
-from dtfit_experimental.experiments.common import fmt
+from dtfit_experimental.study.metrics import fmt
 
 __all__ = [
     "ORDER",

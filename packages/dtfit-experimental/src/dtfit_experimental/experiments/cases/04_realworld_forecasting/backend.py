@@ -27,8 +27,9 @@ import numpy as np
 import dtfit as dt
 from dtfit_experimental import fit_lsi_basis, boosted_fit
 
-from dtfit_experimental.experiments.common import EXPERIMENTS_DIR, metrics
-from dtfit_experimental.experiments.common import baselines as bl
+from dtfit_experimental.study.metrics import metrics
+from dtfit_experimental.study import baselines as bl
+from dtfit_experimental.study.paths import data_dir
 
 __all__ = [
     "load_covid", "load_uah", "load_sunspots", "load_co2",
@@ -40,7 +41,7 @@ __all__ = [
 # Loaders: each returns one 1-D series.
 def load_covid():
     import csv
-    p = EXPERIMENTS_DIR / "data" / "covid_ukraine_confirmed.csv"
+    p = data_dir() / "covid_ukraine_confirmed.csv"
     rows = list(csv.reader(p.open()))[1:]
     cum = np.array([float(r[1]) for r in rows])
     start = next(i for i, v in enumerate(cum) if v >= 500)
@@ -49,7 +50,7 @@ def load_covid():
 
 def load_uah():
     import csv
-    p = EXPERIMENTS_DIR / "data" / "usd_uah_2014_2015.csv"
+    p = data_dir() / "usd_uah_2014_2015.csv"
     rows = list(csv.reader(p.open()))[1:]
     return np.array([float(r[1]) for r in rows])
 

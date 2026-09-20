@@ -39,12 +39,13 @@ from dtfit.streaming import ImageFilter
 
 from dtfit_experimental.streaming import FilterBank
 
-from dtfit_experimental.experiments.common import EXPERIMENTS_DIR, metrics
-from dtfit_experimental.experiments.common import baselines as bl
-from dtfit_experimental.experiments.common.baselines import (
+from dtfit_experimental.study.metrics import metrics
+from dtfit_experimental.study import baselines as bl
+from dtfit_experimental.study.baselines import (
     KalmanCA, EKFParam, RLSPredictor,
 )
-from dtfit_experimental.experiments.domains.common import embedded_footprint
+from dtfit_experimental.study.cost import embedded_footprint
+from dtfit_experimental.study.paths import data_dir
 
 __all__ = [
     "OSC", "PLANTS", "MCUS", "FILTER_REASON",
@@ -595,7 +596,7 @@ def footprint_rows(lat, *, n=3, W=60):
 def load_fx(limit=220):
     """Load the daily USD/UAH 2014-15 crisis rate, normalised as
     ``rate/rate[0]``. Returns ``(t, y)``."""
-    path = EXPERIMENTS_DIR / "data" / "usd_uah_2014_2015.csv"
+    path = data_dir() / "usd_uah_2014_2015.csv"
     rows = list(csv.reader(path.open()))[1:]
     rate = np.array([float(r[1]) for r in rows])[:limit]
     y = rate / rate[0]

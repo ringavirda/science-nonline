@@ -52,11 +52,11 @@ import numpy as np
 import dtfit as dt
 from dtfit_experimental import boosted_fit, fit_lsi_basis
 
-from dtfit_experimental.experiments.common import metrics
-from dtfit_experimental.experiments.common import baselines as bl
-from dtfit_experimental.experiments.common import datasets as ltsf
-from dtfit_experimental.experiments.common import EXPERIMENTS_DIR
-from dtfit_experimental.experiments.domains.common import dominant_period
+from dtfit_experimental.study.metrics import metrics
+from dtfit_experimental.study import baselines as bl
+from dtfit_experimental.study import datasets as ltsf
+from dtfit_experimental.study.paths import data_dir
+from dtfit._signal import dominant_period
 
 __all__ = [
     "SERIES", "N_HARMONICS", "SINUSOIDAL_KINDS", "OSC_KINDS", "LOCAL_FIT_KINDS",
@@ -78,7 +78,7 @@ __all__ = [
 # the real-data loaders, each returning a 1-D series
 def _csv(name, col=1, start_row=1):
     import csv
-    rows = list(csv.reader((EXPERIMENTS_DIR / "data" / name).open()))[start_row:]
+    rows = list(csv.reader((data_dir() / name).open()))[start_row:]
     return np.array([float(r[col]) for r in rows])
 
 

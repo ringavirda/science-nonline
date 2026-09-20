@@ -54,11 +54,12 @@ from dtfit.stochastic import (
     fit_ar,
     fractional_difference,
 )
-from dtfit_experimental.experiments.common import EXPERIMENTS_DIR, metrics
-from dtfit_experimental.experiments.common import baselines as bl
-from dtfit_experimental.experiments.common.classical_stochastic import (
+from dtfit_experimental.study.metrics import metrics
+from dtfit_experimental.study import baselines as bl
+from dtfit_experimental.study.classical_stochastic import (
     fit_classical_stochastic, garch_mle_persistence, classical_decompose,
 )
+from dtfit_experimental.study.paths import data_dir
 
 __all__ = [
     "gen_arfima", "gen_ar1", "gen_garch", "gen_ar2_cycle", "gen_trend_cycle",
@@ -563,7 +564,7 @@ def load_series(name: str, col: int = 1) -> np.ndarray:
     """Load one column from a bundled real-data CSV (``experiments/data``)."""
     import csv
 
-    rows = list(csv.reader((EXPERIMENTS_DIR / "data" / name).open()))[1:]
+    rows = list(csv.reader((data_dir() / name).open()))[1:]
     return np.array([float(r[col]) for r in rows if r and r[col] not in ("", "NA")])
 
 

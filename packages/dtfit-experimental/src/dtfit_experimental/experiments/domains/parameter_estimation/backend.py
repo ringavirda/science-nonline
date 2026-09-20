@@ -16,7 +16,7 @@ standard, where a black-box learner recovers none. What it provides:
 * the established baselines :func:`est_nlls` (SciPy ``curve_fit``) and
   :func:`est_robust_nlls` (soft-L1 ``least_squares``), and the no-parameter
   learners :func:`mlp_curve` and :func:`gp_curve`, re-exported from
-  ``experiments.common.baselines``;
+  ``dtfit_experimental.study.baselines``;
 * the scoring and sweep helpers :func:`param_err`, :func:`safe` and a
   re-exported :func:`metrics`, the sweep drivers :func:`noise_sweep`,
   :func:`outlier_sweep` and :func:`learner_curve_fit`, the special-regime
@@ -36,12 +36,13 @@ import numpy as np
 import dtfit as dt
 from dtfit_experimental import fit_joint
 
-from dtfit_experimental.experiments.common import EXPERIMENTS_DIR, metrics
-from dtfit_experimental.experiments.common import baselines as bl
-from dtfit_experimental.experiments.common.baselines import (
+from dtfit_experimental.study.metrics import metrics
+from dtfit_experimental.study import baselines as bl
+from dtfit_experimental.study.baselines import (
     mlp_curve, gp_curve,
     prony_fit, matrix_pencil_fit, varpro_fit, moment_match_fit,
 )
+from dtfit_experimental.study.paths import data_dir
 
 __all__ = [
     "MODELS", "FAMILY_REASON",
@@ -583,7 +584,7 @@ def subspace_rate_recovery(rng, *, n=400, noise=0.03):
 def load_data(name, col=1):
     """Load one column of a bundled CSV under ``experiments/data``."""
     import csv
-    rows = list(csv.reader((EXPERIMENTS_DIR / "data" / name).open()))[1:]
+    rows = list(csv.reader((data_dir() / name).open()))[1:]
     return np.array([float(r[col]) for r in rows])
 
 
@@ -598,7 +599,7 @@ def load_puromycin():
     curves of D1/D2 only exercise the exponential form. Returns
     ``(conc, velocity)`` as float arrays, from a ``conc,velocity`` header."""
     import csv
-    rows = list(csv.reader((EXPERIMENTS_DIR / "data" / "puromycin.csv").open()))[1:]
+    rows = list(csv.reader((data_dir() / "puromycin.csv").open()))[1:]
     conc = np.array([float(r[0]) for r in rows])
     velocity = np.array([float(r[1]) for r in rows])
     return conc, velocity

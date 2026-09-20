@@ -16,7 +16,7 @@ parameters, exponential or transcendental.
 The LTSF benchmark sets follow, for the long-horizon forecasting comparison
 against the published baselines.
 
-Run:  python -m dtfit_experimental.experiments.download_data
+Run:  python -m dtfit_experimental.study.download_data
 The two series land in experiments/data/ as plain CSV (date,value); the LTSF
 sets keep their published layout under experiments/data/ltsf/.
 """
@@ -30,7 +30,9 @@ import urllib.request
 from datetime import datetime
 from pathlib import Path
 
-DATA_DIR = Path(__file__).resolve().parent / "data"
+from .paths import data_dir
+
+DATA_DIR = data_dir()
 
 NBU_URL = (
     "https://bank.gov.ua/NBU_Exchange/exchange_site"
