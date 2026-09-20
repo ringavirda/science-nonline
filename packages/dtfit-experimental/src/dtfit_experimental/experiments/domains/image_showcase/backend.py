@@ -3,14 +3,17 @@ paper scripts import.
 
 ``image_showcase.ipynb`` does ``from ... import backend as B`` and reads
 the CSV files in ``results/``; the modules behind this one hold the
-implementation (``ngl``, ``ngl_reduce``, ``ngl_fits``, ``isd``,
-``isd_reduce``, ``isd_fits``, ``filters``, ``throughput``, ``stream``,
-``store``, ``compare``, ``paths``).
+implementation (``ngl_reduce``, ``ngl_fits``, ``isd_reduce``,
+``isd_fits``, ``filters``, ``throughput``, ``stream``, ``store``,
+``compare``, ``paths``); the ``ngl`` and ``isd`` readers come from
+``dtfit_experimental.study``.
 """
 
 from __future__ import annotations
 
-from dtfit_experimental.study import isd, ngl  # noqa: F401  (re-exported for the notebook)
+from dtfit_experimental.study import (  # noqa: F401  (re-exported)
+    isd, ngl,
+)
 
 from . import (  # noqa: F401  (re-exported for the notebook)
     compare, filters, isd_fits, isd_reduce, ngl_fits,

@@ -27,12 +27,14 @@ HEADER = (
 )
 
 
-
 @pytest.fixture(autouse=True)
-def _no_archive_from_the_shell(monkeypatch):
-    """``SHOWCASE_ISD`` outranks ``SHOWCASE_DATA``; left set in the shell it
-    sends every ISD command here to the real archive."""
+def _no_archive_from_the_machine(monkeypatch, tmp_path):
+    """Keeps every command here off a real archive: ``SHOWCASE_ISD`` set in
+    the shell outranks ``SHOWCASE_DATA``, and the default root
+    ``~/data/showcase`` may hold a real copy."""
     monkeypatch.delenv("SHOWCASE_ISD", raising=False)
+    monkeypatch.setenv("SHOWCASE_DATA", str(tmp_path / "no-archive"))
+
 
 def make_dataset(root, n_stations=2, n=900, seed=5):
     """``<root>/ngl/tenv3/*.tenv3`` plus a steps file and a MIDAS table,

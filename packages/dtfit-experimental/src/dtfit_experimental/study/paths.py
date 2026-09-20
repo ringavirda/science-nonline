@@ -44,25 +44,57 @@ DEFAULT_SHOWCASE = "~/data/showcase"
 
 
 def showcase_root() -> Path:
-    """The showcase archive root from ``$SHOWCASE_DATA`` (default
-    ``~/data/showcase``); not created here."""
+    """Root of the showcase archives.
+
+    Returns:
+        ``$SHOWCASE_DATA`` when set, else ``~/data/showcase``, with ``~``
+        expanded. The directory is neither created nor required to exist.
+    """
     return Path(os.environ.get("SHOWCASE_DATA", DEFAULT_SHOWCASE)).expanduser()
 
 
 def ngl_dir(root: Path | None = None) -> Path:
-    """The NGL copy ``<root>/ngl``: ``tenv3/``, ``steps.txt``,
-    ``midas.IGS20.txt``, ``DataHoldings.txt``."""
+    """Directory of the NGL copy: ``tenv3/``, ``steps.txt``,
+    ``midas.IGS20.txt``, ``DataHoldings.txt``.
+
+    Args:
+        root: Archive root used instead of :func:`showcase_root`; ``None``
+            reads ``$SHOWCASE_DATA`` (default ``~/data/showcase``).
+
+    Returns:
+        ``<root>/ngl``; not required to exist.
+    """
     return (showcase_root() if root is None else Path(root)) / "ngl"
 
 
 def isd_dir(year: int | None = None) -> Path:
-    """The NOAA copy from ``$SHOWCASE_ISD``, or ``<showcase_root()>/isd``; with
-    ``year``, that year's directory of one CSV per station."""
+    """Directory of the NOAA Global Hourly copy.
+
+    ``$SHOWCASE_ISD`` outranks ``$SHOWCASE_DATA``: when it is set the copy
+    is read from there whatever the archive root is.
+
+    Args:
+        year: Calendar year of the wanted subdirectory, one CSV per
+            station; ``None`` for the directory holding the years.
+
+    Returns:
+        ``$SHOWCASE_ISD`` when set (``~`` expanded), else
+        ``<showcase_root()>/isd``, with ``/<year>`` appended when ``year``
+        is given; not required to exist.
+    """
     env = os.environ.get("SHOWCASE_ISD")
     base = Path(env).expanduser() if env else showcase_root() / "isd"
     return base if year is None else base / str(year)
 
 
 def normals_dir(root: Path | None = None) -> Path:
-    """Where the reduced NOAA hourly normals are stored."""
+    """Directory of the reduced NOAA hourly normals.
+
+    Args:
+        root: Archive root used instead of :func:`showcase_root`; ``None``
+            reads ``$SHOWCASE_DATA`` (default ``~/data/showcase``).
+
+    Returns:
+        ``<root>/normals``; not required to exist.
+    """
     return (showcase_root() if root is None else Path(root)) / "normals"

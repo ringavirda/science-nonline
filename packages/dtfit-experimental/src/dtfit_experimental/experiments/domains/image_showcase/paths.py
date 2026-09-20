@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dtfit_experimental.study.paths import isd_dir, normals_dir, ngl_dir
+from dtfit_experimental.study.paths import isd_dir, ngl_dir, normals_dir
 from dtfit_experimental.study.paths import showcase_root as data_root
 
 __all__ = [
