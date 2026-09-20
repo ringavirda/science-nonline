@@ -14,8 +14,12 @@ windows only:
   find the epochs in the residual of a fine window image and re-cut the
   windows onto them, leaving the windows that hold an epoch out of the fit.
 
-They are experimental: measured on synthetic series, on NGL GPS records and
-on NOAA hourly temperature, not promoted into ``dtfit``.
+They are in trial, not promoted into ``dtfit``.
+
+An image in this basis is a batch-fit object only: ``Image.from_dict``
+resolves basis names against core's ``_BASES`` and rejects ``edge_block``,
+and ``Image.transfer`` and ``Image.truncate`` refuse it as well (a
+``ValueError`` in all three cases, never a silently different basis).
 """
 
 from __future__ import annotations
@@ -28,10 +32,23 @@ import numpy as np
 import dtfit
 from dtfit._input import normalize_bounds, normalize_p0, resolve_model
 from dtfit.image import Grid, Image, Original
-from dtfit.image.bases import Basis, BlockBasis, u_of
+from dtfit.image.bases import Basis, u_of
 from dtfit.types import FittingResult
 
 _END_TOL = 1e-12
+
+
+def _interval_index(edges: np.ndarray, v: np.ndarray) -> np.ndarray:
+    """Interval of each value under the half-open rule, clamped to the ends.
+
+    ``edges`` is strictly increasing; the returned index is in
+    ``[0, edges.size - 2]``. The single rule every window assignment in this
+    module goes through, so a sample's window in the basis and its window in
+    a fine-image accumulation can never disagree.
+    """
+    return np.clip(
+        np.searchsorted(edges, v, side="right") - 1, 0, edges.size - 2
+    )
 
 
 class EdgeBlockBasis(Basis):
@@ -41,6 +58,13 @@ class EdgeBlockBasis(Basis):
     dropped: the windows are given by their edges and any of them may be
     left out of the basis. ``order`` and ``n_coef`` are the number of kept
     windows.
+
+    On equal edges it evaluates exactly as
+    :class:`~dtfit.image.bases.BlockBasis` away from the interior edges. On
+    a ``u`` that sits exactly on an interior edge the two can differ: this
+    class follows the half-open rule to the bit (the window on the right),
+    while ``BlockBasis``'s ``floor((u + 1) / 2 * K)`` can land either side
+    of the integer. Clamping outside ``[-1, 1]`` and at ``+1`` is identical.
 
     Args:
         edges: Edges on the unit variable ``u``, strictly increasing, of
@@ -102,11 +126,7 @@ class EdgeBlockBasis(Basis):
         not kept gives an all-zero row.
         """
         u = np.asarray(u, dtype=float).ravel()
-        idx = np.clip(
-            np.searchsorted(self.edges, u, side="right") - 1,
-            0,
-            self.keep.size - 1,
-        )
+        idx = _interval_index(self.edges, u)
         col = np.cumsum(self.keep) - 1
         col = np.where(self.keep, col, -1)[idx]
         phi = np.zeros((u.size, self.order))
@@ -191,7 +211,6 @@ def aggregated_image(
     counts: Any,
     *,
     x: Any = None,
-    domain: tuple[float, float] | None = None,
 ) -> Image:
     """The block image of data known only as one total per window.
 
@@ -200,36 +219,49 @@ def aggregated_image(
     ``totals / counts``. The image is the exact sufficient statistic of
     those totals in the window basis, which is what makes the fit on it the
     equal-areas least squares rather than the biased reading of the model at
-    the window centres.
+    the window centres. The image's domain is ``(edges[0], edges[-1])``.
+
+    For a continuously integrating sensor, where a window mean is an
+    integral and no sample count exists, the caller chooses the number of
+    quadrature nodes per window as ``counts`` (proportional to the window
+    length) and passes ``totals = means * counts``.
 
     Args:
         edges: Window edges in data units, strictly increasing, length
             ``K + 1``.
-        totals: Sum of the samples per window, length ``K``.
-        counts: Number of samples per window, length ``K``, non-negative.
-            Windows with a zero count carry no data and are left out of the
-            basis.
+        totals: Sum of the samples per window, length ``K``, finite in every
+            window with a positive count. The total of a zero-count window
+            is ignored, including a ``nan`` standing for a missing window.
+        counts: Number of samples per window, length ``K``, non-negative
+            integers (integral floats accepted, to 1e-9). Windows with a
+            zero count carry no data and are left out of the basis.
         x: The sample positions, when they are known; every position must
             fall in a window with a positive count and the number of
             positions per window must equal ``counts``. They are sorted
             here. ``None`` places ``counts[k]`` positions at the midpoints
             of equal sub-intervals of window ``k``, the midpoint quadrature
             of the window mean with as many nodes as there were samples.
-        domain: ``(x0, x1)`` of the image; ``None`` takes
-            ``(edges[0], edges[-1])``.
+            That grid is not the true positions unless the samples are
+            those midpoints: the fitted parameters differ from the fit on
+            the true positions at second order in the sub-interval width,
+            about 1 percent at 20 samples per window.
 
     Returns:
         An :class:`~dtfit.image.Image` in an :class:`EdgeBlockBasis` over
         the windows with a positive count, with ``S`` the kept totals, ``G``
         the diagonal matrix of the kept counts, ``n`` the total sample count
         and ``sumsq`` the sum of ``totals**2 / counts`` over the kept
-        windows, the scatter inside a window not being observed.
+        windows, the scatter inside a window not being observed. ``sumy``
+        is the sum of the kept totals, so ``tss`` is the between-window sum
+        of squares.
 
     Raises:
         ValueError: fewer than two edges, edges not strictly increasing;
-            ``totals`` or ``counts`` of the wrong length; a negative count;
-            every count zero; ``x`` of a length other than ``counts.sum()``,
-            a position outside the domain or in a zero-count window, or a
+            ``totals`` or ``counts`` of the wrong length; a negative or
+            non-integer count (the message names the first such window); a
+            non-finite total in a window with a positive count; every count
+            zero; ``x`` of a length other than ``counts.sum()``, a position
+            outside the span of ``edges`` or in a zero-count window, or a
             per-window position count differing from ``counts``.
     """
     e = np.asarray(edges, dtype=float).ravel()
@@ -245,16 +277,27 @@ def aggregated_image(
             f"totals and counts need one entry per window ({n_win}), got "
             f"{t.size} and {c.size}"
         )
-    if np.any(c < 0.0):
-        raise ValueError("counts must be non-negative")
+    bad = np.flatnonzero(~(c >= 0.0) | (np.abs(c - np.rint(c)) > 1e-9))
+    if bad.size:
+        k = int(bad[0])
+        raise ValueError(
+            "counts must be non-negative integers; window "
+            f"{k} has {float(c[k])!r}"
+        )
+    c = np.rint(c)
     keep = c > 0.0
     if not keep.any():
         raise ValueError("every window is empty: no data to image")
-    dom = (
-        (float(e[0]), float(e[-1])) if domain is None
-        else (float(domain[0]), float(domain[1]))
-    )
-    n = int(round(float(c.sum())))
+    if not np.all(np.isfinite(t[keep])):
+        k = int(np.flatnonzero(keep)[
+            int(np.argmax(~np.isfinite(t[keep])))
+        ])
+        raise ValueError(
+            f"totals must be finite where the count is positive; window "
+            f"{k} has {float(t[k])!r}"
+        )
+    dom = (float(e[0]), float(e[-1]))
+    n = int(c.sum())
     if x is None:
         pos = _midpoint_grid(e, c)
     else:
@@ -267,10 +310,9 @@ def aggregated_image(
             raise ValueError(
                 f"every position must lie in [{e[0]!r}, {e[-1]!r}]"
             )
-        idx = np.clip(
-            np.searchsorted(e, pos, side="right") - 1, 0, n_win - 1
-        )
-        per_window = np.bincount(idx, minlength=n_win).astype(float)
+        per_window = np.bincount(
+            _interval_index(e, pos), minlength=n_win
+        ).astype(float)
         if not np.array_equal(per_window, c):
             raise ValueError(
                 "the positions per window do not match counts: got "
@@ -284,7 +326,7 @@ def aggregated_image(
         np.diag(c[keep]),
         n,
         float(np.sum(t[keep] ** 2 / c[keep])),
-        float(t.sum()),
+        float(t[keep].sum()),
         float(n),
         Grid.of(pos),
     )
@@ -307,7 +349,6 @@ def fit_aggregated(
     counts: Any,
     *,
     x: Any = None,
-    domain: tuple[float, float] | None = None,
     **fit_kwargs: Any,
 ) -> FittingResult:
     """Fit ``model`` to data known only as one total per window.
@@ -316,14 +357,16 @@ def fit_aggregated(
     sums of the model on the sample grid are matched to the window sums of
     the data.
 
-    The covariance is on the scale of the window totals, not of the samples
-    the caller never saw. With ``absolute_sigma`` unset or false the
-    covariance :func:`dtfit.fit` returns is scaled by ``rss / (n - p)`` with
-    ``n`` the sample count; here only ``K`` window observations enter the
-    fit, so it is multiplied by ``(n - p) / (K - p)``, ``K`` the number of
-    windows with a positive count and ``p`` the number of parameters. With
-    ``absolute_sigma=True`` it is returned unchanged. ``cov`` is ``None``
-    when ``K <= p``.
+    The result is on the window scale, not on that of the samples the
+    caller never saw. ``rss`` is the weighted window-sum residual sum of
+    squares, and ``n_obs`` is replaced by ``K``, the number of windows with
+    a positive count, so ``aic`` and ``bic`` are formed with the count that
+    matches ``rss``. With ``absolute_sigma`` unset or false the covariance
+    :func:`dtfit.fit` returns is scaled by ``rss / (n - p)`` with ``n`` the
+    sample count, so it is multiplied here by ``(n - p) / (K - p)``, ``p``
+    the number of parameters; with ``absolute_sigma=True`` it is returned
+    unchanged. ``cov`` is ``None`` when ``K == p``; ``K < p`` raises out of
+    :func:`dtfit.fit`.
 
     Args:
         model: A SymPy expression string, a ``sympy.Expr`` or a callable
@@ -332,26 +375,29 @@ def fit_aggregated(
         totals: Sum of the samples per window, length ``K``.
         counts: Number of samples per window, length ``K``.
         x: Sample positions when known; see :func:`aggregated_image`.
-        domain: ``(x0, x1)``; ``None`` takes ``(edges[0], edges[-1])``.
         **fit_kwargs: Passed to :func:`dtfit.fit` (``p0``, ``bounds``,
             ``var``, ``param_names``, ``absolute_sigma``, ...).
 
     Returns:
         The :class:`~dtfit.types.FittingResult` of the fit, with ``cov``
-        rescaled to the window-level degrees of freedom; ``stderr`` and the
-        prediction bands follow from it.
+        rescaled and ``n_obs`` on the window scale; ``stderr``, the
+        prediction bands, ``aic`` and ``bic`` follow from them.
 
     Raises:
-        ValueError: from :func:`aggregated_image` or :func:`dtfit.fit`.
+        ValueError: from :func:`aggregated_image` or :func:`dtfit.fit`,
+            which rejects an image with fewer coefficients than the model
+            has parameters.
+        TypeError: ``sigma``, ``robust`` or ``basis="auto"`` in
+            ``fit_kwargs``; :func:`dtfit.fit` takes none of them with an
+            image.
     """
-    image = aggregated_image(
-        edges, totals, counts, x=x, domain=domain
-    )
+    image = aggregated_image(edges, totals, counts, x=x)
     result = dtfit.fit(model, image, **fit_kwargs)
-    if fit_kwargs.get("absolute_sigma", False) or result.cov is None:
-        return result
     p = len(result.names) or result.coeffs.size
     k_kept = image.n_coef
+    result.n_obs = k_kept
+    if fit_kwargs.get("absolute_sigma", False) or result.cov is None:
+        return result
     if k_kept <= p:
         result.cov = None
     else:
@@ -412,7 +458,9 @@ def detect_jumps(
         reads as zero.
 
     Raises:
-        ValueError: the four arrays do not have matching lengths.
+        ValueError: the four arrays do not have matching lengths;
+            ``threshold`` is not above zero, which the suppression loop
+            would never terminate under.
     """
     n = np.asarray(counts, dtype=float).ravel()
     sx = np.asarray(sums_x, dtype=float).ravel()
@@ -424,6 +472,8 @@ def detect_jumps(
             "counts, sums_x and resid_sums must share a length and edges "
             f"must be one longer; got {kf}, {sx.size}, {rs.size}, {e.size}"
         )
+    if not float(threshold) > 0.0:
+        raise ValueError(f"threshold must be > 0, got {threshold}")
     ok = n >= n_min
     good = np.flatnonzero(ok)
     if good.size < 3:
@@ -509,7 +559,15 @@ def coarsen(
     Returns:
         The coarse window index of each fine window, length ``n_fine``;
         ``-1`` for a flagged fine window. The labels are non-decreasing.
+
+    Raises:
+        ValueError: ``n_fine`` or ``n_windows`` below 1.
     """
+    if int(n_fine) < 1 or int(n_windows) < 1:
+        raise ValueError(
+            "n_fine and n_windows must be >= 1, got "
+            f"{n_fine} and {n_windows}"
+        )
     flags = sorted({int(b) for b in flagged})
     lab = np.full(int(n_fine), -1, dtype=int)
     cuts = [-1] + flags + [int(n_fine)]
@@ -559,6 +617,7 @@ def fit_aligned(
     fine: int = 8,
     span: int = 8,
     threshold: float = 5.0,
+    n_min: int = 2,
     self_scale: bool = False,
     clip: float | None = None,
     max_jumps: int | None = None,
@@ -592,6 +651,8 @@ def fit_aligned(
             one fine window, ``span(domain) / (fine * n_windows)``.
         span: Fine windows a side in the detector's local lines, >= 3.
         threshold: Detection level of ``|z|``, > 0.
+        n_min: Fewest samples a fine window must hold to take part in the
+            detection, >= 1; passed to :func:`detect_jumps`.
         self_scale: Scale the detection statistic by its own robust spread
             (see :func:`detect_jumps`); for coloured noise.
         clip: ``None``, or the number of robust sigma (1.4826 MAD) beyond
@@ -631,10 +692,14 @@ def fit_aligned(
     base_bounds = normalize_bounds(bounds, names)
     dom = original.domain
     kf = int(fine) * int(n_windows)
+    fine_edges = np.linspace(dom[0], dom[1], kf + 1)
+    fine_basis = EdgeBlockBasis.on(fine_edges, dom)
     x, y = original.x, original.y
     n_dropped = 0
     if clip is not None:
-        keep_s = _clip_local(x, y, dom, kf, float(clip))
+        keep_s = _clip_local(
+            _interval_index(fine_basis.edges, u_of(x, *dom)), y, float(clip)
+        )
         n_dropped = int(keep_s.size - keep_s.sum())
         x, y = x[keep_s], y[keep_s]
         if x.size < kf:
@@ -642,10 +707,9 @@ def fit_aligned(
                 f"clip={clip} left {x.size} samples, too few for "
                 f"{kf} fine windows"
             )
-    idx = _fine_index(x, dom, kf)
+    idx = _interval_index(fine_basis.edges, u_of(x, *dom))
     counts = np.bincount(idx, minlength=kf).astype(float)
     sums_x = np.bincount(idx, weights=x, minlength=kf)
-    fine_edges = np.linspace(dom[0], dom[1], kf + 1)
 
     def stage(epochs: list[float], flagged: list[int], coarse: bool):
         f = _stepped(model, epochs)
@@ -663,7 +727,7 @@ def fit_aligned(
             sel = lab[idx] >= 0
             data = Original(x[sel], y[sel], domain=dom)
         else:
-            basis = BlockBasis(kf)
+            basis = fine_basis
             data = Original(x, y, domain=dom)
         res = dtfit.fit(
             f, data, basis=basis, p0=guess, bounds=b,
@@ -682,7 +746,8 @@ def fit_aligned(
         resid_sums = np.bincount(idx, weights=r, minlength=kf)
         new = detect_jumps(
             counts, sums_x, resid_sums, fine_edges, span=span,
-            threshold=threshold, exclude=flagged, self_scale=self_scale,
+            threshold=threshold, n_min=n_min, exclude=flagged,
+            self_scale=self_scale,
         )
         if max_jumps is not None:
             new = new[: max(0, int(max_jumps) - len(epochs))]
@@ -726,23 +791,10 @@ def _stepped(
     return f
 
 
-def _fine_index(
-    x: np.ndarray, domain: tuple[float, float], kf: int
-) -> np.ndarray:
-    """Fine window of each position, clamped to the end windows."""
-    u = (x - domain[0]) / (domain[1] - domain[0]) * kf
-    return np.clip(u.astype(int), 0, kf - 1)
-
-
 def _clip_local(
-    x: np.ndarray,
-    y: np.ndarray,
-    domain: tuple[float, float],
-    kf: int,
-    c: float,
+    idx: np.ndarray, y: np.ndarray, c: float
 ) -> np.ndarray:
     """Samples within ``c`` robust sigma of their fine window's median."""
-    idx = _fine_index(x, domain, kf)
     order = np.argsort(idx, kind="stable")
     cuts = np.flatnonzero(np.diff(idx[order])) + 1
     med = np.empty_like(y)
