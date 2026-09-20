@@ -189,6 +189,27 @@ def test_header_spans_read_from_header_not_a_fixed_offset():
     assert d.y[0] == pytest.approx(92.9)
 
 
+# Fails if _span stops raising on a header with no matching line span
+# (for example, a search that falls back to a fixed offset instead).
+def test_parse_raises_on_missing_line_span():
+    with pytest.raises(ValueError, match="no 'Starting Values' line span"):
+        reference._parse("no header lines at all", "X", "b1*x", "lower")
+
+
+# Fails if _parse stops raising when the "Residual Sum of Squares" line is
+# absent (for example, defaulting rss to 0 instead of erroring).
+def test_parse_raises_on_missing_residual_sum_of_squares():
+    text = (
+        "Starting Values   (lines 3 to 3)\n\n\n"
+        "b1  1 2 3 4 5\n"
+        "no rss line here\n"
+        "Data   (lines 6 to 6)\n\n\n\n\n"
+        "1.0 2.0\n"
+    )
+    with pytest.raises(ValueError, match="no 'Residual Sum of Squares' line"):
+        reference._parse(text, "X", "b1*x", "lower")
+
+
 def test_puromycin_returns_twelve_pairs_in_file_order():
     conc, velocity = reference.puromycin()
     assert conc.size == 12

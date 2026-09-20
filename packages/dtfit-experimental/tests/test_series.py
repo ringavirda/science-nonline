@@ -42,3 +42,18 @@ def test_loader_returns_none_when_file_missing(tmp_path, monkeypatch):
     monkeypatch.setattr(S, "data_dir", lambda: tmp_path)
     assert S.load_uah() is None
     assert S.load_covid() is None
+
+
+# Fails if load_ltsf swallows the bad-name lookup instead of letting it
+# propagate as documented.
+def test_load_ltsf_unknown_name_raises_key_error():
+    with pytest.raises(KeyError):
+        S.load_ltsf("not-a-dataset")
+
+
+# Fails if load_covid stops raising StopIteration when the series never
+# crosses 500 (for example, a fixed sentinel index that silently clamps).
+def test_load_covid_never_reaching_500_raises(monkeypatch):
+    monkeypatch.setattr(S, "_csv", lambda name, col=1, start_row=1: np.array([1.0, 2.0, 3.0]))
+    with pytest.raises(StopIteration):
+        S.load_covid()

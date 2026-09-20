@@ -177,7 +177,8 @@ next value, then rolled forward recursively. **Why chosen:** the **modern
 machine-learning** foils. The LSTM in particular represents deep sequence models.
 (Cutting-edge deep forecasters -- DLinear/TimesNet/Time-LLM -- are **not**
 re-implemented; instead the suite compares against their *published* benchmark
-numbers in `experiments/06_benchmark_ltsf`, which is the fair way to cite them.)
+numbers in `experiments/realdata/32_forecasting.ipynb`, which is the fair way
+to cite them.)
 
 ---
 

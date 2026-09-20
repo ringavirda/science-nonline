@@ -55,6 +55,7 @@ def test_fit_kind_chirp_recovers_sweep():
 # whatever bl.lstm_forecast raises on a stand-in module instead of omitting
 # the key.
 def test_baseline_preds_omits_lstm_without_torch(monkeypatch):
+    monkeypatch.setattr(F, "_have_torch", None)
     monkeypatch.setattr(F.notebook, "optional_import", lambda name: None)
     y = np.sin(np.linspace(0, 10, 60))
     out = F.baseline_preds(y, 5, dict(seasonal=False, period=None), quick=False)
@@ -67,12 +68,52 @@ def test_baseline_preds_omits_lstm_without_torch(monkeypatch):
 # Fails when the torch guard is removed: with torch present, LSTM would be
 # skipped even though optional_import returns a module.
 def test_baseline_preds_includes_lstm_with_torch(monkeypatch):
+    monkeypatch.setattr(F, "_have_torch", None)
     monkeypatch.setattr(F.notebook, "optional_import", lambda name: object())
     monkeypatch.setattr(
         F.bl, "lstm_forecast", lambda y_tr, h, lookback, epochs: np.zeros(h))
     y = np.sin(np.linspace(0, 10, 60))
     out = F.baseline_preds(y, 5, dict(seasonal=False, period=None), quick=False)
     assert "LSTM" in out
+
+
+# Fails when the try/except around the LSTM call is removed: a raising
+# lstm_forecast then propagates out of baseline_preds instead of leaving
+# every other baseline in place with LSTM all-NaN.
+def test_baseline_preds_lstm_failure_is_nan_others_survive(monkeypatch):
+    monkeypatch.setattr(F, "_have_torch", None)
+    monkeypatch.setattr(F.notebook, "optional_import", lambda name: object())
+
+    def raising_lstm(y_tr, h, lookback, epochs):
+        raise RuntimeError("training diverged")
+
+    monkeypatch.setattr(F.bl, "lstm_forecast", raising_lstm)
+    y = np.sin(np.linspace(0, 10, 60))
+    out = F.baseline_preds(y, 5, dict(seasonal=False, period=None), quick=False)
+    assert np.all(np.isnan(out["LSTM"]))
+    for key in ("random walk", "drift", "poly extrap", "ETS (Holt-Winters)",
+                "Theta", "ARIMA", "MLP"):
+        assert key in out
+        assert not np.all(np.isnan(out[key]))
+
+
+# Fails when the torch probe is not cached: two calls of baseline_preds with
+# torch reported missing would print the skip line twice instead of once.
+def test_baseline_preds_probes_torch_once(monkeypatch, capsys):
+    monkeypatch.setattr(F, "_have_torch", None)
+    calls = []
+
+    def counting_optional_import(name):
+        calls.append(name)
+        print(f"{name} not installed, skipping")
+        return None
+
+    monkeypatch.setattr(F.notebook, "optional_import", counting_optional_import)
+    y = np.sin(np.linspace(0, 10, 60))
+    F.baseline_preds(y, 5, dict(seasonal=False, period=None), quick=False)
+    F.baseline_preds(y, 5, dict(seasonal=False, period=None), quick=False)
+    assert calls == ["torch"]
+    assert capsys.readouterr().out.count("torch not installed, skipping") == 1
 
 
 # _w0_from finds the daily angular frequency of a 24-sample cycle within 1

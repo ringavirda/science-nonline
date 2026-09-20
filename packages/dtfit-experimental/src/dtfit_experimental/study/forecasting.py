@@ -27,13 +27,18 @@ from dtfit._signal import dominant_period
 from . import baselines as bl
 from . import notebook
 
-# how many harmonics the Fourier-series model carries: enough for the 5th
-# harmonic of the fundamental, which is the AC waveform's content
+#: How many harmonics the Fourier-series model carries: enough for the 5th
+#: harmonic of the fundamental, which is the AC waveform's content.
 N_HARMONICS = 5
-# Model kinds fitted by local optimization from p0, without bounds; every
-# other kind fits by a global differential-evolution search over its bounds.
+#: Model kinds fitted by local optimization from p0, without bounds; every
+#: other kind fits by a global differential-evolution search over its bounds.
 LOCAL_FIT_KINDS = {"fourier_series", "chirp", "linear_wave", "poly_seasonal",
                    "linear_seasonal", "transient_seasonal"}
+
+#: Cached result of the one-time torch probe, so a notebook without torch
+#: prints ``notebook.optional_import``'s skip line once per process instead
+#: of once per series per horizon. ``None`` until the first probe.
+_have_torch: bool | None = None
 
 #: The human-readable disclosure of the fixed-order convention below, which
 #: the notebook renders next to the baseline table.
@@ -42,6 +47,20 @@ FIXED_ORDER_NOTE = (
     "SARIMA (1,1,1)x(1,0,1,period), ETS additive+damped) applied uniformly across "
     "series, NOT a per-series AIC / auto_arima search -- a mild, disclosed "
     "fixed-order handicap on the classical baselines.")
+
+
+def _torch_available() -> bool:
+    """Whether torch is importable, probed at most once per process.
+
+    Returns:
+        ``True`` when ``import torch`` succeeds. The probe itself runs once
+        (caching in :data:`_have_torch`), so its skip line prints at most
+        once even across many :func:`baseline_preds` calls in one notebook.
+    """
+    global _have_torch
+    if _have_torch is None:
+        _have_torch = notebook.optional_import("torch") is not None
+    return _have_torch
 
 
 def _fit_bounds(spec, kind):
@@ -336,8 +355,8 @@ def baseline_preds(y_tr, h, cfg, quick):
         A dict of baseline name to its length-``h`` forecast array. A
         baseline whose optional dependency is missing or whose fit fails is
         either absent (LSTM without torch) or present with every value
-        ``nan`` (ETS, Theta, ARIMA, SARIMA, MLP on failure), so a caller can
-        filter on ``np.isfinite``.
+        ``nan`` (ETS, Theta, ARIMA, SARIMA, MLP, LSTM on failure), so a
+        caller can filter on ``np.isfinite``.
     """
     period = cfg["period"] if cfg["seasonal"] else None
     out = {}
@@ -376,7 +395,10 @@ def baseline_preds(y_tr, h, cfg, quick):
             max_iter=300 if quick else 1000)
     except Exception:
         out["MLP"] = np.full(h, np.nan)
-    if not quick and notebook.optional_import("torch"):
-        out["LSTM"] = bl.lstm_forecast(
-            y_tr, h, lookback=min(36, max(6, y_tr.size // 3)), epochs=120)
+    if not quick and _torch_available():
+        try:
+            out["LSTM"] = bl.lstm_forecast(
+                y_tr, h, lookback=min(36, max(6, y_tr.size // 3)), epochs=120)
+        except Exception:
+            out["LSTM"] = np.full(h, np.nan)
     return out

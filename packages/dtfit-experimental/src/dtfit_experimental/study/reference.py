@@ -151,6 +151,8 @@ def load(name: str) -> NistDataset:
         FileNotFoundError: the corpus has not been downloaded; names the
             expected path. Run
             ``python -m dtfit_experimental.study.download_data`` to fetch it.
+        ValueError: the file is present but malformed: no "Starting Values"
+            or "Data" line span, or no "Residual Sum of Squares" line.
     """
     expr_str, level = _MODELS[name]
     path = data_dir() / "nist" / f"{name}.dat"
