@@ -1,6 +1,5 @@
-"""Validation on well-known trajectories: the literature-standard companion to
-the synthetic-random ``realtime_gps`` study and the real-rig
-``realtime_gps_hw`` study.
+"""Validation on well-known trajectories, independent of the sim's random and
+real-rig GPS studies.
 
 Two kinds of well-known trajectory:
 
@@ -16,16 +15,15 @@ Two kinds of well-known trajectory:
    :func:`load_external` so a real log drops straight in; the EXTERNAL DATASETS
    comment further down names them.
 
-Methods under test, the same family as the sim: dtfit Legendre-cubic, dtfit Legendre
-coordinated-turn (``c0+c1*t+c2*sin(c3*t+c4)``, the nonlinear model a single
-Kalman cannot represent), and dtfit block, the honest negative, area being the
-wrong measurement for oscillatory motion.
+Methods under test, the same family as the sim: dtfit Legendre-cubic, dtfit
+Legendre coordinated-turn (``c0+c1*t+c2*sin(c3*t+c4)``, the nonlinear model a
+single Kalman cannot represent), and dtfit block, the area basis.
 
 The baselines a maneuvering-target practitioner actually deploys, all
 position-only and so on the fair information set: Kalman-CA on a single
 constant-acceleration model, CT-EKF (pos-only), a coordinated-turn EKF that
-estimates the turn-rate from position, and IMM (CV+CT), the gold-standard
-interacting-multiple-model tracker. The last two are absent from
+estimates the turn-rate from position, and IMM (CV+CT), the interacting-
+multiple-model tracker. The last two are absent from
 ``dtfit_experimental.study.baselines``, which carries only the gyro-aided
 ``CTEKFGyro``, so they live here.
 
@@ -33,24 +31,6 @@ Fairness rules, the lesson from the rig harness: dtfit's turn model is not
 handed the generating turn-rate (it estimates ``c3`` online), every tracker
 sees only the noisy position, RMSE is against the true trajectory, and numbers
 are averaged over Monte-Carlo seeds.
-
-The finding, adversarially audited for truth leaks and for handicapping dtfit:
-on these idealized-Gaussian-noise benchmarks the model-matched recursive
-trackers win. IMM, CT-EKF and Kalman-CA beat dtfit on clean smoothing (on the
-CT, IMM 1.02 against dtfit 1.33) and especially on dropout coasting (IMM 4.3
-against dtfit 11.4). That dropout gap is structural: a windowed integral fit
-extrapolates a local polynomial across the blank and diverges, where the
-recursive filters dead-reckon an explicit velocity and turn-rate state. dtfit
-runs its own near-optimal config here, a window/order/q sweep confirming
-window-15 poly-cubic is dtfit's optimum, so the loss is real rather than a
-handicap. dtfit's robust winsorized LSI is a genuine, cheap lever, recovering
-most of the glitch error at roughly zero clean cost, and it is competitive with
-a symmetrically Huber-hardened Kalman without beating one: a tie on the
-coordinated turn (2.01 against 2.02) and a slight loss on the smooth figure-8
-(1.86 against 1.58). So this is the recursive filters' home turf, where they
-are optimal under Gaussian noise with known dynamics. dtfit's measured edge
-lives on real non-Gaussian, drifting GPS: ``realtime_gps_hw`` records dtfit Legendre
-beating the Kalman by about 2x on the actual rig.
 """
 from __future__ import annotations
 
@@ -253,6 +233,26 @@ class IMM2:
 
 
 def imm_track(t, meas, *, sigma=SIGMA, q_acc=8.0):
+    """Run an :class:`IMM2` (CV+CT) over a 2-D position-only measurement
+    stream.
+
+    Missing fixes (a non-finite row of ``meas``) coast: :meth:`IMM2.coast`
+    mixes and predicts both modes with no update, dead-reckoning through the
+    gap.
+
+    Args:
+        t: Sample times, seconds, shape ``(n,)``, evenly spaced.
+        meas: Noisy position, metres, shape ``(n, 3)``; only the first two
+            columns are used. A non-finite row is a missed fix.
+        sigma: Per-axis measurement noise, metres, feeding both CT-EKF modes'
+            measurement variance.
+        q_acc: Process-noise scale covering the centripetal/tangential load,
+            shared by both modes; see :class:`_CT5`.
+
+    Returns:
+        Smoothed 2-D position embedded in 3-D, metres, shape ``(n, 3)``, with
+        the third column left at zero.
+    """
     n = len(t)
     imm = IMM2(t[1] - t[0], sigma=sigma, q_acc=q_acc)
     out = np.zeros((n, 3))

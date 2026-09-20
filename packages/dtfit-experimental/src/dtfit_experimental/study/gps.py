@@ -5,9 +5,10 @@ dropouts and multipath glitches.
 
 * the trajectory and rig generators: :func:`trajectory`, :func:`random_plan`,
   :func:`build_rig`, :func:`build_imu`;
-* the dtfit integral trackers: :func:`dtfit_track` (streaming LSI/block) and the
-  full-IMU strapdown :func:`imu_lsi_track` (external-regressor LSI), with the
-  :class:`FusedCUSUM` maneuver detector;
+* the dtfit integral trackers: :func:`dtfit_track` (the streaming Legendre
+  image and the block image of :class:`dtfit.streaming.ImageFilter`) and the
+  full-IMU strapdown :func:`imu_lsi_track` (external-regressor Legendre image
+  fit), with the :class:`FusedCUSUM` maneuver detector;
 * the established baselines: :func:`kalman_track` (constant-accel Kalman) and
   :func:`ekf_track` (gyro-aided coordinated-turn EKF);
 * the scoring and batch helpers: :func:`rmse3`, :func:`roll_rmse`,
@@ -105,6 +106,20 @@ def controls(t, plan=None):
 
 
 def trajectory(t, plan=None):
+    """Integrate a flight ``plan``'s piecewise-constant controls to a 3-D path.
+
+    Heading integrates the turn-rate, (x, y) integrate speed along the
+    current heading and z integrates the climb-rate, all by trapezoidal
+    quadrature over ``t``.
+
+    Args:
+        t: Sample times, seconds, shape ``(n,)``, increasing.
+        plan: Flight plan, the ``(onset, turn_rate, speed, climb)`` segments
+            :func:`controls` reads; defaults to :data:`MANEUVERS`.
+
+    Returns:
+        Position, metres, shape ``(n, 3)``, starting at ``(2.0, 0.0, 5.0)``.
+    """
     om, v, zd = controls(t, plan)
     psi = _cumtrapz(om, t)
     x = 2.0 + _cumtrapz(v * np.cos(psi), t)
@@ -136,6 +151,16 @@ def random_plan(seed, duration=DURATION):
 
 
 def rmse3(a, b):
+    """3-D position RMSE between two tracks.
+
+    Args:
+        a: Position, metres, shape ``(n, 3)``.
+        b: Position, metres, shape ``(n, 3)``, same length as ``a``.
+
+    Returns:
+        The root-mean-square Euclidean distance between ``a`` and ``b``,
+        metres.
+    """
     return float(np.sqrt(np.mean(np.sum((a - b) ** 2, axis=1))))
 
 
@@ -147,9 +172,19 @@ def build_rig(n, seed=0, *, plan=None, gps_sigma=GPS_SIGMA, gyro_sigma=GYRO_SIGM
     ``plan`` selects the flight plan, defaulting to the hand-built canonical
     ``MANEUVERS``; pass a :func:`random_plan` output for the batch test.
     ``gps_sigma`` and ``gyro_sigma`` set the baseline noise. ``glitch_frac``
-    injects multipath anomalies, a fraction of fixes corrupted by
-    N(0, ``glitch_mag``) spikes, which is how the separate harsh scenario for
-    the robustness test is built."""
+    injects multipath anomalies, a fraction of the fixes after the warm-up
+    window corrupted by N(0, ``glitch_mag``) spikes, which is how the
+    separate harsh scenario for the robustness test is built.
+
+    Returns:
+        ``(t, truth, fixes, gyro, rng)``: ``t`` the sample times (seconds,
+        shape ``(n,)``); ``truth`` the exact position (metres, shape
+        ``(n, 3)``); ``fixes`` the noisy GPS position, ``truth`` plus
+        per-axis N(0, ``gps_sigma``) and any glitches (metres, shape
+        ``(n, 3)``); ``gyro`` the noisy yaw-rate (rad/s, shape ``(n,)``); and
+        ``rng`` the generator seeded from ``seed``, left advanced for a
+        caller that wants more draws from the same stream.
+    """
     rng = np.random.default_rng(seed)
     t = np.linspace(0, DURATION, n)
     truth = trajectory(t, plan)
@@ -294,6 +329,32 @@ def dtfit_track(t, fixes, horizons=(10,), *, kind="lsi", model="poly", robust=Fa
 
 
 def kalman_track(t, fixes, horizons=(10,), *, q=5e-2, adaptive=False):
+    """Constant-acceleration Kalman baseline with rolling h-step forecasts.
+
+    A row of ``fixes`` with any NaN is a missed fix: the filter takes a time
+    update of one sample period with no measurement
+    (:meth:`dtfit_experimental.study.baselines.KalmanCA.coast`), so state and
+    covariance are carried through the gap and the next fix is assimilated
+    from the coasted state.
+
+    Args:
+        t: Sample times, seconds, shape ``(n,)``, evenly spaced.
+        fixes: GPS position, metres, shape ``(n, 3)``; a NaN row marks a
+            missed fix.
+        horizons: Forecast horizons, in samples.
+        q: Process-noise scale of the constant-acceleration model.
+        adaptive: When ``True``, a :class:`FusedCUSUM` on the innovations
+            re-arms the covariance (``inflate(3.0)``, a 3x scale-up) whenever
+            it fires.
+
+    Returns:
+        ``(smoothed, pred, drift_times)`` with the same shapes as
+        :func:`ekf_track`: ``smoothed`` shape ``(n, 3)`` metres; ``pred`` a
+        dict mapping each horizon ``h`` to an ``(n, 3)`` array of metres
+        where ``pred[h][i + h]`` is the h-step forecast made at epoch ``i``
+        (NaN before the first such forecast exists); ``drift_times`` the
+        sorted sample times, seconds, where the detector fired.
+    """
     kf = bl.KalmanCA(dim=3, dt=float(t[1] - t[0]), q=q, r=0.5)
     det = FusedCUSUM(3) if adaptive else None
     n = t.size
@@ -572,6 +633,22 @@ def imu_lsi_track(t, fixes, gyro, accel, R0, horizons=(10,), *, window=28,
 
 
 def roll_rmse(pred_h, truth, mask=None):
+    """RMSE of one horizon's rolling forecast against truth.
+
+    Only samples with a defined forecast, past :data:`WARMUP` and, if given,
+    inside ``mask``, are scored.
+
+    Args:
+        pred_h: One horizon's forecast, metres, shape ``(n, 3)``, as
+            ``pred[h]`` from :func:`dtfit_track`, :func:`kalman_track` or
+            :func:`ekf_track`; NaN rows (no forecast yet) are excluded.
+        truth: True position, metres, shape ``(n, 3)``.
+        mask: Optional boolean array, shape ``(n,)``, further restricting the
+            scored samples.
+
+    Returns:
+        The RMSE (metres) over the scored samples, or NaN if none remain.
+    """
     m = ~np.isnan(pred_h[:, 0])
     m[:WARMUP] = False
     if mask is not None:
@@ -580,6 +657,24 @@ def roll_rmse(pred_h, truth, mask=None):
 
 
 def match_onsets(flags):
+    """Score a detector's flag times against the true maneuver onsets.
+
+    An onset in :data:`ONSETS` counts as caught if some flag falls in its
+    ``[onset - 0.3, onset + 1.5]`` window (seconds); a flag outside every
+    onset's window counts as a false alarm.
+
+    Args:
+        flags: Detector flag times, seconds, such as the ``drift_times``
+            returned by :func:`dtfit_track`, :func:`kalman_track` or
+            :func:`ekf_track`.
+
+    Returns:
+        ``(caught, false_alarms, median_latency)``: ``caught`` the count of
+        onsets with a matching flag; ``false_alarms`` the count of flags
+        matching no onset; ``median_latency`` the median, over caught
+        onsets, of (earliest matching flag - onset) in seconds, or NaN if no
+        onset was caught.
+    """
     caught = sum(any(o - 0.3 <= f <= o + 1.5 for f in flags) for o in ONSETS)
     fa = sum(not any(o - 0.3 <= f <= o + 1.5 for o in ONSETS) for f in flags)
     lat = []
@@ -627,6 +722,11 @@ def run_batch(n_traj, n):
     """Run ``n_traj`` independent :func:`batch_trial` calls, each simulating
     ``n`` GPS epochs, through
     :func:`dtfit_experimental.study.montecarlo.pool_map` (one BLAS thread a
-    worker). Returns the trials' results in trial order."""
+    worker), with no serial fallback. ``batch_trial`` is importable at module
+    level so the pool's workers, spawned fresh rather than forked, can
+    import and pickle it. Calling this from inside a daemonic worker process
+    raises ``AssertionError("daemonic processes are not allowed to have
+    children")``, since ``ProcessPoolExecutor`` cannot start its own workers
+    there. Returns the trials' results in trial order."""
     args = [(j, n) for j in range(n_traj)]
     return montecarlo.pool_map(batch_trial, args)
