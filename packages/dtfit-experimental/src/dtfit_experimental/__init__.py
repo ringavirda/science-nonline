@@ -28,6 +28,12 @@ physically rather than being re-imported from here.
         FourierBasis,         # image-interface basis, fit(basis=...)
         ChebyshevBasis,       # image-interface basis, fit(basis=...)
         LaguerreBasis,        # image-interface basis, fit(basis=...)
+        EdgeBlockBasis,       # block basis with explicit window edges
+        aggregated_image,     # image of data known as window totals
+        fit_aggregated,       # the equal-areas fit of such data
+        fit_aligned,          # windows aligned to detected jump epochs
+        AlignedFit,           # what fit_aligned returns
+        detect_jumps,         # the jump test on a fine window image
     )
 
 ``FourierBasis``, ``ChebyshevBasis`` and ``LaguerreBasis`` are the
@@ -52,6 +58,14 @@ domain. Measured verdicts live in ``experiments/cases/analysis``.
 from dtfit._core._backend import available_backends, resolve_backend, Backend
 from .basis_lsi import fit_lsi_basis
 from .bases import ChebyshevBasis, FourierBasis, LaguerreBasis
+from .blocks import (
+    AlignedFit,
+    EdgeBlockBasis,
+    aggregated_image,
+    detect_jumps,
+    fit_aggregated,
+    fit_aligned,
+)
 from .weak_ode import (
     fit_logistic,
     fit_damped_oscillator,
@@ -76,6 +90,12 @@ __all__ = [
     "FourierBasis",
     "ChebyshevBasis",
     "LaguerreBasis",
+    "EdgeBlockBasis",
+    "aggregated_image",
+    "fit_aggregated",
+    "fit_aligned",
+    "AlignedFit",
+    "detect_jumps",
     "weak_operators",
     "fit_logistic",
     "fit_michaelis_menten",
