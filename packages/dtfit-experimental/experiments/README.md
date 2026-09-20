@@ -17,6 +17,12 @@ beyond what `python -m dtfit_experimental.study.download_data` fetches.
 | 12_discrete_image | The image is the discrete statistic: S and G are exactly the basis products on the samples, a fit on it reproduces the pointwise fit on a uniform, a clustered and a random grid, reading the same criterion by quadrature loses that parity through the end samples and through uneven density, and order above what order_for reports is free | about a minute | none |
 | 13_two_bases | h versus p refinement: Legendre wins a smooth target, block is exact on a step only where a window boundary falls on the jump and at parity with Legendre otherwise, the Gram conditioning by order and grid, the cost of restricting a linear fit to either basis | a few seconds | none |
 
+### realdata/
+
+| Notebook | Claim | Runtime | Data |
+|---|---|---|---|
+| 33_gps_simulation | A simulated maneuvering target tracked from GPS fixes and a 9-DOF IMU against a Kalman-CA and a coordinated-turn EKF: the full-IMU Legendre tracker smooths at or below the EKF and loses the 10-step forecast to it, gyro-aided trackers hold through a gap while whole-track scores under scattered dropouts read parity at 10 percent and a loss at 20, reweighting rejects multipath spikes, the fused detector needs the gyro channel to lead, and the GPS-only Legendre tracker is at parity with Kalman-CA over 24 random flights | about two minutes | none |
+
 ## Writing a notebook
 
 1. Title, then the claims it establishes in plain words and what each would
