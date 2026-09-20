@@ -15,7 +15,7 @@ from scipy.optimize import least_squares
 import dtfit
 from dtfit._stats import information_criteria
 from dtfit.image import Original
-from dtfit.image.bases import BlockBasis, u_of
+from dtfit.image.bases import BlockBasis, LegendreBasis, u_of
 from dtfit_experimental import (
     AlignedFit,
     EdgeBlockBasis,
@@ -24,7 +24,7 @@ from dtfit_experimental import (
     fit_aggregated,
     fit_aligned,
 )
-from dtfit_experimental.blocks import coarsen
+from dtfit_experimental.blocks import SegmentBasis, coarsen
 
 
 def test_equal_edges_reproduce_the_block_basis():
@@ -117,6 +117,118 @@ def test_on_requires_the_domain_ends():
     assert b.edges_on((0.0, 10.0)) == pytest.approx([0.0, 3.0, 10.0])
     lo, hi = b.windows_on((0.0, 10.0))
     assert lo.tolist() == [0.0, 3.0] and hi.tolist() == [3.0, 10.0]
+
+
+def test_segment_basis_gram_is_block_diagonal():
+    # Fails if evaluate() drops the segment mask: a sample would then also
+    # light the neighbouring segment's columns, filling in the
+    # off-diagonal blocks of G that a Legendre-per-segment basis must not
+    # have.
+    edges = [-1.0, -0.2, 0.5, 1.0]
+    orders = [2, 1, 3]
+    b = SegmentBasis(edges, orders)
+    rng = np.random.default_rng(2)
+    u = rng.uniform(-1.0, 1.0, 300)
+    phi = b.evaluate(u)
+    idx = np.clip(
+        np.searchsorted(np.asarray(edges), u, side="right") - 1, 0, 2
+    )
+    bounds = np.cumsum([0] + [o + 1 for o in orders])
+    g = phi.T @ phi
+    for i in range(3):
+        for j in range(3):
+            if i != j:
+                block = g[bounds[i]:bounds[i + 1], bounds[j]:bounds[j + 1]]
+                assert np.all(block == 0.0)
+    for j in range(3):
+        rows = np.flatnonzero(idx == j)
+        assert rows.size
+        outside = np.ones(phi.shape[1], dtype=bool)
+        outside[bounds[j]:bounds[j + 1]] = False
+        assert np.all(phi[np.ix_(rows, outside)] == 0.0)
+
+
+def test_on_with_one_segment_reproduces_legendre():
+    # Fails if on()'s edge-to-u mapping per segment slips (an extra
+    # rescale, or the segment's own domain used instead of the whole
+    # one): with a single segment the basis must be exactly the plain
+    # Legendre basis on the same domain.
+    domain = (2.0, 12.0)
+    x = np.linspace(*domain, 50)
+    b = SegmentBasis.on([domain[0], domain[1]], domain, n_coef=6)
+    ref = LegendreBasis(int(b.orders[0]))
+    got = b.evaluate(u_of(x, *domain))
+    want = ref.evaluate(u_of(x, *domain))
+    np.testing.assert_allclose(got, want, atol=1e-12)
+
+
+def test_on_shares_coefficients_with_a_floor_of_two():
+    # Fails if the max(2, ...) floor is dropped: the short first segment
+    # here would otherwise get zero or one coefficient (no room for a
+    # slope, or none at all).
+    edges = [0.0, 0.1, 5.0, 10.0]
+    domain = (0.0, 10.0)
+    b = SegmentBasis.on(edges, domain, n_coef=9)
+    shares = b.orders + 1
+    assert np.all(shares >= 2)
+    assert abs(int(shares.sum()) - 9) <= 1
+
+
+_TAU = 4.37
+_TWO_REGIME_TRUTH = (2.0, 0.6, 3.0, 0.9)
+
+
+def _two_regime(t, a1, l1, a2, l2):
+    t = np.asarray(t, dtype=float)
+    return np.where(
+        t < _TAU, a1 * np.exp(-l1 * t), a2 * np.exp(-l2 * (t - _TAU))
+    )
+
+
+def _num_jac(f, x, c, h=1e-6):
+    c = np.asarray(c, dtype=float)
+    cols = []
+    for i in range(c.size):
+        d = np.zeros_like(c)
+        d[i] = h * max(1.0, abs(c[i]))
+        cols.append((f(x, *(c + d)) - f(x, *(c - d))) / (2 * d[i]))
+    return np.stack(cols, axis=1)
+
+
+def _exact_efficiency(phi, jac):
+    """The deterministic image-restriction ratio of probe_efficiency.py,
+    independent of any noise draw."""
+    keep = phi.any(axis=0)
+    phi = phi[:, keep]
+    q, _ = np.linalg.qr(phi)
+    restricted = np.linalg.pinv(jac.T @ (q @ (q.T @ jac)))
+    full = np.linalg.inv(jac.T @ jac)
+    return np.diag(full) / np.diag(restricted)
+
+
+def test_segment_on_the_switch_reaches_efficiency_where_legendre_does_not():
+    # Fails if on() ignores the given interior edge (the edges ignored):
+    # the segment basis would then behave like plain Legendre across the
+    # whole domain, and a2's efficiency would fall to Legendre's ~0.66
+    # instead of reaching 1.0.
+    domain = (0.0, 10.0)
+    x = np.linspace(*domain, 2000)
+    jac = _num_jac(_two_regime, x, _TWO_REGIME_TRUTH)
+    rng = np.random.default_rng(4)
+    y = _two_regime(x, *_TWO_REGIME_TRUTH) + 0.01 * rng.standard_normal(x.size)
+    original = Original(x, y, domain=domain)
+    seg = SegmentBasis.on([domain[0], _TAU, domain[1]], domain, n_coef=16)
+    result = dtfit.fit(
+        _two_regime, original, basis=seg, p0=_TWO_REGIME_TRUTH,
+        param_names=["a1", "l1", "a2", "l2"],
+    )
+    assert np.all(np.isfinite(result.coeffs))
+    eff_seg = _exact_efficiency(seg.evaluate(u_of(x, *domain)), jac)
+    eff_leg = _exact_efficiency(
+        LegendreBasis(seg.n_coef - 1).evaluate(u_of(x, *domain)), jac
+    )
+    assert eff_seg[2] > 0.999
+    assert eff_leg[2] < 0.7
 
 
 EPOCH = 3.4

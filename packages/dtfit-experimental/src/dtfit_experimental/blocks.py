@@ -1,12 +1,15 @@
 """Block windows placed where the data ask for them.
 
-Three adaptations in trial of dtfit's block (EAC) basis, which is equal
+Four adaptations in trial of dtfit's block (EAC) basis, which is equal
 windows only:
 
 * :class:`EdgeBlockBasis`, a block basis with explicit window edges, so a
   window boundary can be put on a known epoch (an equipment change, an
   earthquake, a tariff date) and the discontinuity there costs the fit
   nothing.
+* :class:`SegmentBasis`, a Legendre polynomial per segment between explicit
+  edges instead of an indicator, for a model that is smooth within a
+  regime but not across the edges that separate them.
 * :func:`aggregated_image` and :func:`fit_aggregated`, for data that arrive
   as one total per window and never as samples: the window image is then the
   data itself and the equal-areas fit is the correct least squares.
@@ -32,7 +35,7 @@ import numpy as np
 import dtfit
 from dtfit._input import normalize_bounds, normalize_p0, resolve_model
 from dtfit.image import Grid, Image, Original
-from dtfit.image.bases import Basis, u_of
+from dtfit.image.bases import Basis, LegendreBasis, u_of
 from dtfit.types import FittingResult
 
 _END_TOL = 1e-12
@@ -201,6 +204,155 @@ class EdgeBlockBasis(Basis):
                 self.order,
                 tuple(float(v) for v in self.edges),
                 tuple(bool(v) for v in self.keep),
+            )
+        )
+
+
+class SegmentBasis(Basis):
+    """Legendre polynomials on each segment between given edges, zero
+    outside it.
+
+    The form the probes call "Legendre per segment", and the one an
+    :class:`~dtfit.image.ImageStream` block image already carries per
+    window generalized from an indicator to a polynomial: a sample in
+    segment ``j`` lights only segment ``j``'s columns, so the Gram matrix
+    is block diagonal and its conditioning is that of each segment's own
+    Legendre basis, never that of the segments strung together. A row for
+    a ``u`` in a segment with no sample in it is never produced by
+    ``evaluate``, but that segment's columns are still allocated: an empty
+    segment costs unused, rank-deficient coefficients rather than a
+    smaller basis.
+
+    Args:
+        edges: Edges on the unit variable ``u``, strictly increasing, of
+            length ``M + 1`` for ``M`` segments; ``edges[0]`` must be
+            ``-1`` and ``edges[-1]`` ``+1`` to an absolute tolerance of
+            1e-12.
+        orders: Legendre degree of each segment, length ``M``, each
+            ``>= 1`` (at least 2 coefficients per segment).
+
+    Raises:
+        ValueError: fewer than two edges; edges not strictly increasing or
+            not ending at ``-1`` and ``+1``; ``orders`` of the wrong length
+            or with an entry below 1.
+    """
+
+    name = "segment"
+
+    def __init__(self, edges: Any, orders: Any) -> None:
+        e = np.asarray(edges, dtype=float).ravel()
+        if e.size < 2:
+            raise ValueError(
+                f"a segment basis needs at least 2 edges, got {e.size}"
+            )
+        if not np.all(np.diff(e) > 0.0):
+            raise ValueError("edges must be strictly increasing")
+        if abs(e[0] + 1.0) > _END_TOL or abs(e[-1] - 1.0) > _END_TOL:
+            raise ValueError(
+                "edges on the unit variable must run from -1 to +1, got "
+                f"({e[0]!r}, {e[-1]!r})"
+            )
+        o = np.asarray(orders, dtype=int).ravel()
+        if o.size != e.size - 1:
+            raise ValueError(
+                f"orders must have one entry per segment ({e.size - 1}), "
+                f"got {o.size}"
+            )
+        if np.any(o < 1):
+            raise ValueError(
+                f"every segment needs order >= 1, got {o.tolist()}"
+            )
+        self.edges = e
+        self.orders = o
+        self.order = int(np.sum(o + 1))
+
+    @property
+    def n_coef(self) -> int:
+        return self.order
+
+    def evaluate(self, u: np.ndarray) -> np.ndarray:
+        """Legendre polynomials of the sample's own segment at ``u``,
+        ``(len(u), n_coef)``.
+
+        ``u`` outside ``[-1, 1]`` falls into the nearest end segment
+        (clamped, not extrapolated), remapped to that segment's own unit
+        interval; every other segment's columns of that row are zero.
+        """
+        u = np.asarray(u, dtype=float).ravel()
+        idx = _interval_index(self.edges, u)
+        phi = np.zeros((u.size, self.n_coef))
+        col = 0
+        for j, order in enumerate(self.orders):
+            m = int(order) + 1
+            sel = np.flatnonzero(idx == j)
+            if sel.size:
+                a, b = float(self.edges[j]), float(self.edges[j + 1])
+                uu = u_of(u[sel], a, b)
+                phi[sel, col:col + m] = LegendreBasis(int(order)).evaluate(uu)
+            col += m
+        return phi
+
+    @classmethod
+    def on(
+        cls, edges: Any, domain: tuple[float, float], n_coef: int
+    ) -> "SegmentBasis":
+        """The basis from edges in data units on ``domain``, sharing
+        ``n_coef`` coefficients out by segment length.
+
+        Args:
+            edges: Edges in data units, strictly increasing; the first and
+                the last must be the ends of ``domain``, to a relative
+                tolerance of 1e-12 of its span.
+            domain: ``(x0, x1)``, the interval the image is taken on.
+            n_coef: Coefficients to share out over the ``M`` segments, as
+                ``max(2, round(n_coef * len / total))`` per segment by its
+                share of the total span; the returned basis's own
+                ``n_coef`` is their sum, which can differ from this by the
+                rounding and the floor of 2.
+
+        Returns:
+            The basis on the unit variable of ``domain``.
+
+        Raises:
+            ValueError: ``domain`` is degenerate; the first or last edge is
+                not the matching end of ``domain``; plus the constructor's
+                own errors.
+        """
+        e = np.asarray(edges, dtype=float).ravel()
+        if e.size < 2:
+            raise ValueError(
+                f"a segment basis needs at least 2 edges, got {e.size}"
+            )
+        x0, x1 = float(domain[0]), float(domain[1])
+        tol = 1e-12 * max(abs(x1 - x0), 1.0)
+        if abs(e[0] - x0) > tol or abs(e[-1] - x1) > tol:
+            raise ValueError(
+                f"the first and last edge ({e[0]!r}, {e[-1]!r}) must be "
+                f"the ends of the domain {(x0, x1)!r}"
+            )
+        lens = np.diff(e)
+        share = np.maximum(
+            2, np.round(n_coef * lens / lens.sum()).astype(int)
+        )
+        u = u_of(e, x0, x1)
+        u[0], u[-1] = -1.0, 1.0
+        return cls(u, share - 1)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "order": self.order,
+            "edges": [float(v) for v in self.edges],
+            "orders": [int(v) for v in self.orders],
+        }
+
+    def __hash__(self) -> int:
+        return hash(
+            (
+                self.name,
+                self.order,
+                tuple(float(v) for v in self.edges),
+                tuple(int(v) for v in self.orders),
             )
         )
 
