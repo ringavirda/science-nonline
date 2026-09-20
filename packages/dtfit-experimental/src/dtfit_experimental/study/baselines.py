@@ -198,8 +198,8 @@ def arima_forecast(train, horizon, *, order=(2, 1, 2), seasonal_order=None):
     return np.asarray(fit.forecast(steps=horizon), dtype=float)
 
 
-# torch sequence nets (small, CPU)
-def _torch_seq_forecast(train, horizon, *, lookback, kind, epochs, seed):
+# small LSTM on the CPU
+def _torch_seq_forecast(train, horizon, *, lookback, epochs, seed):
     torch.manual_seed(seed)
     train = np.asarray(train, dtype=float)
     mu, sd = train.mean(), train.std() + 1e-12
@@ -210,20 +210,16 @@ def _torch_seq_forecast(train, horizon, *, lookback, kind, epochs, seed):
     Xt = torch.tensor(X, dtype=torch.float32)
     Yt = torch.tensor(Y, dtype=torch.float32).unsqueeze(1)
 
-    if kind == "lstm":
-        class Net(nn.Module):
-            def __init__(self):
-                super().__init__()
-                self.lstm = nn.LSTM(1, 32, batch_first=True)
-                self.fc = nn.Linear(32, 1)
+    class Net(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.lstm = nn.LSTM(1, 32, batch_first=True)
+            self.fc = nn.Linear(32, 1)
 
-            def forward(self, x):
-                o, _ = self.lstm(x.unsqueeze(-1))
-                return self.fc(o[:, -1, :])
-        net = Net()
-    else:  # mlp
-        net = nn.Sequential(nn.Linear(lookback, 64), nn.ReLU(),
-                            nn.Linear(64, 64), nn.ReLU(), nn.Linear(64, 1))
+        def forward(self, x):
+            o, _ = self.lstm(x.unsqueeze(-1))
+            return self.fc(o[:, -1, :])
+    net = Net()
 
     opt = torch.optim.Adam(net.parameters(), lr=0.01)
     loss_fn = nn.MSELoss()
@@ -248,7 +244,7 @@ def _torch_seq_forecast(train, horizon, *, lookback, kind, epochs, seed):
 def lstm_forecast(train, horizon, *, lookback=24, epochs=200, seed=0):
     if not HAVE_TORCH:
         raise RuntimeError("torch not available")
-    return _torch_seq_forecast(train, horizon, lookback=lookback, kind="lstm",
+    return _torch_seq_forecast(train, horizon, lookback=lookback,
                                epochs=epochs, seed=seed)
 
 

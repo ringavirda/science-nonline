@@ -1,9 +1,5 @@
-"""Domain-specific compute helpers the ``backend.py`` modules import.
-
-``dtfit_experimental.study`` owns the metric, baseline, dataset and plotting
-helpers; this module adds the two utilities that belong to a single domain:
-peak-memory measurement for big data and the embedded footprint formula.
-"""
+"""Cost measures of the study tier: peak memory of a callable and the state
+size of the embedded streaming filter."""
 
 from __future__ import annotations
 

@@ -13,12 +13,12 @@ def experiments_dir() -> Path:
 
     Returns ``packages/dtfit-experimental/experiments``, beside the package's
     source rather than inside it. Raises ``FileNotFoundError`` naming the path
-    when ``dtfit_experimental`` is not an editable checkout: the notebooks and
-    their results only exist there, never in an installed wheel.
+    when that directory does not exist; an installed wheel carries no
+    experiments tree.
     """
     root = Path(dtfit_experimental.__file__).resolve().parents[2] / "experiments"
     if not root.is_dir():
-        raise FileNotFoundError(f"not an editable checkout, no experiments tree: {root}")
+        raise FileNotFoundError(f"no experiments tree at {root}")
     return root
 
 
