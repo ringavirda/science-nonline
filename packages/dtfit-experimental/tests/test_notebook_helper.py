@@ -47,7 +47,7 @@ def test_save_table_keeps_a_named_index(tmp_path):
 def test_save_table_returns_the_frame_unchanged(tmp_path):
     frame = pd.DataFrame({"a": [1]})
     out = save_table("nb", "t", frame, root=tmp_path)
-    # fails if save_table returned None instead of the frame it wrote
+    # fails if save_table returns None
     assert out is frame
 
 
@@ -61,7 +61,7 @@ def test_save_table_round_trip_reproduces_the_numbers(tmp_path):
 
 def test_data_file_missing_prints_and_returns_none(tmp_path, capsys):
     out = data_file("no_such.csv", root=tmp_path)
-    # fails if a skip raised instead of returning a value
+    # fails if data_file raises instead of returning None
     assert out is None
     # fails if the missing path were not named on the printed line
     assert "no_such.csv" in capsys.readouterr().out
@@ -75,7 +75,7 @@ def test_data_file_present_returns_the_path(tmp_path):
 
 def test_optional_import_missing_prints_and_returns_none(capsys):
     out = optional_import("no_such_package_xyz")
-    # fails if ImportError were left uncaught instead of skipped
+    # fails if optional_import lets ImportError propagate
     assert out is None
     assert "no_such_package_xyz" in capsys.readouterr().out
 
