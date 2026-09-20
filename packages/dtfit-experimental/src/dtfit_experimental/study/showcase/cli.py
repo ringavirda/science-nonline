@@ -1,9 +1,9 @@
 """One command for every real-data run of the showcase.
 
-    python -m dtfit_experimental.experiments.domains.image_showcase.cli \\
+    python -m dtfit_experimental.study.showcase.cli \\
         ngl-reduce --workers 16 --images ~/data/showcase/images/ngl
 
-Each subcommand writes one or two CSV files into the domain's tracked
+Each subcommand writes one or two CSV files into the tracked
 ``results/`` directory and prints what it wrote. ``--suffix`` renames the
 output (the Pi's runs use ``--suffix _pi``), so the two machines' numbers
 sit side by side. The exactness subcommands exit 1 when any station misses

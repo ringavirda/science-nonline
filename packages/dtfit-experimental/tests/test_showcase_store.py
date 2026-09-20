@@ -11,7 +11,7 @@ import pytest
 
 from dtfit.image import Image, Original
 
-from dtfit_experimental.experiments.domains.image_showcase import (
+from dtfit_experimental.study.showcase import (
     compare, paths, store,
 )
 
@@ -59,9 +59,12 @@ def test_paths_follow_the_environment(monkeypatch, tmp_path):
     assert paths.normals_dir() == tmp_path / "d" / "normals"
     monkeypatch.setenv("SHOWCASE_ISD", str(tmp_path / "elsewhere"))
     assert paths.isd_dir(2024) == tmp_path / "elsewhere" / "2024"
+    # the results directory moved out of the package and the CLI kept
+    # writing into the package tree would fail this
+    assert str(paths.results_dir()).endswith(
+        "experiments/results/35_archive_showcase"
+    )
     assert paths.results_dir().is_dir()
-    assert paths.figures_dir().is_dir()
-    assert paths.domain_dir().name == "image_showcase"
 
 
 def test_images_round_trip_through_the_npz_container(tmp_path):

@@ -16,7 +16,7 @@ import pytest
 
 from dtfit.image import Image, ImageStream, Original, assemble
 
-from dtfit_experimental.experiments.domains.image_showcase import (
+from dtfit_experimental.study.showcase import (
     compare, store, stream,
 )
 

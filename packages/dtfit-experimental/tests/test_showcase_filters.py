@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from dtfit.streaming import ImageFilter
-from dtfit_experimental.experiments.domains.image_showcase import filters
+from dtfit_experimental.study.showcase import filters
 from dtfit_experimental.study import isd, ngl
 
 HEADER = (

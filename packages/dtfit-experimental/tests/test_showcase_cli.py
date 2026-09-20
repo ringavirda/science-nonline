@@ -16,7 +16,7 @@ import pytest
 
 from dtfit.image import assemble
 
-from dtfit_experimental.experiments.domains.image_showcase import (
+from dtfit_experimental.study.showcase import (
     cli, filters, ngl_reduce, paths, store, stream,
 )
 from dtfit_experimental.study import ngl
@@ -88,7 +88,7 @@ def make_isd_year(path, sta, year=2024, seed=3):
     """A full hourly station-year (the module's own annual design plus a
     diurnal cycle and noise), the same shape
     ``tests/test_showcase_isd_reduce.py`` fits against."""
-    from dtfit_experimental.experiments.domains.image_showcase import isd_reduce
+    from dtfit_experimental.study.showcase import isd_reduce
     from dtfit_experimental.study import isd
 
     rng = np.random.default_rng(seed)

@@ -8,7 +8,7 @@ import csv
 import numpy as np
 import pytest
 
-from dtfit_experimental.experiments.domains.image_showcase import (
+from dtfit_experimental.study.showcase import (
     compare, isd_fits, isd_reduce,
 )
 from dtfit_experimental.study import isd

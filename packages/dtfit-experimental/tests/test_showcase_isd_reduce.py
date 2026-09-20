@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from dtfit_experimental.experiments.domains.image_showcase import (
+from dtfit_experimental.study.showcase import (
     compare, isd_reduce, store,
 )
 from dtfit_experimental.study import isd

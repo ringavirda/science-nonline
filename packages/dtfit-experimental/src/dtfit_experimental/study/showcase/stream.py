@@ -25,9 +25,9 @@ dataset wiring is in ``cli.py`` (``stream-serve``, ``stream-replay``,
 Running it: the consumer binds and waits, the producer walks a directory
 of reduced ``.npz`` files and sends their block images.
 
-    python -m dtfit_experimental.experiments.domains.image_showcase.stream \\
+    python -m dtfit_experimental.study.showcase.stream \\
         --role consumer --host 0.0.0.0 --port 9600 --out summary.json
-    python -m dtfit_experimental.experiments.domains.image_showcase.stream \\
+    python -m dtfit_experimental.study.showcase.stream \\
         --role producer --host felled-pi.local --port 9600 --images DIR
 """
 
@@ -50,7 +50,7 @@ from dtfit.image import Grid, Image, assemble, make_basis
 from .compare import fit_from_image
 from .store import load_images
 
-MODULE = "dtfit_experimental.experiments.domains.image_showcase.stream"
+MODULE = "dtfit_experimental.study.showcase.stream"
 IMAGE_KIND = "image"
 SAMPLE_KIND = "samples"
 ACK_KIND = "ack"

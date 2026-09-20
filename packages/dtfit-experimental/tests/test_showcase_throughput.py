@@ -9,7 +9,7 @@ import pytest
 
 from dtfit.image import Image, Original
 
-from dtfit_experimental.experiments.domains.image_showcase import (
+from dtfit_experimental.study.showcase import (
     throughput,
 )
 

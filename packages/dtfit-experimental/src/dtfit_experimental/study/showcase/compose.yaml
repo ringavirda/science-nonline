@@ -21,7 +21,7 @@ services:
     command: >-
       bash -lc "pip install --no-cache-dir numpy scipy sympy scikit-learn
       threadpoolctl &&
-      python -m dtfit_experimental.experiments.domains.image_showcase.cli
+      python -m dtfit_experimental.study.showcase.cli
       stream-serve --host 0.0.0.0 --port ${PORT:-9600}
       --model ${MODEL:-ngl-trend} --timeout ${TIMEOUT:-600}
       --out /out/summary.json"
@@ -34,11 +34,12 @@ services:
     ports:
       - "${PORT:-9600}:${PORT:-9600}"
     volumes:
-      - ${REPO:-../../../../../../..}:/repo:ro
+      - ${REPO:-../../../../../..}:/repo:ro
       - ${SHOWCASE_DATA:-${HOME}/data/showcase}:/data/showcase:ro
-      # stream-serve writes its table into the domain's results/, so that
-      # one directory is mounted writable over the read-only repository.
-      - ${OUT:-./results}:/repo/packages/dtfit-experimental/src/dtfit_experimental/experiments/domains/image_showcase/results
+      # stream-serve writes its table into the tracked notebook results
+      # directory, so that one directory is mounted writable over the
+      # read-only repository.
+      - ${OUT:-./results}:/repo/packages/dtfit-experimental/experiments/results/35_archive_showcase
       - ${OUT:-./results}:/out
 
   producer:
@@ -47,7 +48,7 @@ services:
     command: >-
       bash -lc "pip install --no-cache-dir numpy scipy sympy scikit-learn
       threadpoolctl &&
-      python -m dtfit_experimental.experiments.domains.image_showcase.stream
+      python -m dtfit_experimental.study.showcase.stream
       --role producer --host ${PEER:-consumer} --port ${PORT:-9600}
       --images /data/showcase/images/ngl --limit ${LIMIT:-2000}
       --out /out/producer.json"
@@ -57,6 +58,6 @@ services:
     depends_on:
       - consumer
     volumes:
-      - ${REPO:-../../../../../../..}:/repo:ro
+      - ${REPO:-../../../../../..}:/repo:ro
       - ${SHOWCASE_DATA:-${HOME}/data/showcase}:/data/showcase:ro
       - ${OUT:-./results}:/out
