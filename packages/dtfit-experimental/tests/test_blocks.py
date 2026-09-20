@@ -24,7 +24,7 @@ from dtfit_experimental import (
     fit_aggregated,
     fit_aligned,
 )
-from dtfit_experimental.blocks import SegmentBasis, coarsen
+from dtfit_experimental.blocks import SegmentBasis, _interval_index, coarsen
 
 
 def test_equal_edges_reproduce_the_block_basis():
@@ -525,6 +525,27 @@ def test_fit_aligned_finds_two_jumps_and_their_amplitudes():
     assert np.all(np.abs(out.steps - np.asarray(steps)) < 3.0 * se)
     assert out.n_dropped == 0
     assert not out.basis.keep.all()
+
+
+def test_no_sample_of_a_flagged_window_enters_the_refit_via_flagged():
+    # Fails if flagged reports the coarse windows, and if flagged is left
+    # at the detector's order rather than the windows actually dropped.
+    rng = np.random.default_rng(11)
+    epochs, steps = (2.37, 6.81), (10.0, -10.0)
+    x, y = _align_series(rng, epochs, steps)
+    out = fit_aligned(_smooth, Original(x, y, domain=ALIGN_DOMAIN),
+                      n_windows=32, param_names=ALIGN_NAMES,
+                      p0=np.zeros(4))
+    assert len(out.flagged) == len(out.epochs)
+    fine_edges = np.linspace(*ALIGN_DOMAIN, 8 * 32 + 1)
+    fine_basis = EdgeBlockBasis.on(fine_edges, ALIGN_DOMAIN)
+    for b, e in zip(out.flagged, out.epochs):
+        assert fine_edges[b] <= e <= fine_edges[b + 1]
+    u = u_of(x, *ALIGN_DOMAIN)
+    idx = _interval_index(fine_basis.edges, u)
+    in_flagged = np.isin(idx, out.flagged)
+    all_zero = ~out.basis.evaluate(u).any(axis=1)
+    assert np.array_equal(in_flagged, all_zero)
 
 
 def test_a_jump_free_series_yields_the_plain_uniform_fit():

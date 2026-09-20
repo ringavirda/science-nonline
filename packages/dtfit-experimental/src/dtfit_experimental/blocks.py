@@ -751,6 +751,10 @@ class AlignedFit:
         basis: The :class:`EdgeBlockBasis` the final fit ran in.
         n_dropped: Samples left out by ``clip``; the samples of the flagged
             windows are left out too and are not counted here.
+        flagged: The fine-window indices left out of the refit, ascending.
+            They index the fine windows of ``fine * n_windows`` over the
+            original's domain; their samples are in neither the fit nor
+            ``n_dropped``.
     """
 
     result: FittingResult
@@ -759,6 +763,7 @@ class AlignedFit:
     z: np.ndarray
     basis: EdgeBlockBasis
     n_dropped: int
+    flagged: np.ndarray
 
 
 def fit_aligned(
@@ -924,6 +929,7 @@ def fit_aligned(
         z=np.asarray([z_of[e] for e in epochs], dtype=float),
         basis=basis,
         n_dropped=n_dropped,
+        flagged=np.asarray(sorted(flagged), dtype=int),
     )
 
 
