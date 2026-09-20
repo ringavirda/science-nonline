@@ -18,8 +18,6 @@ _BASE = "dtfit_experimental.experiments.domains"
 # backend module -> the public names its notebook and paper scripts call.
 # An empty tuple leaves the import itself as the whole check.
 _BACKENDS = {
-    "forecasting": ("evaluate_series", "merged_forecaster", "win_summary",
-                    "best_oracle", "collapse_oracle_scores", "exp_model_mismatch"),
     "parameter_estimation": ("MODELS", "gen", "est_eac", "est_lsi", "est_nlls",
                              "param_err", "FAMILY_REASON", "load_puromycin",
                              "real_puromycin", "exp_model_mismatch"),

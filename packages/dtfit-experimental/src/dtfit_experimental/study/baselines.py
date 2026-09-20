@@ -22,8 +22,9 @@ wrapped behind a small uniform helper so the harnesses can call them alike:
 The torch and statsmodels backends import lazily behind ``HAVE_TORCH`` /
 ``HAVE_STATSMODELS``, so a core install still runs the suite with those rows
 skipped. The deep forecasting research methods (DLinear, TimesNet, Time-LLM)
-are not re-implemented: ``experiments/cases/06_benchmark_ltsf`` compares
-against their published benchmark numbers instead.
+are not re-implemented: the LTSF section of
+``experiments/realdata/32_forecasting.ipynb`` compares against their
+published benchmark numbers instead.
 """
 
 from __future__ import annotations
