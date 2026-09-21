@@ -1,0 +1,11 @@
+config,perr_mean,perr_std
+block order 3  W 60  q 1e-3  adaptive (inherited),9.87622,9.40057
+legendre order 5  W 60  q 1e-3  adaptive (inherited),9.06367,10.5902
+block order 3  W 60  q 1e-3  fixed,4.71508,3.39863
+legendre order 5  W 60  q 1e-3  fixed,5.67168,4.22371
+legendre order 5  W 60  q 1e-6  adaptive,1.22106,0.934626
+legendre order 5  W 60  q 1e-8  fixed,0.599086,0.521291
+legendre order 7  W 120  q 1e-6  fixed,0.640691,0.617924
+legendre order 9  W 200  q 1e-8  fixed (retuned),0.353859,0.266813
+block order 6  W 120  q 1e-6  fixed,0.598404,0.598588
+EKF (params-as-state),1.07433,0.607462

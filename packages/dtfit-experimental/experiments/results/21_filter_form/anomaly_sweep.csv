@@ -1,0 +1,37 @@
+estimator,kind,level,perr_pct
+block filter (inherited tuning),anomaly,0,9.87622
+block filter (inherited tuning),anomaly,0.05,22.1699
+block filter (inherited tuning),anomaly,0.1,26.7626
+block filter (inherited tuning),anomaly,0.2,69.8626
+block filter (static tuning),anomaly,0,0.618488
+block filter (static tuning),anomaly,0.05,3.93935
+block filter (static tuning),anomaly,0.1,9.99559
+block filter (static tuning),anomaly,0.2,70.1583
+block filter (robust image) (inherited tuning),anomaly,0,9.99029
+block filter (robust image) (inherited tuning),anomaly,0.05,1.45377
+block filter (robust image) (inherited tuning),anomaly,0.1,1.39436
+block filter (robust image) (inherited tuning),anomaly,0.2,6.34052
+block filter (robust image) (static tuning),anomaly,0,0.616694
+block filter (robust image) (static tuning),anomaly,0.05,1.23623
+block filter (robust image) (static tuning),anomaly,0.1,2.83021
+block filter (robust image) (static tuning),anomaly,0.2,3.37982
+Legendre filter (inherited tuning),anomaly,0,9.06367
+Legendre filter (inherited tuning),anomaly,0.05,28.9783
+Legendre filter (inherited tuning),anomaly,0.1,67.6364
+Legendre filter (inherited tuning),anomaly,0.2,66.8297
+Legendre filter (static tuning),anomaly,0,0.599086
+Legendre filter (static tuning),anomaly,0.05,7.16885
+Legendre filter (static tuning),anomaly,0.1,40.3171
+Legendre filter (static tuning),anomaly,0.2,30.5587
+Legendre filter (robust image) (inherited tuning),anomaly,0,9.14088
+Legendre filter (robust image) (inherited tuning),anomaly,0.05,1.20029
+Legendre filter (robust image) (inherited tuning),anomaly,0.1,1.23932
+Legendre filter (robust image) (inherited tuning),anomaly,0.2,2.37358
+Legendre filter (robust image) (static tuning),anomaly,0,0.597456
+Legendre filter (robust image) (static tuning),anomaly,0.05,0.679624
+Legendre filter (robust image) (static tuning),anomaly,0.1,1.18128
+Legendre filter (robust image) (static tuning),anomaly,0.2,1.76004
+EKF (params-as-state),anomaly,0,1.07433
+EKF (params-as-state),anomaly,0.05,352.034
+EKF (params-as-state),anomaly,0.1,458.934
+EKF (params-as-state),anomaly,0.2,886.434

@@ -1,0 +1,4 @@
+config,min_window,own_min_window,first_measured,band_index,steps_to_band,settled,seeds
+block order 2,10,4,9,10.875,1.875,8,8
+block order 4,10,8,9,10.5,1.5,8,8
+legendre order 5,10,7,9,10.875,1.875,8,8

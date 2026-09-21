@@ -1,0 +1,28 @@
+estimator,kind,level,perr_pct
+block filter (inherited tuning),dropout,0.05,6.86684
+block filter (inherited tuning),dropout,0.1,5.91573
+block filter (inherited tuning),dropout,0.2,12.2862
+block filter (static tuning),dropout,0.05,0.613999
+block filter (static tuning),dropout,0.1,0.665618
+block filter (static tuning),dropout,0.2,0.629385
+block filter (robust image) (inherited tuning),dropout,0.05,5.41977
+block filter (robust image) (inherited tuning),dropout,0.1,5.95834
+block filter (robust image) (inherited tuning),dropout,0.2,12.9038
+block filter (robust image) (static tuning),dropout,0.05,0.616464
+block filter (robust image) (static tuning),dropout,0.1,0.660036
+block filter (robust image) (static tuning),dropout,0.2,0.631901
+Legendre filter (inherited tuning),dropout,0.05,7.48286
+Legendre filter (inherited tuning),dropout,0.1,7.70182
+Legendre filter (inherited tuning),dropout,0.2,11.6384
+Legendre filter (static tuning),dropout,0.05,0.595844
+Legendre filter (static tuning),dropout,0.1,0.534737
+Legendre filter (static tuning),dropout,0.2,0.653366
+Legendre filter (robust image) (inherited tuning),dropout,0.05,7.64853
+Legendre filter (robust image) (inherited tuning),dropout,0.1,7.83861
+Legendre filter (robust image) (inherited tuning),dropout,0.2,12.3548
+Legendre filter (robust image) (static tuning),dropout,0.05,0.599624
+Legendre filter (robust image) (static tuning),dropout,0.1,0.538114
+Legendre filter (robust image) (static tuning),dropout,0.2,0.658272
+EKF (params-as-state),dropout,0.05,1.12827
+EKF (params-as-state),dropout,0.1,1.01153
+EKF (params-as-state),dropout,0.2,1.07677

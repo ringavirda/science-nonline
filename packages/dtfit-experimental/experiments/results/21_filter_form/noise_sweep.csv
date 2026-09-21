@@ -1,0 +1,21 @@
+estimator,noise,perr_pct
+block filter (inherited tuning),0.02,7.71886
+block filter (inherited tuning),0.05,9.87622
+block filter (inherited tuning),0.1,11.2292
+block filter (inherited tuning),0.2,9.30911
+block filter (static tuning),0.02,0.282112
+block filter (static tuning),0.05,0.618488
+block filter (static tuning),0.1,1.05849
+block filter (static tuning),0.2,1.84004
+Legendre filter (inherited tuning),0.02,7.23752
+Legendre filter (inherited tuning),0.05,9.06367
+Legendre filter (inherited tuning),0.1,8.75962
+Legendre filter (inherited tuning),0.2,12.5461
+Legendre filter (static tuning),0.02,0.277529
+Legendre filter (static tuning),0.05,0.599086
+Legendre filter (static tuning),0.1,1.09511
+Legendre filter (static tuning),0.2,1.82442
+EKF (params-as-state),0.02,0.874382
+EKF (params-as-state),0.05,1.07433
+EKF (params-as-state),0.1,1.62052
+EKF (params-as-state),0.2,3.17022

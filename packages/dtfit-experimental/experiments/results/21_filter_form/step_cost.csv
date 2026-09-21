@@ -1,0 +1,7 @@
+config,n_params,window,n_coef,us_per_step,spread_us
+block order 3  W 60  fixed,3,60,3,107.926,20.6142
+block order 3  W 60  adaptive,3,60,3,112.043,37.4145
+legendre order 5  W 60  fixed,3,60,6,108.901,4.51614
+legendre order 5  W 60  adaptive,3,60,6,110.622,13.4207
+legendre order 9  W 200  fixed (retuned),3,200,10,132.159,26.431
+EKF (params-as-state),3,,,12.7949,0.59606
