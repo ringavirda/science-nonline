@@ -26,7 +26,9 @@ carry breaking changes, and each one is listed explicitly under **Changed**.
   `FittingResult` with a calibrated covariance; `innovation_` and `nis_`
   expose the last whitened innovation and its normalized magnitude; a
   `stream` hook (an `ImageStream`) can be fed alongside the filter;
-  `noise_var` sets the measurement variance directly.
+  `noise_var` sets the measurement variance directly; under `robust=True`
+  the winsorization sigma is the window's MAD sigma times
+  `sqrt(k / (k - n_params))`, reported as `robust_scale_`.
 - `dtfit.image.analytics`: what an image says about itself -- `noise_sigma`
   (the noise level from the tail orders), `effective_order`, `decay`
   (geometric ratio and algebraic exponent, with the goodness of fit of

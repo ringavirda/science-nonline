@@ -89,7 +89,10 @@ class ImageFilter:
         robust: Winsorize each sample's residual to the current model at
             ``huber_c`` MAD sigmas around the window's median residual
             before imaging, so a spike cannot carry into the image while a
-            sustained shift passes through to the drift test.
+            sustained shift passes through to the drift test. The MAD
+            sigma of a window of ``k`` samples carries the factor
+            ``sqrt(k / (k - n_params))``, the residual degrees of freedom
+            of a model fitted on those samples.
         huber_c: The winsorization threshold in robust sigmas.
         drift_reset: ``"inflate"`` multiplies ``P`` by ``drift_inflation``
             and keeps the window; ``"full"`` resets ``P`` to its initial
@@ -115,6 +118,10 @@ class ImageFilter:
             measurement. Summing it over several filters is a fused test.
         last_residual_: The one-step residual ``y - f(t; p)`` at the newest
             sample before the update; NaN before the first measurement.
+        robust_scale_: The sigma the last winsorization used, in the units
+            of ``y``; NaN when ``robust`` is off, before the first
+            measurement, and zero for a window the model fits exactly
+            (no winsorization then).
         detector: The :class:`DriftDetector`. It sees the innovation
             rotated so that its first component is the window-mean
             innovation, the direction channel for every basis.
@@ -246,6 +253,7 @@ class ImageFilter:
         self.drift_flag_ = False
         self.last_drift_direction_ = 0
         self.last_residual_ = float("nan")
+        self.robust_scale_ = float("nan")
         self.innovation_: np.ndarray = np.full(b.n_coef, np.nan)
         self.nis_ = float("nan")
 
@@ -399,6 +407,8 @@ class ImageFilter:
         if self._robust:
             med = float(np.median(resid))
             sigma = 1.4826 * float(np.median(np.abs(resid - med)))
+            sigma *= float(np.sqrt(k / max(k - self.p.size, 1)))
+            self.robust_scale_ = sigma
             if sigma > 0.0:
                 c = self._huber_c * sigma
                 y_eff = f + (med + np.clip(resid - med, -c, c))

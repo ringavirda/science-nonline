@@ -105,6 +105,9 @@ only pass overrides:
   measurement. See [several streams](#several-streams).
 - `last_residual_` -- the one-step residual `y - f(t; p)` at the newest
   sample before the update; NaN before the first measurement.
+- `robust_scale_` -- the sigma the last winsorization used (the window's
+  MAD sigma times `sqrt(k / (k - n_params))`); NaN when `robust` is off
+  and before the first measurement.
 - `detector` -- the `DriftDetector` (see [below](#driftdetector)). It sees
   the innovation rotated so its first component is the window-mean
   innovation, the direction channel for every basis.

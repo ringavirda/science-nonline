@@ -87,7 +87,11 @@ the window fixed at `window_size`.
 `robust=True` winsorizes each sample's residual to the current model at
 `huber_c` MAD sigmas around the window's median residual before it enters
 the image: a single spike cannot carry into `S_w`, while a sustained
-shift still passes through unclipped and reaches the drift test.
+shift still passes through unclipped and reaches the drift test. The MAD
+sigma of a window of `k` samples is multiplied by `sqrt(k / (k - n_params))`:
+residuals to a model fitted on the same samples are smaller than the noise
+by that factor on average, and without it a short window clips clean
+samples. `robust_scale_` reports the sigma the last update used.
 
 ## The two bases
 

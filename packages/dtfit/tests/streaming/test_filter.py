@@ -588,6 +588,28 @@ def test_robust_mode_clean_signal_matches_default():
     assert out[True] <= out[False] + 0.1
 
 
+def test_robust_scale_carries_the_residual_dof_factor():
+    """``robust_scale_`` is the MAD sigma of the window's residuals to the
+    pre-update estimate times ``sqrt(k / (k - n_params))``. Fails when the
+    factor is dropped: at k=8 and two parameters the plain MAD sigma is
+    smaller by sqrt(8 / 6)."""
+    rng = np.random.default_rng(3)
+    t = np.arange(40.0)
+    y = 2.0 + 0.5 * t + rng.normal(0.0, 1.0, t.size)
+    flt = ImageFilter("a + b*t", "t", p0=[0.0, 0.0], window_size=8, order=3,
+                      q_diag=[1e-3, 1e-3], robust=True,
+                      adaptive_window=False, basis="legendre")
+    assert np.isnan(flt.robust_scale_)
+    for ti, yi in zip(t[:-1], y[:-1]):
+        flt.partial_fit(ti, yi)
+    before = dict(flt.params_)
+    flt.partial_fit(t[-1], y[-1])
+    resid = y[-8:] - (before["a"] + before["b"] * t[-8:])
+    mad = np.median(np.abs(resid - np.median(resid)))
+    assert flt.robust_scale_ == pytest.approx(
+        1.4826 * mad * np.sqrt(8 / 6), rel=1e-12)
+
+
 def test_robust_mode_still_detects_drift():
     """Winsorizing the residual around its median preserves a sustained shift,
     which leaves a genuine regime change detectable under robust mode."""
