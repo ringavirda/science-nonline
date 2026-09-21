@@ -57,6 +57,10 @@ class ImageFilter:
         var: The main variable name (a label only for a callable).
         basis: ``"legendre"`` or ``"block"``, or a
             :class:`~dtfit.image.Basis` instance (which fixes ``order``).
+            The block basis splits the window's time span into equal
+            blocks; across a gap in the samples that would leave a block
+            empty, the window is split into blocks of equal sample counts
+            instead, so the filter keeps measuring.
         order: The Legendre order, or the window count of the block basis,
             default 5; the image has ``order + 1`` or ``order`` coefficients
             and needs at least as many as the model has parameters. A
@@ -312,21 +316,22 @@ class ImageFilter:
 
     def _window_ops(
         self, t_arr: np.ndarray
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """The basis at the window's positions, the Cholesky factor of its
         Gram and the rotation that maps the window-mean channel onto the
         first axis, cached against the last window length while the
-        normalized positions repeat (uniform streaming). ``None`` when a
-        block window holds no sample, which leaves the Gram singular."""
+        normalized positions repeat (uniform streaming). A block window
+        whose equal-width blocks leave one without a sample takes blocks
+        of equal sample counts instead."""
         k = t_arr.size
         u = u_of(t_arr, float(t_arr[0]), float(t_arr[-1]))
         hit = self._cache.get(k)
         if hit is not None and np.allclose(u, hit[0], rtol=0.0, atol=1e-9):
             return hit[1], hit[2], hit[3]
         Phi = self.basis.evaluate(u)
+        if self.basis.name == "block" and not Phi.any(axis=0).all():
+            Phi = self.basis.evaluate((2.0 * np.arange(k) + 1.0) / k - 1.0)
         G = Phi.T @ Phi
-        if self.basis.name == "block" and np.any(np.diag(G) <= 0.0):
-            return None
         L = gram_whitener(G)
         # The constant function in basis coordinates: ones for the block
         # indicators, the first function otherwise. Its whitened direction
@@ -354,10 +359,10 @@ class ImageFilter:
 
     def _grow_on_skip(self) -> None:
         """Grow the adaptive window past a skipped measurement. A window
-        that keeps failing to measure (an empty block bin, a rejected
-        step) does not get more likely to measure by staying the size it
-        stalled at; growing it is what gives the next sample a wider
-        window to land a bin in, or a better-conditioned step to try."""
+        that keeps failing to measure (a rejected step, a non-finite
+        innovation) does not get more likely to measure by staying the size
+        it stalled at; growing it gives the next sample a
+        better-conditioned step to try."""
         if self.adaptive_window and self._W_eff < self.W:
             self._W_eff += 1
 
@@ -370,10 +375,10 @@ class ImageFilter:
         value}`` mapping or a sequence ordered like ``regressors``. A
         non-finite sample is skipped with a ``RuntimeWarning``. A sample
         is ingested but not measured when the window is not yet full
-        enough, a block window holds an empty bin, the step never lowers
-        the window's whitened misfit, or the innovation or the Jacobian
-        comes out entirely non-finite; a partly non-finite Jacobian is
-        instead measured with its non-finite entries zeroed.
+        enough, the step never lowers the window's whitened misfit, or the
+        innovation or the Jacobian comes out entirely non-finite; a partly
+        non-finite Jacobian is instead measured with its non-finite entries
+        zeroed.
         """
         self.drift_flag_ = False
         if not self._ingest(t_new, y_new, regressors):
@@ -395,11 +400,7 @@ class ImageFilter:
         if self.model.has_regressors:
             rb = np.asarray(self._rbuf, dtype=float)
             reg_cols = [rb[:, c] for c in range(rb.shape[1])]
-        ops = self._window_ops(t_arr)
-        if ops is None:
-            self._grow_on_skip()
-            return self
-        Phi, L, Q = ops
+        Phi, L, Q = self._window_ops(t_arr)
 
         f = self.model.eval(t_arr, reg_cols, self.p)
         resid = y_arr - f

@@ -499,6 +499,26 @@ def test_block_adaptive_window_grows_to_the_cap_and_stays_accurate():
     assert abs(flt.params_["A"] - 2.0) / 2.0 < 0.1
 
 
+def test_block_window_keeps_measuring_across_a_gap():
+    """A gap longer than a block leaves an equal-width block without a
+    sample; the window then takes blocks of equal sample counts, so the
+    first sample after the gap is measured. Fails if ``_window_ops`` loses
+    the equal-count fallback."""
+    flt = ImageFilter(
+        "c0 + c1*t", "t", p0=[2.0, 0.5], window_size=12, order=4,
+        q_diag=[1e-2, 1e-2], adaptive_window=False, basis="block",
+    )
+    t = np.arange(20.0)
+    for ti in t:
+        flt.partial_fit(ti, 2.0 + 0.5 * ti)
+    t_after = t[-1] + 30.0
+    yhat = float(flt.predict(np.array([t_after]))[0])
+    flt.partial_fit(t_after, 2.0 + 0.5 * t_after + 1.0)
+    assert abs(flt.last_residual_ - (2.0 + 0.5 * t_after + 1.0 - yhat)) < 1e-9
+    Phi = flt._window_ops(np.asarray(flt._t, dtype=float))[0]
+    assert Phi.sum(axis=0).tolist() == [3.0, 3.0, 3.0, 3.0]
+
+
 def test_min_window_is_respected_and_clamped():
     """``min_window`` controls when acquisition starts and is clamped
     sanely."""

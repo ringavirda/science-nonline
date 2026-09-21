@@ -73,9 +73,11 @@ only pass overrides:
 - `partial_fit(t_new, y_new, regressors=None) -> self` -- ingest one sample
   and update in place; `update` is an alias. A non-finite sample is skipped
   with a `RuntimeWarning`. A sample is ingested but not measured when the
-  window is not yet full enough, a block window holds an empty bin, the
-  step never lowers the window's whitened misfit, or the innovation or the
-  Jacobian comes out entirely non-finite.
+  window is not yet full enough, the step never lowers the window's
+  whitened misfit, or the innovation or the Jacobian comes out entirely
+  non-finite. A block window that a gap in the samples would leave with an
+  empty block is split into blocks of equal sample counts instead, so the
+  filter keeps measuring across the gap.
 - `result(**kwargs) -> FittingResult` -- see [below](#result).
 - `predict(x, regressors=None) -> ndarray` -- the model at the current
   estimate on `x`.
