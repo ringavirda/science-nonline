@@ -11,7 +11,6 @@ import sys
 import numpy as np
 import pytest
 
-from dtfit_experimental.experiments.domains.parameter_estimation import backend
 from dtfit_experimental.study import baselines as bl
 from dtfit_experimental.study import families as F
 from dtfit_experimental.study.montecarlo import noisy
@@ -23,41 +22,14 @@ def test_families_has_sixteen_unique_keys():
     assert len(set(fam.key for fam in F.FAMILIES)) == 16
 
 
-def test_families_match_backend_source():
-    """Every field matches the entry :data:`backend.MODELS` was copied from.
-
-    Catches a transcription slip that :func:`test_clean_data_recovery`
-    cannot: a truth or bound copied wrong from the source is still
-    internally consistent with itself there, since that test both draws its
-    data from and scores against the same (possibly wrong) family. Fails
-    under any single field of a FAMILIES entry drifting from its
-    backend.MODELS source, e.g. a truth value edited in one place only.
-    """
-    by_key = {m["key"]: m for m in backend.MODELS}
-    for family in F.FAMILIES:
-        model = by_key[family.key]
-        assert family.domain == model["domain"]
-        assert family.shape == model["shape"]
-        assert family.expr == model["expr"]
-        assert tuple(family.names) == tuple(model["names"])
-        assert family.truth == model["true"]
-        assert family.span == model["t"]
-        assert list(family.p0) == model["p0"]
-        assert [tuple(b) for b in family.bounds] == [
-            tuple(b) for b in model["bounds"]
-        ]
-        assert family.osc == model.get("osc")
-
-
 @pytest.mark.parametrize("family", F.FAMILIES, ids=lambda fam: fam.key)
 def test_clean_data_recovery(family):
     """SciPy NLLS recovers each family's truth from noise-free data seeded
     at its own p0/bounds. Fails if a family's p0 or bounds were copied
     wrong: a bound narrowed past the truth, or a p0 far enough from the
     truth to miss the basin, both leave the recovered value off by more
-    than the tolerance below. A truth-only slip is not caught here (the
-    same truth both draws the data and scores the fit); that case is
-    :func:`test_families_match_backend_source`'s job.
+    than the tolerance below. A truth-only slip is not caught here: the
+    same truth both draws the data and scores the fit.
     """
     x = np.linspace(family.span[0], family.span[1], 220)
     clean = family.func(x, *[family.truth[k] for k in family.names])

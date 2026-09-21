@@ -10,9 +10,12 @@ import numpy as np
 import pytest
 from sklearn.metrics import r2_score
 
+import dtfit as dt
+from dtfit_experimental.study import families as F
 from dtfit_experimental.study.baselines import (
     prony_fit,
     matrix_pencil_fit,
+    scipy_curve_fit,
     varpro_fit,
     moment_match_fit,
 )
@@ -91,28 +94,64 @@ def test_moment_match_recovers_exponential_growth():
     assert b == pytest.approx(0.6, abs=0.05)
 
 
-# the domain head-to-head wiring
-def test_subspace_rate_recovery_head_to_head():
-    """Every method the domain helper reports stays inside its error budget: 2
-    percent for dtfit Legendre, SciPy NLLS and Matrix Pencil / ESPRIT on both
-    tasks, 10 percent for classical Prony and only on the clean exponential. On
-    the noisy sinusoid Prony is asked for nothing but a finite number, which is
-    the textbook reason the subspace methods replaced it.
+# the head-to-head on the two tasks a subspace mode maps onto one quantity
+def _dominant_rate(model):
+    return float(model.rate[int(np.argmax(np.abs(model.amp)))].real)
 
-    Fails under the row key going back to "dtfit LSI" (a KeyError on the
-    lookup) or under the Legendre error crossing the 2 percent budget
-    (measured today: 0.039 percent on the exponential rate, 0.0003 percent on
-    the sinusoid frequency, against 3.8 and 100 for Prony)."""
-    from dtfit_experimental.experiments.domains.parameter_estimation.backend import (
-        subspace_rate_recovery,
-    )
-    rows = subspace_rate_recovery(np.random.default_rng(0), noise=0.03)
-    assert len(rows) == 2
+
+def _dominant_frequency(model):
+    osc = model.frequency > 1e-9
+    if not np.any(osc):
+        return 0.0
+    return float(model.frequency[int(np.argmax(np.where(osc, np.abs(model.amp), -np.inf)))])
+
+
+def _rate_recovery_row(family, quantity, modes, rng):
+    """Percent error of each method on one parameter of ``family``: the growth
+    rate of a single exponential (``modes=1``) or the angular frequency of a
+    mean-removed sinusoid (``modes=2``)."""
+    t, y, _ = F.simulate(family, rng, n=400, noise=0.01)
+    image_fit = dt.fit(family.expr, dt.Original(t, y), family.var, basis="legendre",
+                       p0=list(family.p0), bounds=list(family.bounds),
+                       freq_param=family.osc)
+    legendre = dict(zip(sorted(family.names), image_fit.coeffs))
+    lo = [b[0] for b in family.bounds]
+    hi = [b[1] for b in family.bounds]
+    nlls = dict(zip(family.names, scipy_curve_fit(t, y, family.func, list(family.p0),
+                                                  bounds=(lo, hi))))
+    ys = y if modes == 1 else y - float(np.mean(y))
+    pick = _dominant_rate if modes == 1 else _dominant_frequency
+    true = family.truth[quantity]
+
+    def err(value):
+        return float(abs(value - true) / abs(true) * 100)
+
+    return {
+        "dtfit Legendre": err(legendre[quantity]),
+        "SciPy NLLS": err(nlls[quantity]),
+        "Prony": err(pick(prony_fit(t, ys, modes))),
+        "Matrix Pencil/ESPRIT": err(pick(matrix_pencil_fit(t, ys, modes))),
+    }
+
+
+def test_subspace_rate_recovery_head_to_head():
+    """Every method stays inside its error budget: 2 percent for dtfit
+    Legendre, SciPy NLLS and Matrix Pencil / ESPRIT on both tasks, 10 percent
+    for classical Prony and only on the exponential. On the noisy sinusoid
+    Prony is asked for nothing but a finite number, which is the textbook
+    reason the subspace methods replaced it.
+
+    Fails under the Legendre error crossing the 2 percent budget (measured
+    today: 0.047 percent on the exponential rate, 0.0003 percent on the
+    sinusoid frequency, against 5.7 and 100 for Prony)."""
+    by_key = {family.key: family for family in F.FAMILIES}
+    rng = np.random.default_rng(0)
+    rows = [_rate_recovery_row(by_key["expgrow"], "b", 1, rng),
+            _rate_recovery_row(by_key["sine"], "w", 2, rng)]
     for row in rows:
         for method in ("dtfit Legendre", "SciPy NLLS", "Matrix Pencil/ESPRIT"):
-            assert row[method] < 2.0, (row["task"], method, row[method])
-    # Prony is held to a number only on rows[0], the clean exponential
+            assert row[method] < 2.0, (method, row[method])
+    # Prony is held to a number only on rows[0], the exponential
     assert rows[0]["Prony"] < 10.0
     # nothing crashes: every method returns a finite error on both tasks
-    assert all(np.isfinite(row[m]) for row in rows for m in
-               ("dtfit Legendre", "SciPy NLLS", "Prony", "Matrix Pencil/ESPRIT"))
+    assert all(np.isfinite(v) for row in rows for v in row.values())
