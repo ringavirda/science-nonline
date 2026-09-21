@@ -11,8 +11,8 @@ with no ``matplotlib``: a notebook drives these and does the presentation.
   :class:`LegAd`, :class:`LegRobAd`, :class:`EKFAd`, :class:`RLSAd` and
   :class:`RefitAd`, driven one sample at a time by :func:`drive`, scored by
   :func:`perr`;
-* the model-mismatch negative control, ``_MISMATCH_PAIRS`` and
-  :func:`_mismatch_scores`: an estimator configured for the wrong plant,
+* the model-mismatch negative control, :data:`MISMATCH_PAIRS` and
+  :func:`mismatch_scores`: an estimator configured for the wrong plant,
   driven over another plant's stream;
 * the multi-axis fault detection, :func:`make_multi`, :class:`MergedTracker`,
   :func:`run_tracker` and :func:`kalman_multi`, on a fused chi-square
@@ -37,6 +37,7 @@ __all__ = [
     "gen_plant",
     "EAAd", "EARobAd", "LegAd", "LegRobAd", "EKFAd", "RLSAd", "RefitAd",
     "perr", "drive", "adapters",
+    "MISMATCH_PAIRS", "MISMATCH_CEILING", "mismatch_scores",
     "make_multi", "MergedTracker", "run_tracker", "kalman_multi",
 ]
 
@@ -383,7 +384,7 @@ def adapters(plant):
 # Model mismatch, the negative control: the wrong physical model on-device.
 # Each pair is the true plant that generates the stream and the wrong plant
 # whose model is fitted to it.
-_MISMATCH_PAIRS = [
+MISMATCH_PAIRS = [
     ("damped_osc", "first_order"),  # a decaying sinusoid fitted as a saturating rise
     ("first_order", "ac_sine"),     # a monotone RC rise fitted as a pure sinusoid
     ("ca_traj", "first_order"),     # an accelerating trajectory fitted as a plateau
@@ -393,16 +394,34 @@ _MISMATCH_PAIRS = [
 # RMSE ceiling: on some mismatch pairs a wrong-model EKF's covariance windup
 # or exponential blow-up pushes the track to the edge of float64 range;
 # values past this are clipped and reported as diverged instead.
-_MM_CEIL = 1e4
+MISMATCH_CEILING = 1e4
 
 
-def _mismatch_scores(adapter, t, y, clean, warm):
-    """Drive one adapter over a stream and return
-    ``(rmse_vs_clean, insample_residual_rmse, diverged)``. The residual, track
-    against the noisy observations, is the on-device self-diagnosis signal: a
-    wrong model cannot fit even the data it sees, so its residual stays
-    structured and large. ``diverged`` is set when the estimate blew up, going
-    non-finite or past :data:`_MM_CEIL`."""
+def mismatch_scores(adapter, t, y, clean, warm):
+    """Drive one adapter over a stream and score its track two ways.
+
+    Args:
+        adapter: An estimator adapter (:class:`EKFAd` and the others),
+            constructed for the model under test, which in this control is
+            a different plant's model than the one that generated the
+            stream.
+        t: The time grid of the stream, in seconds, increasing.
+        y: The noisy observations on ``t``, in the plant's output unit.
+        clean: The clean signal on ``t``, the same length as ``y``.
+        warm: Leading samples to exclude from both scores, the adapter's
+            warm-up in samples; 0 excludes none.
+
+    Returns:
+        ``(rmse_vs_clean, insample_residual_rmse, diverged)``. The residual,
+        the track against the noisy observations, is the on-device
+        self-diagnosis signal: a wrong model cannot fit even the data it
+        sees, so its residual stays structured and large. Both RMSE values
+        are clipped at :data:`MISMATCH_CEILING`, and are NaN when the track
+        holds no finite sample past ``warm``. ``diverged`` is True when the
+        estimate blew up, going non-finite or past that ceiling, and a
+        clipped score is not a measurement: count those runs, do not
+        average them.
+    """
     with np.errstate(over="ignore", invalid="ignore", divide="ignore"):
         _, _, track = drive(adapter, t, y, clean, warm)
     valid = np.isfinite(track)
@@ -411,8 +430,8 @@ def _mismatch_scores(adapter, t, y, clean, warm):
         return float("nan"), float("nan"), True
     rmse_clean = float(np.sqrt(np.mean((track[valid] - clean[valid]) ** 2)))
     resid = float(np.sqrt(np.mean((track[valid] - y[valid]) ** 2)))
-    diverged = not np.isfinite(rmse_clean) or rmse_clean > _MM_CEIL
-    return min(rmse_clean, _MM_CEIL), min(resid, _MM_CEIL), diverged
+    diverged = not np.isfinite(rmse_clean) or rmse_clean > MISMATCH_CEILING
+    return min(rmse_clean, MISMATCH_CEILING), min(resid, MISMATCH_CEILING), diverged
 
 
 # fault detection and on-device re-adaptation, by the multi-axis fused detector

@@ -4,9 +4,10 @@ shared by the filter notebooks."""
 import numpy as np
 import pytest
 
+from dtfit_experimental.study import plants
 from dtfit_experimental.study.plants import (
     PLANTS, EAAd, EKFAd, LegAd, gen_plant, perr, drive,
-    _MISMATCH_PAIRS, _mismatch_scores,
+    MISMATCH_PAIRS, mismatch_scores,
     make_multi, MergedTracker, run_tracker, kalman_multi,
 )
 from dtfit_experimental.study.cost import MCUS, footprint_rows
@@ -162,16 +163,27 @@ def test_kalman_multi_excludes_warmup_from_rmse():
 
 
 def test_mismatch_scores_correct_model_beats_wrong_model():
-    """For every entry of `_MISMATCH_PAIRS`, an EKF fitted to the plant that
+    """For every entry of `MISMATCH_PAIRS`, an EKF fitted to the plant that
     actually generated the stream scores a lower clean-RMSE than the same
     EKF fitted to the paired wrong plant; the mutation this catches is a
     copy-paste in the pair table that fits a plant against itself, which
     collapses the two scores to the same value instead of a clear gap."""
     by_key = {p["key"]: p for p in PLANTS}
     rng = np.random.default_rng(3)
-    for true_key, wrong_key in _MISMATCH_PAIRS:
+    for true_key, wrong_key in MISMATCH_PAIRS:
         true_plant = by_key[true_key]
         t, y, clean = gen_plant(true_plant, rng, noise=0.05)
-        right_rmse, _, _ = _mismatch_scores(EKFAd(true_plant), t, y, clean, warm=20)
-        wrong_rmse, _, _ = _mismatch_scores(EKFAd(by_key[wrong_key]), t, y, clean, warm=20)
+        right_rmse, _, _ = mismatch_scores(EKFAd(true_plant), t, y, clean, warm=20)
+        wrong_rmse, _, _ = mismatch_scores(EKFAd(by_key[wrong_key]), t, y, clean, warm=20)
         assert right_rmse < wrong_rmse
+
+
+def test_mismatch_control_names_are_public():
+    """The mismatch control is reachable under the names a caller imports:
+    `MISMATCH_PAIRS`, `MISMATCH_CEILING` and `mismatch_scores`, each listed
+    in `__all__` and bound on the module; the mutation this catches is
+    spelling one of them with a leading underscore, which leaves `__all__`
+    advertising a name the module does not bind."""
+    for name in ("MISMATCH_PAIRS", "MISMATCH_CEILING", "mismatch_scores"):
+        assert name in plants.__all__
+        assert hasattr(plants, name)
