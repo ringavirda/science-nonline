@@ -16,6 +16,7 @@ prototyped and evaluated here.
   Notebook 19 (`experiments/method/19_adaptations_in_trial.ipynb`) measures each
   against the plain route and carries its verdict.
 - `weak_ode` -- weak-form ODE identification: rate laws linearized by clearing denominators or eliminating hidden states, fit by least squares with no ODE solve and no p0 (`weak_operators`, `fit_logistic`, `fit_michaelis_menten`, `fit_lotka_volterra_prey`), plus `seed_nlls`, which solves the ODE and refines the weak estimate by nonlinear least squares to full accuracy.
+- `local_time` -- `LocalTimeFilter`, the window image filter for a polynomial trend carried in the time of its newest sample: the origin moves onto every new sample through the exact coefficient map `shift_matrix`, so the estimate does not depend on the clock's zero and the process noise is stated per unit of time. Measured on the recorded rig logs in `packages/dtfit-hardware/experiments/rig.ipynb`.
 - **`dtfit_experimental.experiments`** -- the experiment suite: `cases/` (each
   adaptation in isolation), `domains/` (per-application-domain validation against
   the established baselines), shared `study/` framework, and `data/`.

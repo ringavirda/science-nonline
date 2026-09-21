@@ -32,6 +32,8 @@ physically rather than being re-imported from here.
         fit_aligned,          # windows aligned to detected jump epochs
         AlignedFit,           # what fit_aligned returns
         detect_jumps,         # the jump test on a fine window image
+        LocalTimeFilter,      # window image filter in the newest sample's time
+        shift_matrix,         # polynomial coefficients under an origin shift
     )
 
 ``FourierBasis``, ``ChebyshevBasis`` and ``LaguerreBasis`` are the
@@ -65,12 +67,15 @@ from .weak_ode import (
     weak_operators,
 )
 from .information import InformationFilter
+from .local_time import LocalTimeFilter, shift_matrix
 
 __all__ = [
     "available_backends",
     "resolve_backend",
     "Backend",
     "InformationFilter",
+    "LocalTimeFilter",
+    "shift_matrix",
     "FourierBasis",
     "ChebyshevBasis",
     "LaguerreBasis",
