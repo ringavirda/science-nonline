@@ -174,6 +174,32 @@ def test_fused_detector_flags_multiaxis_fault():
     assert det.threshold_ > 0 and det.n_flags_ == len(det.flags_)
 
 
+def test_fused_detector_rearm_collapses_every_window():
+    """With ``rearm=True`` a flag re-arms each filter through ``rearm``: the
+    adaptive windows collapse and ``P`` takes the filter's own
+    ``drift_inflation``. Fails if the detector still calls ``inflate``
+    (the windows stay grown and ``P`` is multiplied by 4) or skips the
+    re-arm."""
+    rng = np.random.default_rng(0)
+    t, Y, fault_at = _multiaxis(rng, n=600)
+    bank = FilterBank.from_model(
+        OSC, "t", 3, basis="legendre", p0=[2.0, 2.5, 0.1],
+        window_size=60, order=5, q_diag=[1e-3] * 3,
+        cusum_h=np.inf, drift_inflation=9.0)
+    det = bank.fused_detector(alpha=1e-4, inflate=4.0, rearm=True)
+    for i in range(Y.shape[0]):
+        before = [f.P.copy() for f in bank.filters]
+        windows = [f._W_eff for f in bank.filters]
+        if det.update(float(t[i]), Y[i]):
+            break
+    assert det.flags_ and det.flags_[0] >= fault_at
+    assert min(windows) > bank.filters[0].min_window
+    for f, p_before in zip(bank.filters, before):
+        assert f._W_eff == f.min_window
+        # the update before the flag moved P, so only the scale is tested
+        assert np.trace(f.P) > 5.0 * np.trace(p_before)
+
+
 def test_fused_detector_factory_matches_class():
     bank = FilterBank.from_model(
         OSC, "t", 2, basis="legendre", p0=[2.0, 2.5, 0.1],

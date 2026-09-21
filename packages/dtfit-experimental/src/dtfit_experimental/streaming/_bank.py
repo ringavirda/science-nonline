@@ -306,7 +306,8 @@ class FusedChiSquareDetector:
     model) into one fused ``chi2(sum n_coef)`` statistic. Passing the
     ``alpha``-level threshold flags a synchronized multi-axis fault that
     any single stream's innovation would miss, and optionally re-arms
-    each filter via :meth:`~dtfit.ImageFilter.inflate`.
+    each filter via :meth:`~dtfit.ImageFilter.inflate` or
+    :meth:`~dtfit.ImageFilter.rearm`.
 
     Usage::
 
@@ -319,13 +320,18 @@ class FusedChiSquareDetector:
 
     Args:
         bank: The :class:`FilterBank` to drive. Its filters must expose
-            ``nis_``, ``basis.n_coef``, ``W`` and :meth:`inflate`; both
-            stock ones do.
+            ``nis_``, ``basis.n_coef``, ``W`` and :meth:`inflate`, and
+            :meth:`rearm` when ``rearm=True``; both stock ones do.
         alpha: Per-step false-alarm probability; the threshold is
             ``chi2.ppf(1 - alpha, df=sum(n_coef))`` over the bank's filters.
         inflate: Covariance re-arm factor applied to every filter on a
             detection (``<= 1`` disables the re-arm; the flag is still
-            raised).
+            raised). Ignored when ``rearm=True``.
+        rearm: On a detection call every filter's
+            :meth:`~dtfit.ImageFilter.rearm` instead of :meth:`inflate`,
+            which applies the filter's own ``drift_reset`` and collapses
+            its adaptive window, so the samples from before the change
+            leave the window at once rather than after one window length.
         warmup: Steps to wait before detecting. Defaults to ``3 * window``,
             long enough for the filters to settle.
         cooldown: Steps to suppress detection after a flag. Defaults to one
@@ -338,6 +344,7 @@ class FusedChiSquareDetector:
         *,
         alpha: float = 1e-4,
         inflate: float = 4.0,
+        rearm: bool = False,
         warmup: int | None = None,
         cooldown: int | None = None,
     ) -> None:
@@ -346,6 +353,7 @@ class FusedChiSquareDetector:
         df = sum(f.basis.n_coef for f in bank.filters)
         self.threshold_ = float(chi2.ppf(1.0 - alpha, df=df))
         self.inflate_factor = float(inflate)
+        self.rearm = bool(rearm)
         # W is the filter's window cap. An adaptive-window filter starts at
         # min_window and grows, so the default ``3*W`` warmup is conservative:
         # it delays first detection but never causes a false positive. Pass an
@@ -386,7 +394,10 @@ class FusedChiSquareDetector:
         if self._seen < self._warmup:
             return False
         if self.statistic_ > self.threshold_:
-            if self.inflate_factor > 1.0:
+            if self.rearm:
+                for f in self.bank.filters:
+                    f.rearm()
+            elif self.inflate_factor > 1.0:
                 for f in self.bank.filters:
                     f.inflate(self.inflate_factor)
             self.flag_ = True

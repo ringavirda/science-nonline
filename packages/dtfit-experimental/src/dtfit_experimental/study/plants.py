@@ -435,15 +435,16 @@ def mismatch_scores(adapter, t, y, clean, warm):
 
 
 # fault detection and on-device re-adaptation, by the multi-axis fused detector
-def make_multi(rng, n=900, noise=0.05):
+def make_multi(rng, n=900, noise=0.05, fault=1.0):
     """A 3-axis damped oscillator carrying a damping fault: zeta jumps on every
-    axis at the midpoint. Returns ``(t, noisy, clean, half)``."""
+    axis at the midpoint, by ``fault`` times the full jump (``1.0`` is the full
+    jump, ``0.0`` no fault). Returns ``(t, noisy, clean, half)``."""
     t = np.linspace(0, 18, n)
     half = n // 2
     A = np.array([2.0, 1.5, 2.5])
     w = np.array([2.5, 2.0, 3.0])
     z1 = np.array([0.08, 0.10, 0.06])
-    z2 = np.array([0.30, 0.28, 0.25])
+    z2 = z1 + fault * (np.array([0.30, 0.28, 0.25]) - z1)
     clean = np.zeros((n, 3))
     dtt = np.diff(t, prepend=t[0])
     for d in range(3):

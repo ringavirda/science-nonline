@@ -122,6 +122,25 @@ def test_make_multi_shapes_and_finite():
     assert np.all(np.isfinite(clean))
 
 
+def test_make_multi_fault_scales_the_damping_jump():
+    """`fault=0.0` leaves the second half on the first half's damping and
+    `fault=1.0` is the default stream; the mutation this catches is `fault`
+    scaling the final damping instead of the jump, which would undamp the
+    second half at `fault=0.0`."""
+    _t, _noisy, clean0, half = make_multi(np.random.default_rng(0), n=200,
+                                          fault=0.0)
+    _t, _noisy, clean1, _half = make_multi(np.random.default_rng(0), n=200)
+    _t, _noisy, full, _half = make_multi(np.random.default_rng(0), n=200,
+                                         fault=1.0)
+    assert np.array_equal(clean1, full)
+    assert np.array_equal(clean0[:half], clean1[:half])
+    # undamped, the second half would swing at the full amplitude; on the
+    # first half's damping it has decayed well below the first half's peak
+    assert (np.abs(clean0[half:]).max(axis=0)
+            < 0.5 * np.abs(clean0[:half]).max(axis=0)).all()
+    assert np.abs(clean0[half:]).max() > np.abs(clean1[half:]).max()
+
+
 def test_merged_tracker_step_predict_shape():
     """One `step` then `predict` returns one finite value per axis; the
     mutation this catches is swapping the detector's `update(t, y)`
