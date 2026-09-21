@@ -254,7 +254,10 @@ print(det.update(rng.normal(0, 1, 2)), det.n_tests_)
 `nis_` is chi-square under the model, so several filters' `nis_` sum to a
 chi-square with the summed degrees of freedom, giving the pooled test
 more degrees of freedom and power than any one filter's innovation
-alone. This treats successive `nis_` values from one filter as
+alone when the change is spread evenly over the streams; on the
+three-axis damping fault of [notebook 21](Domain-Embedded-Control),
+carried mostly by one axis, per-axis tests on every sample are as fast.
+This treats successive `nis_` values from one filter as
 independent draws at each sample; they are not, since consecutive
 windows overlap by `W - 1` samples. Measured for the regime below (order
 4, dof 5, static): mean `nis_` 4.08 against the nominal 5, median 3.63,

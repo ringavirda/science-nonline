@@ -332,8 +332,8 @@ it re-adapts to the new regime instead of stubbornly averaging across the break.
 - `result()` -- the current window as a batch fit, with a calibrated
   covariance; `P` itself is a gain state, not a confidence measure.
 - **Pooling several streams** -- summing several filters' `nis_` is a fused
-  fault test with more degrees of freedom and power than any one filter's
-  innovation alone.
+  fault test with more degrees of freedom, and more power than any one
+  filter's innovation when the change is spread evenly over the streams.
   -> [api/streaming.md#several-streams](API-Streaming#several-streams)
 - **Coasting through gaps** (`filter.coast(x, order=)`, `coast_cov`) -- when
   measurements drop out, roll the current parameter model forward
