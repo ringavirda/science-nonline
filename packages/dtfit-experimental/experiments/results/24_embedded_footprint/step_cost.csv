@@ -1,26 +1,26 @@
 plant,estimator,n_params,window,coeff_count,latency_us_median,latency_us_lo,latency_us_hi,latency_us_mean,latency_us_max
-damped_osc,dtfit block filter,3,60,3,96.333,95.211,97.174,111.14,269.431
-damped_osc,dtfit Legendre filter,3,60,5,96.804,95.892,97.635,109.93,346.458
-damped_osc,EKF (params-as-state),3,60,,12.193,12.153,12.274,12.9392,74.873
-damped_osc,RLS (AR predictor),3,60,,4.589,4.588,4.608,4.79155,39.806
-damped_osc,sliding-window curve_fit,3,60,,0.219996,0.200998,0.221,120.431,14916.4
-ac_sine,dtfit block filter,3,60,3,78.339,76.846,78.539,92.1177,377.357
-ac_sine,dtfit Legendre filter,3,60,5,77.657,77.227,78.068,88.5343,317.167
-ac_sine,EKF (params-as-state),3,60,,9.148,9.097,9.21699,9.66502,46.999
-ac_sine,RLS (AR predictor),3,60,,4.50901,4.489,4.519,4.73522,30.698
-ac_sine,sliding-window curve_fit,3,60,,0.209999,0.200998,0.209999,29.2984,751.036
-first_order,dtfit block filter,2,50,2,73.289,71.806,78.278,83.9086,250.345
-first_order,dtfit Legendre filter,2,50,5,72.819,71.566,73.269,81.8368,236.59
-first_order,EKF (params-as-state),2,50,,8.777,8.736,8.797,9.30563,51.318
-first_order,RLS (AR predictor),2,50,,4.549,4.538,4.578,4.72336,27.161
-first_order,sliding-window curve_fit,2,50,,0.221,0.210006,0.240994,49.6325,2290.77
-ca_traj,dtfit block filter,3,40,3,72.498,71.927,73.049,81.2878,237.782
-ca_traj,dtfit Legendre filter,3,40,5,73.88,73.359,74.331,83.0971,226.52
-ca_traj,EKF (params-as-state),3,40,,9.027,8.997,9.047,9.52982,47.6
-ca_traj,RLS (AR predictor),3,40,,4.659,4.629,4.689,4.85292,32.502
-ca_traj,sliding-window curve_fit,3,40,,0.210995,0.201006,0.211003,58.8731,1728.11
-,dtfit block filter,,,,72.778,71.1555,73.5545,,
-,dtfit Legendre filter,,,,73.134,73.0735,73.635,,
-,Kalman-CA (1-axis),,,,8.346,8.336,8.38601,,
-,Kalman-CA (3-axis),,,,24.025,23.926,24.136,,
-,sliding-window curve_fit (refit),,,,50.8815,48.5775,51.3025,,
+damped_osc,dtfit block filter,3,60,3,97.245,95.682,104.85,118.196,308.481
+damped_osc,dtfit Legendre filter,3,60,5,97.796,96.543,98.416,114.096,339.845
+damped_osc,EKF (params-as-state),3,60,,12.253,12.223,12.314,13.2553,63.701
+damped_osc,RLS (AR predictor),3,60,,4.589,4.569,4.719,4.85884,45.346
+damped_osc,sliding-window curve_fit,3,60,,0.191008,0.190994,0.200002,120.532,14820.8
+ac_sine,dtfit block filter,3,60,3,76.906,76.335,77.788,91.5366,278.94
+ac_sine,dtfit Legendre filter,3,60,5,76.906,76.616,77.617,90.0176,325.427
+ac_sine,EKF (params-as-state),3,60,,9.26701,9.25701,9.298,9.82858,58.461
+ac_sine,RLS (AR predictor),3,60,,4.55901,4.51901,4.57899,4.74863,32.833
+ac_sine,sliding-window curve_fit,3,60,,0.190994,0.190994,0.200002,29.0188,859.993
+first_order,dtfit block filter,2,50,2,71.766,71.636,72.468,80.8567,203.636
+first_order,dtfit Legendre filter,2,50,5,72.368,72.137,72.888,82.7483,289.981
+first_order,EKF (params-as-state),2,50,,8.827,8.766,8.837,9.32326,50.175
+first_order,RLS (AR predictor),2,50,,4.56801,4.548,4.609,4.84665,31.14
+first_order,sliding-window curve_fit,2,50,,0.191008,0.190994,0.191008,48.5636,2327.84
+ca_traj,dtfit block filter,3,40,3,73.589,72.578,74.241,88.9746,279.301
+ca_traj,dtfit Legendre filter,3,40,5,74.181,73.109,79.731,91.2872,306.728
+ca_traj,EKF (params-as-state),3,40,,8.96699,8.897,8.997,9.62412,57.389
+ca_traj,RLS (AR predictor),3,40,,4.569,4.52899,4.60799,4.75856,29.917
+ca_traj,sliding-window curve_fit,3,40,,0.200002,0.200002,0.219996,60.017,1868.31
+,dtfit block filter,,,,72.127,71.546,72.583,,
+,dtfit Legendre filter,,,,72.087,71.9665,72.738,,
+,Kalman-CA (1-axis),,,,8.406,8.40599,8.42601,,
+,Kalman-CA (3-axis),,,,24.276,24.106,24.317,,
+,sliding-window curve_fit (refit),,,,50.3605,49.774,51.017,,

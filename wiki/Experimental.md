@@ -148,7 +148,7 @@ No starting guess, no ODE solve.
 `(1 - u^2)^order * P_k(u)` with `P_k` the Legendre polynomials; the boundary
 terms of the integration by parts vanish with the window factor.
 
-**What is measured.** A call takes about 1 ms against 31 to 205 ms for the
+**What is measured.** A call takes about 1 ms against 30 to 200 ms for the
 solved fit. It is less accurate than the solved fit from a good start, by
 1.69 to 4.39 times, and ahead of finite-difference regression at every law
 and noise level. Used as the start of the solved fit (`seed_nlls`) it reaches

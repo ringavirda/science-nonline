@@ -33,8 +33,8 @@ nothing at one chunk.
 MiB against 335.7 MiB resident, and between the two record lengths tried its
 peak moves by -4.5 MiB while the resident one grows by 400 percent.
 
-**Many fits.** 200 fits take 1.93 s in a serial loop, 0.52 s on 4 processes
-(3.5 to 3.8 times) and 0.20 s on 12.
+**Many fits.** 200 fits take 1.97 s in a serial loop, 0.54 s on 4 processes
+(3.6 to 3.9 times) and 0.20 s on 12.
 
 **The surrogate trap.** A polynomial surrogate matches or beats the structured
 fit in sample at 4 of 6 degrees and extrapolates 3.3 to 9431 times worse on
@@ -43,18 +43,19 @@ the held-out half, on a record that holds one exponential decay.
 ## Where dtfit loses
 
 - Chunking does not pay in time: imaging eight chunks of a million samples and
-  merging takes 0.074 s against 0.045 s whole. The reduce buys exactness under
+  merging takes 0.078 s against 0.045 s whole. The reduce buys exactness under
   splitting, not speed against the resident route.
 - On a short record `ImageStream` costs more memory than the resident fit (84.6
   against 67.1 MiB); its fixed cost is what buys the flat growth.
-- `fit_many` on a thread pool is 1.11 times slower than the serial loop. The
+- `fit_many` on a thread pool is 1.12 times slower than the serial loop. The
   GIL owns that; nothing in the image route is a compiled kernel, and
   throughput comes from the process pool.
-- With the host transfer counted, the cupy projection is slower than one BLAS
-  thread at every width (1.14 to 1.95 times); warm on the device it takes 0.20
-  of the numpy time at the widest. The projection is a device win only once
+- With the host transfer counted, the cupy projection is no clear win over one
+  BLAS thread at any width (1.68, 1.15 and 1.08 times the numpy time by the
+  medians, the repeats at the widest spanning 0.93 to 1.55); warm on the device
+  it takes 0.16 to 0.19 of the numpy time at the widest. The projection is a device win only once
   the data is already there.
-- The legacy map-reduce accumulators of `dtfit-legacy` reduce 16 to 48 times
+- The legacy map-reduce accumulators of `dtfit-legacy` reduce 14 to 45 times
   faster than the image merge
   ([notebook 17](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit-experimental/experiments/method/17_evolution_matrix.ipynb));
   what they reduce to is a different estimator, 1e-4 and 1e-7 away from the

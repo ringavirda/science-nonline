@@ -22,7 +22,7 @@ scheme rather than proposes it. Measured in
 ``experiments/method/16_weak_form.ipynb`` against nonlinear least squares on
 the integrated law, started near the truth and handed the true initial state
 (60 seeds, 2 to 10 percent noise), the weak form is 1.7 to 4.4 times less
-accurate and 30 to 200 times faster, and needs no start. Used as the start of
+accurate and about 35 to 200 times faster, and needs no start. Used as the start of
 that nonlinear least squares instead, the weak estimate gives the full
 least-squares accuracy on every law at 2 to 10 percent noise and removes
 the basin failures of a poor start (Michaelis-Menten: 97 to 100 percent of

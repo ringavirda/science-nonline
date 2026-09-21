@@ -89,10 +89,10 @@ every sample match the pooled test at every fault size tried.
 
 | | per step | note |
 |---|---|---|
-| window filter, either basis | 102 to 124 us | worst step 0.2 to 0.4 ms |
-| EKF | 12.5 us | |
-| sliding-window refit | 29 to 120 us in the mean | worst step 0.8 to 15 ms; needs an optimizer on the device |
-| Kalman-CA, one axis | 8.3 us | tracks a position, identifies nothing |
+| window filter, either basis | 107 to 133 us | worst step 0.2 to 0.3 ms |
+| EKF | 13.1 us | |
+| sliding-window refit | 29 to 121 us in the mean | worst step 0.9 to 15 ms; needs an optimizer on the device |
+| Kalman-CA, one axis | 8.4 us | tracks a position, identifies nothing |
 
 The state is a fixed struct that does not grow with the stream: 212 bytes in
 float32 for a quadratic axis at a window of 15, 492 for the damped oscillator

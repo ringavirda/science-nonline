@@ -82,7 +82,7 @@ model. Application view: [Parameter estimation](Domain-Parameter-Estimation).
 
 [16_weak_form](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit-experimental/experiments/method/16_weak_form.ipynb):
 weak-form identification of a rate law needs no starting guess and no ODE
-solve, and a call takes about 1 ms against 31 to 205 ms for the solved fit. It
+solve, and a call takes about 1 ms against 30 to 200 ms for the solved fit. It
 is less accurate than the solved fit from a good start at every law and noise
 level, by 1.69 to 4.39 times, and beats finite-difference regression at every
 cell. Seeding the solved fit with the weak estimate reaches the good-start
@@ -103,7 +103,7 @@ interval coverage orders image, direct integral forms, adequate-degree balance
 at 0.883, 0.734 and 0.133. Streaming: the window image tracks an amplitude jump
 at 0.018 of the recursive equal-areas form's RMSE. Map-reduce: the image merge
 reproduces the whole-data fit to rounding, and the legacy accumulators reduce
-16 to 48 times faster.
+14 to 45 times faster.
 
 ## 18 -- where the block basis applies
 
