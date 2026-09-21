@@ -228,9 +228,11 @@ basis of the streaming [ImageFilter(basis="block")](Methods-Equal-Areas-Filter).
 ## Where it is best applied
 
 **Use EAC for:** a jump or regime change aligned to a window edge (the h-
-version's exact case), high-order conditioning (the diagonal block Gram --
-the showcase's 1,275-station Legendre Gram hit condition 1e19 where the
-block Gram stays diagonal), and the streaming and map-reduce tiers where the
+version's exact case), a Gram that stays diagonal at any order (the
+showcase's 1,275-station Legendre Gram hit condition 1e19; under the
+pseudo-inverse solve in double precision that conditioning costs the
+Legendre image no accuracy, so the diagonal Gram is a cost and storage
+reason, not an accuracy one), and the streaming and map-reduce tiers where the
 block image is `n_windows` sums, the batch form of the streaming
 [ImageFilter(basis="block")](Methods-Equal-Areas-Filter)'s measurement and of the MCU block
 images. It is also a fast, stable initializer for a slower method. For peaks
@@ -240,7 +242,12 @@ rather than to the block basis (1.04 to 1.22 times the Legendre parameter
 error on the peaked families). Outlier-prone data reach for the robust image
 (`robust=True`) on whichever basis the shape chose, scattered or bursty.
 
-**Caveats.** EAC's window sums partly cancel **oscillations** -- for a cycle
+**Caveats.** On a record seen in bursts the block image is behind the
+Legendre one at every K: over 200 draws on a 20 percent duty grid it sits at
+3.19 times the pointwise rmse at K = 32 where the Legendre image is at 1.00,
+because a window that holds one whole burst reads the constant and the cycle
+terms as a single number (notebook `18a_block_basis_synthetic`, section 4).
+EAC's window sums partly cancel **oscillations** -- for a cycle
 use [LSI](Methods-LSI)'s oscillatory recipe or the streaming
 [ImageFilter(basis="legendre")](Methods-Legendre-Filter). For real-time tracking of
 *time-varying* parameters, use the recursive [ImageFilter(basis="block")](Methods-Equal-Areas-Filter).
