@@ -166,11 +166,11 @@ FitDisplay.from_estimator(reg, x, y)  # data + fitted curve (needs the viz extra
   (process or threading backend); the threading backend shares memory and
   avoids pickling.
 
-Further experimental adaptations (pluggable orthogonal bases, joint
-multi-channel fits, stage-wise boosting) live in the separate
-**`dtfit-experimental`** package
-(`dtfit_experimental`); their cross-application evaluation is in its experiment
-suite ([../dtfit-experimental/src/dtfit_experimental/experiments/cases/REPORTS.md](../dtfit-experimental/src/dtfit_experimental/experiments/cases/REPORTS.md)).
+Adaptations still in trial (further image bases, fits of aggregated data and
+of windows aligned to jumps, weak-form ODE identification, the filter bank)
+live in the separate **`dtfit-experimental`** package (`dtfit_experimental`);
+the notebooks that measure them are indexed in
+[../dtfit-experimental/experiments/README.md](../dtfit-experimental/experiments/README.md).
 
 Each method's mathematical grounding (in differential / non-Taylor
 transformations), full algorithm, optimizations, guards, applicability, usage

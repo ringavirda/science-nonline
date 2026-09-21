@@ -3,11 +3,10 @@
 The distribution has two tiers. The library tier is this package
 (``import dtfit_experimental``): a small importable surface of adaptations
 plus the backend helpers, staging code that may graduate into stable
-``dtfit``. The study tier is :mod:`dtfit_experimental.experiments`, the
-per-case and per-domain validation suite each adaptation is measured in.
-That tier is a research tree rather than an API: exempt from the mypy gate,
-ruff-relaxed, driven with ``python -m dtfit_experimental.experiments...``
-instead of imported. Nothing in the library tier imports from it.
+``dtfit``. The study tier is :mod:`dtfit_experimental.study`: the baselines,
+simulators, dataset loaders and notebook helpers the experiment notebooks
+under ``experiments/`` import, module by module. Nothing in the library tier
+imports from it.
 :mod:`dtfit_experimental.streaming` is a third, narrower surface:
 ``FilterBank`` and ``FusedChiSquareDetector``, experiment tooling over
 ``dtfit``'s filters rather than library API, moved here with the
@@ -16,7 +15,7 @@ experiments that use them.
 The adaptations are new ways to compose the differential-transformation
 fitting methods of :mod:`dtfit`, grounded in the methods' own math: linearity
 of integration, orthogonal-basis projection, additive areas. They are
-prototyped here and evaluated across the experiment suite; whatever holds up
+prototyped here and measured in the experiment notebooks; whatever holds up
 on two or more domains is promoted into stable ``dtfit``, where it then lives
 physically rather than being re-imported from here.
 

@@ -45,8 +45,8 @@ def grid(
     span: float = 1.0,
     rng: np.random.Generator | None = None,
 ) -> np.ndarray:
-    """A sample grid on ``[0, span]``, the three shapes of
-    ``experiments/evolution.py``.
+    """A sample grid on ``[0, span]`` in one of the three shapes the method
+    notebooks run on.
 
     Args:
         kind: ``"uniform"`` (evenly spaced), ``"clustered"`` (half the
@@ -87,9 +87,9 @@ def noisy(
 ) -> tuple[np.ndarray, float]:
     """Additive Gaussian noise scaled to the signal's own range.
 
-    ``sigma = noise * numpy.ptp(clean)``, the convention of
-    ``experiments/evolution.py``; a flat ``clean`` (``ptp == 0``) falls back
-    to ``sigma = noise`` so the noise level never collapses to zero.
+    ``sigma = noise * numpy.ptp(clean)``; a flat ``clean`` (``ptp == 0``)
+    falls back to ``sigma = noise`` so the noise level never collapses to
+    zero.
 
     Args:
         clean: Noise-free signal, any shape.

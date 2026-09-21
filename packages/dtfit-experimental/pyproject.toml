@@ -28,7 +28,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Experiment / benchmark suite (dtfit_experimental.experiments): plotting + the
+# The notebooks under experiments/ and the study tier they import: plotting + the
 # baseline methods compared against (deep nets via torch, classical TS via
 # statsmodels). joblib (parallel fitting) ships with scikit-learn.
 bench = ["dtfit-legacy", "matplotlib>=3.7", "torch>=2.2", "statsmodels>=0.14", "pandas>=2.0", "nbclient>=0.10", "ipykernel>=6"]
@@ -50,10 +50,6 @@ Issues = "https://github.com/ringavirda/science-nonline/issues"
 [tool.setuptools.packages.find]
 where = ["src"]
 
-[tool.setuptools.package-data]
-# Ship the experiment datasets with the package so the suite runs after install.
-"dtfit_experimental.experiments" = ["data/**/*.csv"]
-
 [tool.ruff]
 line-length = 79
 target-version = "py310"
@@ -64,14 +60,9 @@ select = ["E4", "E7", "E9", "F"]
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401", "F403"]  # star re-exports are intentional
-# Experiment/benchmark scripts: allow compact one-line matplotlib axis setup
-# (`ax.set_xlabel(...); ax.set_ylabel(...)`), a script convention only.
-"src/dtfit_experimental/experiments/**" = ["E702"]
 # Research notebooks legitimately import after a markdown/setup cell (E402),
 # use short throwaway names in plotting (E741), and write compact one-line
 # control flow / lambdas (E701/E731) -- conventions, not defects.
-"src/dtfit_experimental/experiments/**/*.ipynb" = ["E402", "E701", "E741", "E731"]
-# Same conventions, for the new experiments/ tree that sits outside src/.
 "experiments/**/*.ipynb" = ["E402", "E701", "E741", "E731"]
 
 [tool.pytest.ini_options]
@@ -83,20 +74,15 @@ testpaths = ["tests"]
 # numpy stubs that pip installs on the 3.12/3.13 runners; the 3.10 matrix job
 # still enforces the language floor.
 files = ["src/dtfit_experimental"]
-# The experiment suite (numeric-prefixed folders like ``01_control_systems`` are
-# imported by string via the runner, not as importable package names) is a
-# research/script tree and is not type-checked; only the adaptation modules are.
-# study/showcase/ is the same kind of script tree (a domain's CLI and notebook
-# backing moved under study/ by path, not by kind) and stays excluded with it.
-exclude = "/experiments/|/study/showcase/"
+# study/showcase/ is a script tree (the archive showcase's CLI and the code
+# behind its notebook) and is not type-checked.
+exclude = "/study/showcase/"
 ignore_missing_imports = true
 
 [tool.pyright]
-# Type-check the adaptation modules; the experiment suite (numeric-prefixed
-# folders imported by string via the runner) is a research/script tree, excluded
-# here exactly as it is from mypy.
+# study/showcase/ is excluded here exactly as it is from mypy.
 include = ["src"]
-exclude = ["src/dtfit_experimental/experiments", "src/dtfit_experimental/study/showcase"]
+exclude = ["src/dtfit_experimental/study/showcase"]
 pythonVersion = "3.10"
 typeCheckingMode = "standard"
 

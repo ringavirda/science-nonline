@@ -1,13 +1,13 @@
-"""dtfit-hardware: the real-silicon rig, hardware twin of ``realtime_gps``.
+"""dtfit-hardware: the real-silicon rig, hardware twin of the GPS simulation.
 
-The ``realtime_gps`` domain in dtfit-experimental simulates a 9-DOF
-GPS/inertial rig in NumPy. This package runs the same study on an Arduino
+``dtfit_experimental.study.gps`` simulates a 9-DOF GPS/inertial rig in
+NumPy. This package runs the same study on an Arduino
 Nano 33 BLE Sense (onboard IMU and BLE) reading a NEO-M8N GPS.
 
 * ``backend.py`` drives the board from the host: locate it, flash a sketch
   from ``firmware/``, capture the USB or BLE stream.
 * ``compare_real.py`` scores captured logs against the simulation's
-  ``realtime_gps.backend`` baselines: Kalman/CT-EKF, IMU fusion,
+  baselines in ``dtfit_experimental.study.gps``: Kalman/CT-EKF, IMU fusion,
   glitch and float32.
 * ``firmware/`` holds the Arduino sketches. ``nano_lsi_log`` is the one the
   rig actually runs.

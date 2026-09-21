@@ -25,18 +25,13 @@ def experiments_dir() -> Path:
 def data_dir() -> Path:
     """Directory holding the bundled and downloaded CSV datasets.
 
-    ``$DTFIT_DATA`` when set; else the pre-migration
-    ``dtfit_experimental/experiments/data`` while that directory still exists
-    on disk; else ``experiments/data`` beside the package source, the current
-    location. Unlike :func:`experiments_dir`, does not require the directory
+    ``$DTFIT_DATA`` when set, else ``experiments/data`` beside the package
+    source. Unlike :func:`experiments_dir`, does not require the directory
     to exist: ``study.download_data`` creates it on first use.
     """
     env = os.environ.get("DTFIT_DATA")
     if env:
         return Path(env)
-    legacy = Path(__file__).resolve().parent.parent / "experiments" / "data"
-    if legacy.is_dir():
-        return legacy
     return Path(dtfit_experimental.__file__).resolve().parents[2] / "experiments" / "data"
 
 

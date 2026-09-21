@@ -1,7 +1,7 @@
-# dtfit-hardware — the real-silicon rig (hardware twin of `realtime_gps`)
+# dtfit-hardware — the real-silicon rig (hardware twin of the GPS simulation)
 
-The simulated [`realtime_gps`](../dtfit-experimental/src/dtfit_experimental/experiments/domains/realtime_gps/realtime_gps.ipynb)
-domain (in `dtfit-experimental`) validates the streaming LSI/EAC trackers on a
+The [GPS simulation notebook](../dtfit-experimental/experiments/realdata/33_gps_simulation.ipynb)
+(in `dtfit-experimental`) validates the streaming trackers on a
 **simulated** 9-DOF GPS/inertial rig. This package runs the same story on **real
 hardware** — an Arduino Nano 33 BLE Sense + NEO-M8N GPS — and scores the on-MCU
 filter against captured real-data logs and public RTK/INS datasets. It is the
@@ -11,7 +11,7 @@ It encapsulates everything device-specific: the Arduino **firmware**, the host
 **telemetry link** (`backend.py`, USB + BLE), the real-log **comparison harness**
 (`compare_real.py`), and a phone-side **BLE monitor app** (`mobile/`).
 
-Depends on `dtfit-experimental` (to score against the sim's `realtime_gps.backend`)
+Depends on `dtfit-experimental` (to score against the baselines of `dtfit_experimental.study.gps`)
 → `dtfit`. The dependency is one-directional: `dtfit-hardware` → `dtfit-experimental` → `dtfit`.
 
 - **Report:** [`src/dtfit_hardware/realtime_gps_hw.ipynb`](src/dtfit_hardware/realtime_gps_hw.ipynb) — reproduces the sim's **E1/E2/E3/E5 on real-data logs** (forecast, dropout-coasting, glitch robustness, on-MCU cost + float32 bit-faithfulness), with rig status and BOM. A living report, expanded as more runs land.
@@ -104,6 +104,6 @@ for line in rig.capture(seconds=10):   # raw NMEA once the GPS is wired
 > energy-per-estimate experiment is cut; the on-MCU **cost story rests on µs/update + RAM**
 > instead (measured on the M4F via `nano_lsi_onboard`: ~267 µs/update, sub-kB state).
 
-Each hardware stage reproduces a cell (E1–E7) of the `realtime_gps` simulation on
+Each hardware stage reproduces a cell (E1–E7) of the GPS simulation on
 real silicon; the notebook compares the captured logs to the simulated baselines
 (constant-accel Kalman, CT-EKF) and to public RTK/INS ground truth.

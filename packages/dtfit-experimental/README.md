@@ -17,21 +17,22 @@ prototyped and evaluated here.
   against the plain route and carries its verdict.
 - `weak_ode` -- weak-form ODE identification: rate laws linearized by clearing denominators or eliminating hidden states, fit by least squares with no ODE solve and no p0 (`weak_operators`, `fit_logistic`, `fit_michaelis_menten`, `fit_lotka_volterra_prey`), plus `seed_nlls`, which solves the ODE and refines the weak estimate by nonlinear least squares to full accuracy.
 - `local_time` -- `LocalTimeFilter`, the window image filter for a polynomial trend carried in the time of its newest sample: the origin moves onto every new sample through the exact coefficient map `shift_matrix`, so the estimate does not depend on the clock's zero and the process noise is stated per unit of time. Measured on the recorded rig logs in `packages/dtfit-hardware/experiments/rig.ipynb`.
-- **`dtfit_experimental.experiments`** -- the experiment suite: `cases/` (each
-  adaptation in isolation), `domains/` (per-application-domain validation against
-  the established baselines), shared `study/` framework, and `data/`.
+- **`dtfit_experimental.streaming`** -- `FilterBank` and the fused chi-square
+  detector over `dtfit`'s filters: experiment tooling rather than library API.
+- **`dtfit_experimental.study`** -- what the notebooks import: baselines,
+  simulators, dataset loaders, metrics, cost measurement, plotting and notebook
+  helpers, imported module by module.
+- **`experiments/`** -- the experiments themselves, outside `src/`: one notebook
+  per experiment under `method/`, `technology/` and `realdata/`, the tables they
+  export under `results/`, and the downloaded datasets under `data/` (ignored).
+  [`experiments/README.md`](experiments/README.md) is the index: the claim of
+  each notebook, its runtime and the data it needs.
 
 When an adaptation proves effective across enough domains it is **promoted into
 stable `dtfit`** and physically moved there; it is then imported from `dtfit`,
-not from here. Already promoted: the LSI **oscillatory recipe**
-(`dtfit.fit_lsi(oscillatory=..., freq_param=...)` +
-`dtfit.image.fft_frequency_seed`); the filter bank and the fused chi-square
-detector live here in `dtfit_experimental.streaming`.
-Adaptive-window EAC (#6, curvature-placed windows) is retired; `fit(basis="block")`
-places equal windows. The map-reduce estimators (`PartitionedLSI` /
-`PartitionedEAC`, #1) and the GEMM-batched `fit_lsi_batched` /
-`project_spectra` / `PartitionedBatchLSI` live here in
-`dtfit_experimental.scale` until the notebooks rerun on `ImageStream`.
+not from here. Already promoted: the oscillatory recipe
+(`dtfit.fit(..., freq_param=...)` with `dtfit.image.fft_frequency_seed`).
+Notebook 19 carries the verdict on each adaptation still in trial.
 
 ## Install
 
@@ -43,28 +44,24 @@ pip install -e packages/dtfit-experimental       # this package
 pip install -e "packages/dtfit-experimental[bench]"  # + matplotlib/torch/statsmodels/pandas
 ```
 
-## Run the suites
+## Run the experiments
 
-The experiments are self-contained **Jupyter notebooks** -- `cases/` (per-adaptation
-studies) and `domains/` (per-application-domain studies). Each experiment folder
-holds a `backend.py` (the compute) and the notebook (the report: tables, figures,
-narrative). Fetch the datasets once, then open or execute any notebook:
+Each notebook is one experiment and its report: the claim at the top, the code
+that measures it, the numbers it prints and the prose that reads them. There is
+no generator; a notebook is edited by hand and re-executed.
 
 ```bash
 python -m dtfit_experimental.study.download_data                # fetch datasets
 
 # open and re-run interactively
-jupyter lab src/dtfit_experimental/experiments/cases/01_control_systems/01_control_systems.ipynb
+jupyter lab experiments/method/12_discrete_image.ipynb
 
-# or execute headless (writes outputs + figures in place)
+# or execute headless (writes outputs in place)
 jupyter nbconvert --to notebook --execute --inplace \
-    src/dtfit_experimental/experiments/cases/01_control_systems/01_control_systems.ipynb
+    experiments/method/12_discrete_image.ipynb
 ```
 
-Each notebook has a config block of knobs near the top (sized for a few-minute run
-by default; comments show how to scale up). The indexes
-[`cases/REPORTS.md`](src/dtfit_experimental/experiments/cases/REPORTS.md) and
-[`domains/DOMAINS.md`](src/dtfit_experimental/experiments/domains/DOMAINS.md) link
-every notebook. See
-[`src/dtfit_experimental/experiments/README.md`](src/dtfit_experimental/experiments/README.md)
-for the real-data validation details.
+`DTFIT_QUICK=1` shrinks every notebook to a run of seconds; `tests/test_notebooks.py`
+executes each committed notebook that way. `DTFIT_DATA` moves the dataset
+directory. A section on real data says where the data comes from and skips with
+a visible message when it is absent.

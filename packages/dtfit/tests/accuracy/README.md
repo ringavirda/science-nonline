@@ -26,8 +26,8 @@ being tested on a hand-picked, method-favourable dataset.
   noise realizations and a perturbed initial guess (no lucky-seed results).
 - **`tests/validation/test_accuracy_regression.py`** (Phase 4) — no scenario
   drifts worse than the golden snapshot.
-- **`dtfit_experimental.experiments.accuracy_explore`** — a runnable report of
-  dtfit-vs-`curve_fit` recovery across the corpus (no thresholds; for inspection).
+- **`packages/dtfit-experimental/experiments/method/15_families.ipynb`** — a
+  notebook that fits the corpus against `curve_fit` (no thresholds; for inspection).
 
 ## Metric per scenario
 

@@ -62,9 +62,9 @@ RESULTS = {
 # One entry per leg-5 run the showcase has produced: the JSON summary's
 # stem under results/leg5/, its optional producer-side sibling, the
 # direction and block length the table reports it under, and the image
-# subtree its groups reassemble from (see task 18's brief). A source
-# whose JSON is absent is skipped, so a partial leg 5 (one direction
-# unmeasured) still tables what exists.
+# subtree its groups reassemble from. A source whose JSON is absent is
+# skipped, so a partial leg 5 (one direction unmeasured) still tables
+# what exists.
 LEG5_SOURCES: tuple[tuple[str, str | None, str, float, str], ...] = (
     ("pi_to_pc", "pi_to_pc_producer", "pi->pc", 1.0, "ngl"),
     ("pc_to_pi", "pc_to_pi_producer", "pc->pi", 1.0, "ngl"),
