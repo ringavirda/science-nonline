@@ -1,0 +1,121 @@
+method,config,h,rmse,drive,window,shift_s
+local,order 3 window 8 q_rate 1,2,1.39727,5 Hz drive,adaptive,0
+local,order 3 window 8 q_rate 1,3,1.91295,5 Hz drive,adaptive,0
+local,order 3 window 8 q_rate 1,5,3.00897,5 Hz drive,adaptive,0
+local,order 3 window 8 q_rate 1,10,6.05765,5 Hz drive,adaptive,0
+local,order 3 window 8 q_rate 1,2,1.43593,5 Hz drive,adaptive,1000
+local,order 3 window 8 q_rate 1,3,1.96717,5 Hz drive,adaptive,1000
+local,order 3 window 8 q_rate 1,5,3.09344,5 Hz drive,adaptive,1000
+local,order 3 window 8 q_rate 1,10,6.20603,5 Hz drive,adaptive,1000
+local,order 3 window 8 q_rate 1,2,1.43593,5 Hz drive,adaptive,3000
+local,order 3 window 8 q_rate 1,3,1.96717,5 Hz drive,adaptive,3000
+local,order 3 window 8 q_rate 1,5,3.09344,5 Hz drive,adaptive,3000
+local,order 3 window 8 q_rate 1,10,6.20603,5 Hz drive,adaptive,3000
+local,order 3 window 8 q_rate 1,2,1.39727,5 Hz drive,adaptive,5000
+local,order 3 window 8 q_rate 1,3,1.91295,5 Hz drive,adaptive,5000
+local,order 3 window 8 q_rate 1,5,3.00897,5 Hz drive,adaptive,5000
+local,order 3 window 8 q_rate 1,10,6.05765,5 Hz drive,adaptive,5000
+local,order 3 window 8 q_rate 1,2,1.39727,5 Hz drive,adaptive,10000
+local,order 3 window 8 q_rate 1,3,1.91295,5 Hz drive,adaptive,10000
+local,order 3 window 8 q_rate 1,5,3.00897,5 Hz drive,adaptive,10000
+local,order 3 window 8 q_rate 1,10,6.05765,5 Hz drive,adaptive,10000
+local,order 3 window 8 q_rate 1,2,1.50716,5 Hz drive,held at the cap,0
+local,order 3 window 8 q_rate 1,3,2.07092,5 Hz drive,held at the cap,0
+local,order 3 window 8 q_rate 1,5,3.25465,5 Hz drive,held at the cap,0
+local,order 3 window 8 q_rate 1,10,6.4966,5 Hz drive,held at the cap,0
+local,order 3 window 8 q_rate 1,2,1.50716,5 Hz drive,held at the cap,1000
+local,order 3 window 8 q_rate 1,3,2.07092,5 Hz drive,held at the cap,1000
+local,order 3 window 8 q_rate 1,5,3.25465,5 Hz drive,held at the cap,1000
+local,order 3 window 8 q_rate 1,10,6.4966,5 Hz drive,held at the cap,1000
+local,order 3 window 8 q_rate 1,2,1.50716,5 Hz drive,held at the cap,3000
+local,order 3 window 8 q_rate 1,3,2.07092,5 Hz drive,held at the cap,3000
+local,order 3 window 8 q_rate 1,5,3.25465,5 Hz drive,held at the cap,3000
+local,order 3 window 8 q_rate 1,10,6.4966,5 Hz drive,held at the cap,3000
+local,order 3 window 8 q_rate 1,2,1.50716,5 Hz drive,held at the cap,5000
+local,order 3 window 8 q_rate 1,3,2.07092,5 Hz drive,held at the cap,5000
+local,order 3 window 8 q_rate 1,5,3.25465,5 Hz drive,held at the cap,5000
+local,order 3 window 8 q_rate 1,10,6.4966,5 Hz drive,held at the cap,5000
+local,order 3 window 8 q_rate 1,2,1.50716,5 Hz drive,held at the cap,10000
+local,order 3 window 8 q_rate 1,3,2.07092,5 Hz drive,held at the cap,10000
+local,order 3 window 8 q_rate 1,5,3.25465,5 Hz drive,held at the cap,10000
+local,order 3 window 8 q_rate 1,10,6.4966,5 Hz drive,held at the cap,10000
+local,order 3 window 12 q_rate 10,2,7.40409,walk,adaptive,0
+local,order 3 window 12 q_rate 10,3,10.0957,walk,adaptive,0
+local,order 3 window 12 q_rate 10,5,15.6768,walk,adaptive,0
+local,order 3 window 12 q_rate 10,10,29.9139,walk,adaptive,0
+local,order 3 window 12 q_rate 10,2,7.40409,walk,adaptive,1000
+local,order 3 window 12 q_rate 10,3,10.0957,walk,adaptive,1000
+local,order 3 window 12 q_rate 10,5,15.6768,walk,adaptive,1000
+local,order 3 window 12 q_rate 10,10,29.9139,walk,adaptive,1000
+local,order 3 window 12 q_rate 10,2,7.40409,walk,adaptive,3000
+local,order 3 window 12 q_rate 10,3,10.0957,walk,adaptive,3000
+local,order 3 window 12 q_rate 10,5,15.6768,walk,adaptive,3000
+local,order 3 window 12 q_rate 10,10,29.9139,walk,adaptive,3000
+local,order 3 window 12 q_rate 10,2,7.40409,walk,adaptive,5000
+local,order 3 window 12 q_rate 10,3,10.0957,walk,adaptive,5000
+local,order 3 window 12 q_rate 10,5,15.6768,walk,adaptive,5000
+local,order 3 window 12 q_rate 10,10,29.9139,walk,adaptive,5000
+local,order 3 window 12 q_rate 10,2,7.40409,walk,adaptive,10000
+local,order 3 window 12 q_rate 10,3,10.0957,walk,adaptive,10000
+local,order 3 window 12 q_rate 10,5,15.6768,walk,adaptive,10000
+local,order 3 window 12 q_rate 10,10,29.9139,walk,adaptive,10000
+local,order 3 window 12 q_rate 10,2,7.63116,walk,held at the cap,0
+local,order 3 window 12 q_rate 10,3,10.2544,walk,held at the cap,0
+local,order 3 window 12 q_rate 10,5,15.7099,walk,held at the cap,0
+local,order 3 window 12 q_rate 10,10,29.8059,walk,held at the cap,0
+local,order 3 window 12 q_rate 10,2,7.63116,walk,held at the cap,1000
+local,order 3 window 12 q_rate 10,3,10.2544,walk,held at the cap,1000
+local,order 3 window 12 q_rate 10,5,15.7099,walk,held at the cap,1000
+local,order 3 window 12 q_rate 10,10,29.8059,walk,held at the cap,1000
+local,order 3 window 12 q_rate 10,2,7.63116,walk,held at the cap,3000
+local,order 3 window 12 q_rate 10,3,10.2544,walk,held at the cap,3000
+local,order 3 window 12 q_rate 10,5,15.7099,walk,held at the cap,3000
+local,order 3 window 12 q_rate 10,10,29.8059,walk,held at the cap,3000
+local,order 3 window 12 q_rate 10,2,7.63116,walk,held at the cap,5000
+local,order 3 window 12 q_rate 10,3,10.2544,walk,held at the cap,5000
+local,order 3 window 12 q_rate 10,5,15.7099,walk,held at the cap,5000
+local,order 3 window 12 q_rate 10,10,29.8059,walk,held at the cap,5000
+local,order 3 window 12 q_rate 10,2,7.63116,walk,held at the cap,10000
+local,order 3 window 12 q_rate 10,3,10.2544,walk,held at the cap,10000
+local,order 3 window 12 q_rate 10,5,15.7099,walk,held at the cap,10000
+local,order 3 window 12 q_rate 10,10,29.8059,walk,held at the cap,10000
+local,order 3 window 12 q_rate 1,2,4.14224,1 Hz drive,adaptive,0
+local,order 3 window 12 q_rate 1,3,6.0309,1 Hz drive,adaptive,0
+local,order 3 window 12 q_rate 1,5,10.7688,1 Hz drive,adaptive,0
+local,order 3 window 12 q_rate 1,10,28.241,1 Hz drive,adaptive,0
+local,order 3 window 12 q_rate 1,2,4.14224,1 Hz drive,adaptive,1000
+local,order 3 window 12 q_rate 1,3,6.0309,1 Hz drive,adaptive,1000
+local,order 3 window 12 q_rate 1,5,10.7688,1 Hz drive,adaptive,1000
+local,order 3 window 12 q_rate 1,10,28.241,1 Hz drive,adaptive,1000
+local,order 3 window 12 q_rate 1,2,4.14224,1 Hz drive,adaptive,3000
+local,order 3 window 12 q_rate 1,3,6.0309,1 Hz drive,adaptive,3000
+local,order 3 window 12 q_rate 1,5,10.7688,1 Hz drive,adaptive,3000
+local,order 3 window 12 q_rate 1,10,28.241,1 Hz drive,adaptive,3000
+local,order 3 window 12 q_rate 1,2,4.14224,1 Hz drive,adaptive,5000
+local,order 3 window 12 q_rate 1,3,6.0309,1 Hz drive,adaptive,5000
+local,order 3 window 12 q_rate 1,5,10.7688,1 Hz drive,adaptive,5000
+local,order 3 window 12 q_rate 1,10,28.241,1 Hz drive,adaptive,5000
+local,order 3 window 12 q_rate 1,2,4.14224,1 Hz drive,adaptive,10000
+local,order 3 window 12 q_rate 1,3,6.0309,1 Hz drive,adaptive,10000
+local,order 3 window 12 q_rate 1,5,10.7688,1 Hz drive,adaptive,10000
+local,order 3 window 12 q_rate 1,10,28.241,1 Hz drive,adaptive,10000
+local,order 3 window 12 q_rate 1,2,4.44297,1 Hz drive,held at the cap,0
+local,order 3 window 12 q_rate 1,3,6.34782,1 Hz drive,held at the cap,0
+local,order 3 window 12 q_rate 1,5,11.2207,1 Hz drive,held at the cap,0
+local,order 3 window 12 q_rate 1,10,28.7494,1 Hz drive,held at the cap,0
+local,order 3 window 12 q_rate 1,2,4.44297,1 Hz drive,held at the cap,1000
+local,order 3 window 12 q_rate 1,3,6.34782,1 Hz drive,held at the cap,1000
+local,order 3 window 12 q_rate 1,5,11.2207,1 Hz drive,held at the cap,1000
+local,order 3 window 12 q_rate 1,10,28.7494,1 Hz drive,held at the cap,1000
+local,order 3 window 12 q_rate 1,2,4.44297,1 Hz drive,held at the cap,3000
+local,order 3 window 12 q_rate 1,3,6.34782,1 Hz drive,held at the cap,3000
+local,order 3 window 12 q_rate 1,5,11.2207,1 Hz drive,held at the cap,3000
+local,order 3 window 12 q_rate 1,10,28.7494,1 Hz drive,held at the cap,3000
+local,order 3 window 12 q_rate 1,2,4.44297,1 Hz drive,held at the cap,5000
+local,order 3 window 12 q_rate 1,3,6.34782,1 Hz drive,held at the cap,5000
+local,order 3 window 12 q_rate 1,5,11.2207,1 Hz drive,held at the cap,5000
+local,order 3 window 12 q_rate 1,10,28.7494,1 Hz drive,held at the cap,5000
+local,order 3 window 12 q_rate 1,2,4.44297,1 Hz drive,held at the cap,10000
+local,order 3 window 12 q_rate 1,3,6.34782,1 Hz drive,held at the cap,10000
+local,order 3 window 12 q_rate 1,5,11.2207,1 Hz drive,held at the cap,10000
+local,order 3 window 12 q_rate 1,10,28.7494,1 Hz drive,held at the cap,10000

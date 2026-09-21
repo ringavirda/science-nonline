@@ -1,0 +1,13 @@
+method,config,h,rmse,drive
+local,order 3 window 8 q_rate 1,2,1.39727,5 Hz drive
+local,order 3 window 8 q_rate 1,3,1.91295,5 Hz drive
+local,order 3 window 8 q_rate 1,5,3.00897,5 Hz drive
+local,order 3 window 8 q_rate 1,10,6.05765,5 Hz drive
+local,order 3 window 12 q_rate 10,2,7.40409,walk
+local,order 3 window 12 q_rate 10,3,10.0957,walk
+local,order 3 window 12 q_rate 10,5,15.6768,walk
+local,order 3 window 12 q_rate 10,10,29.9139,walk
+local,order 3 window 12 q_rate 1,2,4.14224,1 Hz drive
+local,order 3 window 12 q_rate 1,3,6.0309,1 Hz drive
+local,order 3 window 12 q_rate 1,5,10.7688,1 Hz drive
+local,order 3 window 12 q_rate 1,10,28.241,1 Hz drive
