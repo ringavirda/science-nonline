@@ -147,6 +147,24 @@ def test_run_methods_realdata_survives_an_outlier_and_guards_a_small_window():
         gb.run_methods_realdata(t, meas, window=3)
 
 
+def test_dtfit_realdata_track_forwards_the_clip_threshold():
+    rng = np.random.default_rng(0)
+    n = 60
+    t = np.arange(n, dtype=float)
+    truth = np.stack([t * 2.0, t * 0.5, np.zeros(n)], axis=1)
+    meas = truth + rng.normal(0.0, 1.0, truth.shape)
+    meas[30, 0] += 300.0
+    plain = gb.dtfit_realdata_track(t, meas, window=8)
+    clipped = gb.dtfit_realdata_track(t, meas, window=8, robust=True)
+    never = gb.dtfit_realdata_track(t, meas, window=8, robust=True, huber_c=1e9)
+    # fails if huber_c were not forwarded to the filter: a threshold no
+    # residual reaches would clip like the default instead of like no clip
+    assert np.allclose(never, plain)
+    assert not np.allclose(clipped, plain)
+    # fails if robust were not forwarded: the spike would pull both alike
+    assert np.abs(clipped[30:40, 0] - truth[30:40, 0]).max() < np.abs(plain[30:40, 0] - truth[30:40, 0]).max()
+
+
 def _cv_track_with_gross_outlier(n=140, spike_idx=80, spike_m=10_300.0):
     t = np.arange(n, dtype=float)
     truth = np.stack([t * 10.0, np.zeros(n), np.zeros(n)], axis=1)
@@ -197,3 +215,18 @@ def test_imm_mode_probabilities_stay_a_probability_vector_through_the_outlier():
             assert np.all(np.isfinite(imm.mu))
             assert imm.mu.sum() == pytest.approx(1.0)
             assert np.all(imm.mu >= 0.0)
+
+
+def test_dtfit_track_coasts_through_a_gap_by_default():
+    t, truth, fixes, gyro, rng = gps.build_rig(300, seed=3)
+    gapped = fixes.copy()
+    gapped[150:180] = np.nan
+    default = gps.dtfit_track(t, gapped, (1,))[0]
+    coasted = gps.dtfit_track(t, gapped, (1,), coast=True)[0]
+    extrapolated = gps.dtfit_track(t, gapped, (1,), coast=False)[0]
+    # fails if the default went back to coast=False, which hands the dropout
+    # and forecast scores the diverging cubic
+    assert np.array_equal(default, coasted)
+    assert not np.allclose(default[150:180], extrapolated[150:180])
+    # fails if coasting changed the in-window smoothing before the gap
+    assert np.allclose(default[:150], extrapolated[:150])

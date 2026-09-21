@@ -273,20 +273,20 @@ class FusedCUSUM:
 
 
 def dtfit_track(t, fixes, horizons=(10,), *, kind="legendre", model="poly", robust=False,
-                fused=False, gyro=None, coast=False, coast_order=1,
+                fused=False, gyro=None, coast=True, coast_order=1,
                 adaptive_window=True):
     """Online per-axis tracking with rolling h-step forecasts. Missing fixes
-    (NaN rows) coast: no update happens and the local model extrapolates.
+    (NaN rows) take no update and the track is extrapolated off the window.
     Returns ``(smoothed, pred, drift_times)``.
 
-    ``coast`` selects how the local model is extrapolated off its window
-    support, during a GPS gap and for the h-step forecast. ``False`` evaluates
-    the fitted model directly through ``predict``, where a cubic diverges past
-    the window; ``True`` dead-reckons from the last in-window sample via
-    :meth:`the Legendre filter.coast`, constant-velocity at order 1 by default and
-    constant-acceleration at order 2. Only the off-support branch changes,
-    since in-window smoothing is identical either way, so this is a clean
-    matched control for the dropout and forecast regime.
+    ``coast`` selects how the track is extrapolated off the window's support,
+    during a GPS gap and for the h-step forecast. ``True`` (the default)
+    dead-reckons from the last in-window sample through
+    :meth:`dtfit.streaming.ImageFilter.coast`, constant-velocity at
+    ``coast_order=1`` and constant-acceleration at 2. ``False`` evaluates the
+    fitted model itself through ``predict``, where a cubic diverges past the
+    window. In-window smoothing is identical either way, so ``False`` is the
+    matched control for the dropout and forecast scores.
 
     ``adaptive_window`` is threaded straight into the underlying
     :class:`ImageFilter`: ``True`` (the default) sizes the window from the

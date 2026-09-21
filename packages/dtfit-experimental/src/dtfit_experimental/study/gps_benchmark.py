@@ -362,6 +362,36 @@ def run_methods(t, meas, *, sigma=SIGMA):
     }
 
 
+def dtfit_realdata_track(t, meas, *, window=5, robust=False, huber_c=3.0):
+    """The per-axis Legendre-cubic filter of :func:`run_methods_realdata`.
+
+    Args:
+        t: Fix times, seconds, shape ``(n,)``.
+        meas: Position fixes, metres, shape ``(n, 3)``; a NaN row is a missed
+            fix and takes no update.
+        window: Window cap, samples; the cubic image needs at least 6.
+        robust: Winsorize the window residuals before the image is taken.
+        huber_c: Clip threshold in robust sigmas, read only when ``robust``.
+
+    Returns:
+        The smoothed track, shape ``(n, 3)``.
+    """
+    md = G.MODELS["poly"]
+    n = len(t)
+    fl = [G.ImageFilter(md["expr"], "t", p0=[float(meas[0, ax])] + list(md["rest"]),
+                        window_size=window, order=md["order"], q_diag=[1e-2] * 4,
+                        robust=robust, huber_c=huber_c, drift_reset="inflate")
+          for ax in range(3)]
+    sm = np.zeros((n, 3))
+    for i in range(n):
+        miss = np.any(np.isnan(meas[i]))
+        for ax in range(3):
+            if not miss:
+                fl[ax].partial_fit(t[i], meas[i, ax])
+            sm[i, ax] = float(fl[ax].predict(np.array([t[i]]))[0])
+    return sm
+
+
 def run_methods_realdata(t, meas, *, window=5, q_acc=20.0, kalman_q=5e-2, huber=3.0):
     """``run_methods`` configured for a real low-rate road trip. A 15-sample
     sim window is about 15 s there, hundreds of metres at road speed, so dtfit
@@ -369,26 +399,10 @@ def run_methods_realdata(t, meas, *, window=5, q_acc=20.0, kalman_q=5e-2, huber=
     CA/CT baselines take a regime-appropriate process noise. Both dtfit and the
     Kalman carry a robust variant, keeping the multipath column hardened
     against hardened. NaN rows coast predict-only."""
-    md = G.MODELS["poly"]
-    n = len(t)
-
-    def dtfit(robust):
-        fl = [G.ImageFilter(md["expr"], "t", p0=[float(meas[0, ax])] + list(md["rest"]),
-                          window_size=window, order=md["order"], q_diag=[1e-2] * 4,
-                          robust=robust, drift_reset="inflate")
-              for ax in range(3)]
-        sm = np.zeros((n, 3))
-        for i in range(n):
-            miss = np.any(np.isnan(meas[i]))
-            for ax in range(3):
-                if not miss:
-                    fl[ax].partial_fit(t[i], meas[i, ax])
-                sm[i, ax] = float(fl[ax].predict(np.array([t[i]]))[0])
-        return sm
-
     return {
-        "dtfit Legendre-cubic": dtfit(False),
-        "dtfit Legendre-cubic (robust)": dtfit(True),
+        "dtfit Legendre-cubic": dtfit_realdata_track(t, meas, window=window),
+        "dtfit Legendre-cubic (robust)": dtfit_realdata_track(t, meas, window=window,
+                                                              robust=True),
         "Kalman-CA": G.kalman_track(t, meas, (1,), q=kalman_q)[0],
         "Kalman-CA (Huber)": kalman_ca_track(t, meas, q=kalman_q, huber=huber),
         "CT-EKF (pos-only)": ctekf_pos_track(t, meas, q_acc=q_acc),
@@ -440,10 +454,7 @@ def monte_carlo(bench_fn, seeds=range(50), *, sigma=SIGMA, **bench_kw):
     return {nm: {k: float(np.mean(v)) for k, v in row.items()} for nm, row in acc.items()}
 
 
-# Stress scenarios. Clean smoothing is not where the integral methods earn
-# their keep; per the sim's E2 and E3 their edge is coasting through GPS
-# dropouts and rejecting multipath glitches. A benchmark that skips both tells
-# half the story.
+# stress scenarios: GPS dropouts and multipath glitches
 def _gap_mask(n, gap=20, period=120):
     m = np.zeros(n, bool)
     for st in range(WARM + 20, n - gap, max(period, gap * 3)):
