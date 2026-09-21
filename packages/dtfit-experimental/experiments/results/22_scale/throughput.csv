@@ -1,0 +1,5 @@
+configuration,median (s),min (s),max (s),n_problems,reps
+serial,1.92935,1.89998,1.93784,200,5
+4 processes,0.516845,0.506666,0.537763,200,5
+12 processes,0.203749,0.19611,0.214601,200,5
+4 threads,2.13781,2.11848,2.16926,200,5

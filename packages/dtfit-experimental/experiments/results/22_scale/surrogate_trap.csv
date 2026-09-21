@@ -1,0 +1,8 @@
+method,degree/order,noise sigma,in-sample RMSE,held-out RMSE,held-out against the structured fit
+structured fit (a exp(-b t)),2,0.01,0.0101269,0.00984919,1
+polynomial surrogate (degree 2),2,0.01,0.0126299,0.394633,40.0676
+polynomial surrogate (degree 3),3,0.01,0.010129,0.173228,17.588
+polynomial surrogate (degree 4),4,0.01,0.010115,0.0325948,3.30939
+polynomial surrogate (degree 5),5,0.01,0.0101144,0.194377,19.7353
+polynomial surrogate (degree 6),6,0.01,0.0101134,1.68557,171.138
+polynomial surrogate (degree 8),8,0.01,0.0101093,92.8886,9431.09

@@ -1,0 +1,7 @@
+# chunks,naive float32 rel err,float64 rel err,Kahan float32 rel err,coefficients the compensation leaves untouched,coefficients
+1,9.21528e-07,9.36935e-16,9.21528e-07,7,7
+4,4.60456e-07,1.36379e-15,4.60456e-07,6,7
+16,5.86186e-07,3.89655e-16,5.86186e-07,4,7
+64,4.1984e-07,1.56156e-16,1.82195e-07,2,7
+256,7.15451e-07,6.33287e-16,1.20462e-07,1,7
+1024,1.25687e-06,1.89986e-15,5.16624e-08,0,7
