@@ -1,0 +1,13 @@
+series,structure given,auto_forecast,random walk,winner
+AC + harmonics,2.28061,13.3703,41.1727,MLP
+AM signal,1.16026,26.5474,60.8419,structure given
+COVID-19 UA,2.95414,2.95414,72.7495,auto_forecast
+ETTh1 oil-temp,15.7072,38.3673,22.3549,structure given
+El Nino SST,13.147,12.6815,36.8458,Theta
+Linear chirp,1.44158,36.9696,48.2822,structure given
+Mauna Loa CO2,17.623,18.813,44.4711,drift
+Nile flow,29.7222,29.7222,30.7414,poly extrap
+RLC transient,9.548,133.47,28.2438,structure given
+Sunspots,35.102,31.6019,37.3873,MLP
+USD/UAH,94.2299,205.42,50.9323,Theta
+Weather LTSF,77.9471,80.597,78.1398,ARIMA

@@ -1,0 +1,13 @@
+series,source,length,structure,why
+COVID-19 UA,"measured, data_dir()/covid_ukraine_confirmed.csv",30,logistic,epidemic growth
+USD/UAH,"measured, data_dir()/usd_uah_2014_2015.csv",730,linear_wave,currency depreciation
+Sunspots,"measured, statsmodels.datasets.sunspots",309,sine,solar ~11y cycle
+Mauna Loa CO2,"measured, statsmodels.datasets.co2",571,poly_seasonal,climate trend+season
+El Nino SST,"measured, statsmodels.datasets.elnino",732,linear_seasonal,ocean seasonal
+Nile flow,"measured, statsmodels.datasets.nile",100,poly,hydrology level
+ETTh1 oil-temp,"measured, LTSF ETTh1.csv, replayed",1500,linear_seasonal,transformer temp
+Weather LTSF,"measured, LTSF weather.csv, replayed",1500,transient_seasonal,weather sensor
+RLC transient,"generated, damped oscillation equation, seeded",360,damped,physics: electrical ring-down
+AC + harmonics,"generated, fundamental + 3rd + 5th harmonic, seeded",360,fourier_series,physics: power waveform
+AM signal,"generated, amplitude-modulated carrier, seeded",400,am,physics: modulated carrier
+Linear chirp,"generated, linear frequency sweep, seeded",400,chirp,physics: frequency sweep

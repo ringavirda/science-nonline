@@ -1,0 +1,4 @@
+series,right,wrong,right_rmse,right_r2,wrong_rmse,wrong_r2
+RLC transient,damped,poly,0.0194322,0.995266,0.263067,0.132382
+AM signal,am,linear_seasonal,0.0315214,0.998319,0.318609,0.828297
+Linear chirp,chirp,poly,0.0287146,0.99833,0.686949,0.0441684

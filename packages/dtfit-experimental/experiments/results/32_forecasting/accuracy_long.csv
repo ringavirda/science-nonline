@@ -1,0 +1,118 @@
+series,method,nrmse
+COVID-19 UA,structure given,2.95414
+COVID-19 UA,auto_forecast,2.95414
+COVID-19 UA,random walk,72.7495
+COVID-19 UA,drift,34.9854
+COVID-19 UA,poly extrap,13.7782
+COVID-19 UA,ETS (Holt-Winters),34.4682
+COVID-19 UA,Theta,53.7474
+COVID-19 UA,ARIMA,37.3061
+COVID-19 UA,MLP,56.3915
+USD/UAH,structure given,94.2299
+USD/UAH,auto_forecast,205.42
+USD/UAH,random walk,50.9323
+USD/UAH,drift,39.1162
+USD/UAH,poly extrap,205.42
+USD/UAH,ETS (Holt-Winters),53.1409
+USD/UAH,Theta,18.4217
+USD/UAH,ARIMA,51.9744
+USD/UAH,MLP,55.1732
+Sunspots,structure given,35.102
+Sunspots,auto_forecast,31.6019
+Sunspots,random walk,37.3873
+Sunspots,drift,36.4263
+Sunspots,poly extrap,36.945
+Sunspots,seasonal naive,32.7796
+Sunspots,ETS (Holt-Winters),27.1683
+Sunspots,Theta,27.3647
+Sunspots,ARIMA,29.5474
+Sunspots,SARIMA,40.5266
+Sunspots,MLP,27.0246
+Mauna Loa CO2,structure given,17.623
+Mauna Loa CO2,auto_forecast,18.813
+Mauna Loa CO2,random walk,44.4711
+Mauna Loa CO2,drift,14.2722
+Mauna Loa CO2,poly extrap,19.6575
+Mauna Loa CO2,seasonal naive,47.0339
+Mauna Loa CO2,ETS (Holt-Winters),27.5169
+Mauna Loa CO2,Theta,28.3022
+Mauna Loa CO2,ARIMA,40.6668
+Mauna Loa CO2,SARIMA,39.6589
+Mauna Loa CO2,MLP,45.4336
+El Nino SST,structure given,13.147
+El Nino SST,auto_forecast,12.6815
+El Nino SST,random walk,36.8458
+El Nino SST,drift,40.2594
+El Nino SST,poly extrap,23.6534
+El Nino SST,seasonal naive,14.2306
+El Nino SST,ETS (Holt-Winters),12.3866
+El Nino SST,Theta,12.3449
+El Nino SST,ARIMA,12.4626
+El Nino SST,SARIMA,12.554
+El Nino SST,MLP,15.4079
+Nile flow,structure given,29.7222
+Nile flow,auto_forecast,29.7222
+Nile flow,random walk,30.7414
+Nile flow,drift,38.9678
+Nile flow,poly extrap,29.7222
+Nile flow,ETS (Holt-Winters),36.3625
+Nile flow,Theta,38.1606
+Nile flow,ARIMA,29.8052
+Nile flow,MLP,30.3024
+ETTh1 oil-temp,structure given,15.7072
+ETTh1 oil-temp,auto_forecast,38.3673
+ETTh1 oil-temp,random walk,22.3549
+ETTh1 oil-temp,drift,22.396
+ETTh1 oil-temp,poly extrap,17.8775
+ETTh1 oil-temp,seasonal naive,19.0933
+ETTh1 oil-temp,ETS (Holt-Winters),18.2411
+ETTh1 oil-temp,Theta,19.2814
+ETTh1 oil-temp,ARIMA,21.495
+ETTh1 oil-temp,MLP,854.83
+Weather LTSF,structure given,77.9471
+Weather LTSF,auto_forecast,80.597
+Weather LTSF,random walk,78.1398
+Weather LTSF,drift,110.1
+Weather LTSF,poly extrap,249.749
+Weather LTSF,seasonal naive,91.6535
+Weather LTSF,ETS (Holt-Winters),61.4144
+Weather LTSF,Theta,91.9193
+Weather LTSF,ARIMA,43.8285
+Weather LTSF,MLP,81.8592
+RLC transient,structure given,9.548
+RLC transient,auto_forecast,133.47
+RLC transient,random walk,28.2438
+RLC transient,drift,28.7024
+RLC transient,poly extrap,133.47
+RLC transient,ETS (Holt-Winters),47.3691
+RLC transient,Theta,33.6622
+RLC transient,ARIMA,65.7691
+RLC transient,MLP,11.8402
+AC + harmonics,structure given,2.28061
+AC + harmonics,auto_forecast,13.3703
+AC + harmonics,random walk,41.1727
+AC + harmonics,drift,41.3258
+AC + harmonics,poly extrap,77.2438
+AC + harmonics,seasonal naive,3.19075
+AC + harmonics,ETS (Holt-Winters),3.97191
+AC + harmonics,Theta,4.43836
+AC + harmonics,ARIMA,41.9318
+AC + harmonics,MLP,2.05407
+AM signal,structure given,1.16026
+AM signal,auto_forecast,26.5474
+AM signal,random walk,60.8419
+AM signal,drift,70.3347
+AM signal,poly extrap,26.5474
+AM signal,ETS (Holt-Winters),98.5802
+AM signal,Theta,61.5647
+AM signal,ARIMA,17.2994
+AM signal,MLP,13.9246
+Linear chirp,structure given,1.44158
+Linear chirp,auto_forecast,36.9696
+Linear chirp,random walk,48.2822
+Linear chirp,drift,52.3411
+Linear chirp,poly extrap,36.9696
+Linear chirp,ETS (Holt-Winters),82.0848
+Linear chirp,Theta,49.7281
+Linear chirp,ARIMA,66.9284
+Linear chirp,MLP,50.5112
