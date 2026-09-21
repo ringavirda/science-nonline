@@ -3,17 +3,17 @@ window,method,RMSE,median,p95
 6,dtfit Legendre-cubic (robust),6.88014,3.74251,12.8142
 6,Kalman-CA,254.481,3.12301,11.9524
 6,Kalman-CA (Huber),5.95543,3.13195,10.5911
-6,CT-EKF (pos-only),282.231,3.94158,10.8606
-6,IMM (CV+CT),,,
+6,CT-EKF (pos-only),282.068,3.94929,10.8611
+6,IMM (CV+CT),280.215,5.13766,12.9019
 8,dtfit Legendre-cubic,124.353,4.11327,22.3525
 8,dtfit Legendre-cubic (robust),7.82639,4.3182,16.116
 8,Kalman-CA,254.481,3.12301,11.9524
 8,Kalman-CA (Huber),5.95543,3.13195,10.5911
-8,CT-EKF (pos-only),282.231,3.94158,10.8606
-8,IMM (CV+CT),,,
+8,CT-EKF (pos-only),282.068,3.94929,10.8611
+8,IMM (CV+CT),280.215,5.13766,12.9019
 12,dtfit Legendre-cubic,118.605,4.9121,24.426
 12,dtfit Legendre-cubic (robust),10.8429,5.43954,23.7147
 12,Kalman-CA,254.481,3.12301,11.9524
 12,Kalman-CA (Huber),5.95543,3.13195,10.5911
-12,CT-EKF (pos-only),282.231,3.94158,10.8606
-12,IMM (CV+CT),,,
+12,CT-EKF (pos-only),282.068,3.94929,10.8611
+12,IMM (CV+CT),280.215,5.13766,12.9019

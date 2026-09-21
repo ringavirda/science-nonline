@@ -145,3 +145,55 @@ def test_run_methods_realdata_survives_an_outlier_and_guards_a_small_window():
     # fails if a window too small to hold the image were let through silently
     with pytest.raises(ValueError, match="cannot hold an image"):
         gb.run_methods_realdata(t, meas, window=3)
+
+
+def _cv_track_with_gross_outlier(n=140, spike_idx=80, spike_m=10_300.0):
+    t = np.arange(n, dtype=float)
+    truth = np.stack([t * 10.0, np.zeros(n), np.zeros(n)], axis=1)
+    rng = np.random.default_rng(0)
+    meas = truth + rng.normal(0.0, 1.5, truth.shape)
+    meas[spike_idx, 0] += spike_m
+    return t, truth, meas
+
+
+def test_imm_and_ctekf_stay_finite_and_psd_after_a_gross_outlier():
+    t, truth, meas = _cv_track_with_gross_outlier()
+    spike_idx = 80
+
+    # CT-EKF (pos-only), driven directly so its P is visible at every step
+    f = gb._CT5(t[1] - t[0], gb.SIGMA ** 2)
+    f.init_state(meas[0, :2])
+    for i in range(1, t.size):
+        f.predict()
+        f.update(meas[i, :2])
+        assert np.all(np.isfinite(f.x))
+        if i >= spike_idx and i < spike_idx + 50:
+            assert np.linalg.eigvalsh(f.P).min() > -1e-6
+
+    # IMM (CV+CT): both modes' P, not just the combined estimate. Fails under
+    # the short covariance form P = (I - KH) P.
+    imm = gb.IMM2(t[1] - t[0])
+    imm.init_state(meas[0, :2])
+    for i in range(1, t.size):
+        out = imm.step(meas[i, :2])
+        assert np.all(np.isfinite(out))
+        if spike_idx <= i < spike_idx + 50:
+            for m in imm.models:
+                assert np.all(np.isfinite(m.x))
+                assert np.linalg.eigvalsh(m.P).min() > -1e-6
+
+
+def test_imm_mode_probabilities_stay_a_probability_vector_through_the_outlier():
+    t, truth, meas = _cv_track_with_gross_outlier()
+    spike_idx = 80
+    imm = gb.IMM2(t[1] - t[0])
+    imm.init_state(meas[0, :2])
+    for i in range(1, t.size):
+        imm.step(meas[i, :2])
+        if i >= spike_idx:
+            # fails under a linear-domain mode-probability update: the spike's
+            # likelihood ratio overflows exp() to inf/NaN and mu stops being
+            # a probability vector
+            assert np.all(np.isfinite(imm.mu))
+            assert imm.mu.sum() == pytest.approx(1.0)
+            assert np.all(imm.mu >= 0.0)

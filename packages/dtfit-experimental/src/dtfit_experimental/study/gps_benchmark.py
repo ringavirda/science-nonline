@@ -74,8 +74,7 @@ def figure8_benchmark(seed=0, *, sigma=SIGMA, n=N, scale=150.0):
     """The figure-8 (Gerono lemniscate) at the native scale:
     ``x = scale*cos(phi)``, ``y = scale*sin(2*phi)/2`` over one period, a
     smooth and continuously curving path with speed 10.4 to 22.2 m/s, median
-    14.7 m/s. Exact ground
-    truth."""
+    14.7 m/s. Exact ground truth."""
     rng = np.random.default_rng(seed)
     t = np.linspace(0.0, G.DURATION, n)
     ph = 2.0 * np.pi * t / G.DURATION
@@ -90,10 +89,11 @@ class _CT5:
     position-only measurement, so the turn-rate ``w`` is estimated rather than
     measured. Reused both as a stand-alone tracker and as an IMM mode. Call
     ``predict`` then ``update(z)`` with ``z = [x, y]``; ``update`` returns the
-    Gaussian measurement likelihood the IMM weights its modes by. The defaults
-    suit the native 10 Hz and GPS-sigma scale: ``r`` is the measurement
-    variance, ``q_acc`` covers the ~8 m/s^2 centripetal load, and ``q_w`` lets
-    the turn-rate slew across the onsets."""
+    Gaussian measurement log-likelihood the IMM weights its modes by. The
+    covariance update is the Joseph form, symmetrised. The defaults suit the
+    native 10 Hz and GPS-sigma scale: ``r`` is the measurement variance,
+    ``q_acc`` covers the ~8 m/s^2 centripetal load, and ``q_w`` lets the
+    turn-rate slew across the onsets."""
 
     def __init__(self, dt, r, q_acc=8.0, q_w=0.30):
         self.dt = float(dt)
@@ -132,6 +132,7 @@ class _CT5:
         F = self._F(self.x)
         self.x = self._prop(self.x)
         self.P = F @ self.P @ F.T + self.Q
+        self.P = 0.5 * (self.P + self.P.T)
 
     _H = np.array([[1.0, 0, 0, 0, 0], [0, 0, 1.0, 0, 0]])
 
@@ -140,12 +141,14 @@ class _CT5:
         R = np.eye(2) * self.r
         yk = np.asarray(z, float) - H @ self.x
         S = H @ self.P @ H.T + R
-        K = self.P @ H.T @ np.linalg.inv(S)
+        K = np.linalg.solve(S, H @ self.P).T
         self.x = self.x + K @ yk
-        self.P = (np.eye(5) - K @ H) @ self.P
-        det = float(np.linalg.det(2.0 * np.pi * S))
-        return max(float(np.exp(-0.5 * yk @ np.linalg.solve(S, yk)) / np.sqrt(max(det, 1e-12))),
-                   1e-300)
+        IKH = np.eye(5) - K @ H
+        self.P = IKH @ self.P @ IKH.T + K @ R @ K.T
+        self.P = 0.5 * (self.P + self.P.T)
+        _, logdet = np.linalg.slogdet(2.0 * np.pi * S)
+        quad = float(yk @ np.linalg.solve(S, yk))
+        return -0.5 * (quad + logdet)
 
     def init_state(self, z):
         self.x = np.array([z[0], 0.0, z[1], 0.0, 0.0])
@@ -178,7 +181,9 @@ class IMM2:
     zero, and a maneuver mode whose larger ``q_w`` lets w adapt. The standard
     IMM cycle applies: mixing, model-matched predict and update,
     mode-probability update, combination. ``Pij`` is the mode-transition
-    matrix."""
+    matrix. The mode-probability update runs in the log domain from each
+    mode's log-likelihood, and a mode's probability never falls below 1e-12,
+    so a mode a gross outlier ruled out can recover."""
 
     def __init__(self, dt, sigma=SIGMA, q_acc=8.0, q_w_cv=1e-3, q_w_ct=0.5,
                  Pij=((0.95, 0.05), (0.10, 0.90))):
@@ -206,9 +211,13 @@ class IMM2:
         for j in range(2):
             self.models[j].x, self.models[j].P = mixed[j]
             self.models[j].predict()
-            L[j] = self.models[j].update(z)
-        self.mu = cbar * L                                    # mode-probability update
-        self.mu = self.mu / (self.mu.sum() + 1e-300)
+            L[j] = self.models[j].update(z)                   # log-likelihood
+        # Mode probabilities never fall below 1e-12, so a mode can recover.
+        log_mu = np.log(cbar) + L
+        self.mu = np.exp(log_mu - log_mu.max())
+        self.mu = self.mu / self.mu.sum()
+        self.mu = np.maximum(self.mu, 1e-12)
+        self.mu = self.mu / self.mu.sum()
         xc = sum(self.mu[j] * self.models[j].x for j in range(2))  # combination
         return np.array([xc[0], xc[2]])
 
@@ -457,8 +466,8 @@ def dropout_score(t, truth, meas, *, gap=20, sigma=SIGMA):
 def glitch_score(t, truth, meas, *, frac=0.06, mag=12.0, seed=0, sigma=SIGMA):
     """Inject multipath spikes, N(0, ``mag``) on a ``frac`` of the fixes, and
     score each tracker against true position at the spiked samples. Adds
-    dtfit's winsorized ``robust=True`` Legendre image filter, the integral method's robustness
-    lever that the pointwise filters lack.
+    dtfit's winsorized ``robust=True`` Legendre filter, the window method's
+    robustness lever that the pointwise filters lack.
 
     Glitch placement uses a decorrelated child of ``seed``
     (``SeedSequence.spawn``) rather than a correlated integer offset, so the
