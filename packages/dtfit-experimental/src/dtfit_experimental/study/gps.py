@@ -381,14 +381,34 @@ def kalman_track(t, fixes, horizons=(10,), *, q=5e-2, adaptive=False):
     return sm, pred, sorted(drift)
 
 
-def ekf_track(t, fixes, gyro, horizons=(10,), *, adaptive=False):
+def ekf_track(t, fixes, gyro, horizons=(10,), *, adaptive=False, q_acc=3.0,
+              q_w=0.8):
     """Gyro-aided coordinated-turn EKF: the fair GPS+IMU recursive baseline. It
     sees the same information as the windowed gyro dead-reckoning, GPS position
     and gyro yaw-rate, but as a textbook EKF. Through a GPS gap it dead-reckons
-    on the gyro rather than holding. Returns
-    ``(smoothed, pred, drift_times)``."""
+    on the gyro rather than holding.
+
+    Args:
+        t: Sample times, seconds, shape ``(n,)``, evenly spaced.
+        fixes: GPS position, metres, shape ``(n, 3)``; a NaN row marks a
+            missed fix.
+        gyro: Yaw rate about world up, rad/s, shape ``(n,)``; a non-finite
+            sample repeats the last finite one.
+        horizons: Forecast horizons, in samples.
+        adaptive: When ``True``, a :class:`FusedCUSUM` on the innovations
+            re-arms the covariance (``inflate(3.0)``) whenever it fires.
+        q_acc: Variance of the planar acceleration
+            :class:`dtfit_experimental.study.baselines.CTEKFGyro` holds over
+            one sample period, m^2/s^4.
+        q_w: Turn-rate random-walk process-noise density of the same
+            filter, rad^2/s^3.
+
+    Returns:
+        ``(smoothed, pred, drift_times)``, shaped as :func:`kalman_track`
+        returns them.
+    """
     ekf = bl.CTEKFGyro(dt=float(t[1] - t[0]), r_gps=GPS_SIGMA ** 2,
-                       r_gyro=GYRO_SIGMA ** 2)
+                       r_gyro=GYRO_SIGMA ** 2, q_acc=q_acc, q_w=q_w)
     det = FusedCUSUM(3) if adaptive else None
     n = t.size
     sm = np.zeros((n, 3))
@@ -568,7 +588,7 @@ def strapdown_basis(t, gyro, accel, R0, *, tau=IMU_WASH_TAU,
 
 def imu_track(t, fixes, gyro, accel, R0, horizons=(10,), *, window=28,
                   drift="c2*tt**2", mag_heading=None, mag_gain=MAG_GAIN, S=None,
-                  adaptive_window=True):
+                  adaptive_window=True, order=6, q=1e-2):
     """Full-IMU GPS fusion, run per axis entirely through dtfit's Legendre image filter.
 
     The strapdown basis ``S`` (gyro attitude plus accelerometer, washed out) is
@@ -591,13 +611,14 @@ def imu_track(t, fixes, gyro, accel, R0, horizons=(10,), *, window=28,
     term overfits the GPS noise on clean fixes and, having no data to anchor
     it, extrapolates explosively while coasting through a gap. The quadratic is
     both more accurate on clean smoothing and far more stable during dropouts.
-    Paired with a slightly wider ``window`` of 28, which the order-6 projection
-    wants room for, the per-axis Legendre image filter leads the coordinated-turn EKF on
-    smoothing, coasting and robustness alike.
+    It is paired with a ``window`` of 28 samples, which the order-6 projection
+    wants room for.
 
     ``adaptive_window`` is threaded straight into the underlying
     :class:`ImageFilter`: ``True`` (the default) sizes the window from the
-    data, ``False`` holds it fixed at ``window``."""
+    data, ``False`` holds it fixed at ``window``. ``order`` is the Legendre
+    image order and ``q`` the process-noise variance added to every
+    parameter at each update (``q_diag=[q] * n_params``)."""
     n = t.size
     sm = np.zeros((n, 3))
     ax = ["Sx", "Sy", "Sz"]
@@ -615,7 +636,7 @@ def imu_track(t, fixes, gyro, accel, R0, horizons=(10,), *, window=28,
 
     flts = [ImageFilter(expr(a), "tt", regressors=ax[a],
                       p0=[float(fixes[0, a])] + [0.0] * (nq - 1), window_size=window,
-                      order=6, q_diag=[1e-2] * nq, adaptive_window=adaptive_window,
+                      order=order, q_diag=[q] * nq, adaptive_window=adaptive_window,
                       drift_reset="inflate", basis="legendre") for a in range(3)]
     pred = {h: np.full((n, 3), np.nan) for h in horizons}
     for i in range(n):

@@ -640,6 +640,95 @@ def sweep_rows(path: str, *, horizons=(2, 3, 5, 10), gaps=(5, 10, 15),
     return rows
 
 
+def config_rows(path: str, *, tracker=(), kalman_q=(), ekf=(),
+                horizons=(2, 3, 5, 10), t_shift: float = 0.0) -> list[dict]:
+    """Forecast RMSE of the GPS-only Legendre tracker, Kalman-CA and CT-EKF
+    on one log under a list of configurations each, motion-only.
+
+    Args:
+        path: rig CSV log with IMU columns (``load_log``).
+        tracker: ``(order, window, q)`` triples: the image order, the window
+            cap in samples and the process-noise variance added to every
+            parameter at each update. The window is adaptive.
+        kalman_q: process-noise scales of Kalman-CA.
+        ekf: ``(q_acc, q_w)`` pairs, the process noise of CT-EKF's planar
+            acceleration (m^2/s^4) and turn rate (rad^2/s^3).
+        horizons: forecast steps ahead to score, in samples.
+        t_shift: seconds added to the log's clock before the tracker runs.
+            Both baselines take the sample period alone, so it does not
+            reach them.
+
+    Returns:
+        One ``dict`` per method, configuration and horizon: ``method``
+        (``"tracker"``, ``"kalman"`` or ``"ct_ekf"``), ``config`` (a label
+        built from the configuration's numbers), ``h`` and ``rmse`` in
+        metres. Empty with no IMU columns in the log.
+    """
+    log = load_log(path)
+    fixes, _ = to_enu(log["lat"], log["lon"], log["alt_m"])
+    t, n = log["t"], log["n"]
+    imu = _imu(log)
+    if imu is None:
+        return []
+    rest = imu["rest"]
+    z3 = np.zeros((n, 3))
+    horizons = tuple(horizons)
+
+    def score(method, config, pred):
+        return [dict(method=method, config=config, h=h,
+                     rmse=_fc_rmse(pred[h], fixes, motion=rest))
+                for h in horizons]
+
+    rows = []
+    for order, window, q in tracker:
+        pred = G.imu_track(t + t_shift, fixes, imu["gyro"], imu["accel"],
+                           imu["R0"], horizons, S=z3, window=window,
+                           order=order, q=q)[1]
+        rows += score("tracker", f"order {order} window {window} q {q:g}", pred)
+    for q in kalman_q:
+        rows += score("kalman", f"q {q:g}",
+                      G.kalman_track(t, fixes, horizons, q=q)[1])
+    for q_acc, q_w in ekf:
+        pred = G.ekf_track(t, fixes, imu["yaw"], horizons, q_acc=q_acc,
+                           q_w=q_w)[1]
+        rows += score("ct_ekf", f"q_acc {q_acc:g} q_w {q_w:g}", pred)
+    return rows
+
+
+def leave_one_log_out(rows: list[dict]) -> list[dict]:
+    """Pick each method's configuration for a log from the other logs.
+
+    The score of a configuration is its mean log forecast RMSE over every
+    horizon of every log except the one being scored; the lowest wins.
+
+    Args:
+        rows: :func:`config_rows` rows, each with a ``drive`` key added; at
+            least two drives, and every configuration scored on every drive.
+
+    Returns:
+        The rows of the winning configurations on their held-out log, one
+        per drive, method and horizon, in the input's order of drives and
+        methods. A configuration with a non-finite ``rmse`` on any other
+        log is never picked.
+    """
+    drives = list(dict.fromkeys(r["drive"] for r in rows))
+    methods = list(dict.fromkeys(r["method"] for r in rows))
+    out = []
+    for held in drives:
+        for method in methods:
+            logs: dict[str, list[float]] = {}
+            for r in rows:
+                if r["method"] == method and r["drive"] != held:
+                    logs.setdefault(r["config"], []).append(
+                        np.log(r["rmse"]) if np.isfinite(r["rmse"]) else np.inf)
+            if not logs:
+                continue
+            best = min(logs, key=lambda c: float(np.mean(logs[c])))
+            out += [r for r in rows if r["drive"] == held
+                    and r["method"] == method and r["config"] == best]
+    return out
+
+
 def sweep(path: str, horizons=(2, 3, 5, 10), gaps=(5, 10, 15), *,
          adaptive_window: bool = True) -> str:
     """Compact horizon/gap sweep of the key fusion rows, formatted from
