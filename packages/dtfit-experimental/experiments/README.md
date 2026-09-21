@@ -23,6 +23,7 @@ beyond what `python -m dtfit_experimental.study.download_data` fetches.
 | Notebook | Claim | Runtime | Data |
 |---|---|---|---|
 | 33_gps_simulation | A simulated maneuvering target tracked from GPS fixes and a 9-DOF IMU against a Kalman-CA and a coordinated-turn EKF: the full-IMU Legendre tracker smooths at or below the EKF and loses the 10-step forecast to it, gyro-aided trackers hold through a gap while whole-track scores under scattered dropouts read parity at 10 percent and a loss at 20, reweighting rejects multipath spikes, the fused detector needs the gyro channel to lead, and the GPS-only Legendre tracker is at parity with Kalman-CA over 24 random flights | about two minutes | none |
+| 34_gps_benchmark | Two literature trajectories with closed-form truth (a coordinated turn, a figure-8) over 30 seeds and two GSDC 2022 trips with RTK truth: Kalman-CA and IMM win dropout coasting over every dtfit route, clean smoothing is near parity, the reweighted Legendre fit and a Huber-hardened Kalman tie under a multipath glitch and are the only two routes that recover the urban-canyon trip, the block basis drags the whole track down after a gap, and reweighting a clean highway trip at a short window fails | about five minutes | GSDC trips, skipped per trip when absent |
 
 ## Writing a notebook
 
