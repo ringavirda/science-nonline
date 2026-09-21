@@ -640,8 +640,9 @@ def sweep_rows(path: str, *, horizons=(2, 3, 5, 10), gaps=(5, 10, 15),
     return rows
 
 
-def config_rows(path: str, *, tracker=(), kalman_q=(), ekf=(),
-                horizons=(2, 3, 5, 10), t_shift: float = 0.0) -> list[dict]:
+def config_rows(path: str, *, tracker=(), kalman_q=(), ekf=(), local=(),
+                local_adaptive: bool = True, horizons=(2, 3, 5, 10),
+                t_shift: float = 0.0) -> list[dict]:
     """Forecast RMSE of the GPS-only Legendre tracker, Kalman-CA and CT-EKF
     on one log under a list of configurations each, motion-only.
 
@@ -653,16 +654,22 @@ def config_rows(path: str, *, tracker=(), kalman_q=(), ekf=(),
         kalman_q: process-noise scales of Kalman-CA.
         ekf: ``(q_acc, q_w)`` pairs, the process noise of CT-EKF's planar
             acceleration (m^2/s^4) and turn rate (rad^2/s^3).
+        local: ``(order, window, q_rate)`` triples of the tracker carried in
+            the newest fix's time (``study.gps.local_track``): the image
+            order, the window cap in samples and the process-noise variance
+            added to each coefficient per second.
+        local_adaptive: size the ``local`` tracker's window from the data up
+            to its cap (the default) or hold it at the cap.
         horizons: forecast steps ahead to score, in samples.
-        t_shift: seconds added to the log's clock before the tracker runs.
-            Both baselines take the sample period alone, so it does not
-            reach them.
+        t_shift: seconds added to the log's clock before either tracker
+            runs. Both baselines take the sample period alone, so it does
+            not reach them.
 
     Returns:
         One ``dict`` per method, configuration and horizon: ``method``
-        (``"tracker"``, ``"kalman"`` or ``"ct_ekf"``), ``config`` (a label
-        built from the configuration's numbers), ``h`` and ``rmse`` in
-        metres. Empty with no IMU columns in the log.
+        (``"tracker"``, ``"kalman"``, ``"ct_ekf"`` or ``"local"``),
+        ``config`` (a label built from the configuration's numbers), ``h``
+        and ``rmse`` in metres. Empty with no IMU columns in the log.
     """
     log = load_log(path)
     fixes, _ = to_enu(log["lat"], log["lon"], log["alt_m"])
@@ -692,6 +699,12 @@ def config_rows(path: str, *, tracker=(), kalman_q=(), ekf=(),
         pred = G.ekf_track(t, fixes, imu["yaw"], horizons, q_acc=q_acc,
                            q_w=q_w)[1]
         rows += score("ct_ekf", f"q_acc {q_acc:g} q_w {q_w:g}", pred)
+    for order, window, q_rate in local:
+        pred = G.local_track(t + t_shift, fixes, horizons, window=window,
+                             order=order, q_rate=q_rate,
+                             adaptive_window=local_adaptive)[1]
+        rows += score("local",
+                      f"order {order} window {window} q_rate {q_rate:g}", pred)
     return rows
 
 

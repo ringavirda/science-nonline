@@ -24,6 +24,7 @@ import numpy as np
 
 from dtfit.streaming import ImageFilter
 
+from dtfit_experimental.local_time import LocalTimeFilter
 from dtfit_experimental.study import baselines as bl
 from dtfit_experimental.study import montecarlo
 
@@ -33,7 +34,7 @@ __all__ = [
     "MAG_SIGMA", "MAG_GAIN", "GYRO_BIAS",
     "trajectory", "random_plan", "rmse3", "build_rig", "build_imu", "build_mag",
     "controls", "dtfit_track", "kalman_track", "ekf_track",
-    "strapdown_basis", "imu_track", "FusedCUSUM", "roll_rmse", "match_onsets",
+    "strapdown_basis", "imu_track", "local_track", "FusedCUSUM", "roll_rmse", "match_onsets",
     "exp_so3", "batch_trial", "run_batch",
 ]
 
@@ -652,6 +653,49 @@ def imu_track(t, fixes, gyro, accel, R0, horizons=(10,), *, window=28,
         # nuisance fit, so evaluating the model at a future time would extrapolate
         # them and blow up. The smoothed-track velocity already carries the
         # accelerometer's information without that pathology.
+        for h in horizons:
+            if i >= 1 and i + h < n:
+                pred[h][i + h] = sm[i] + h * (sm[i] - sm[i - 1])
+    return sm, pred
+
+
+def local_track(t, fixes, horizons=(10,), *, window=8, order=3, q_rate=0.1,
+                adaptive_window=True):
+    """GPS-only tracking, per axis, with the quadratic carried in the time of
+    the newest fix (:class:`dtfit_experimental.LocalTimeFilter`).
+
+    Args:
+        t: fix times, seconds, non-decreasing; any clock origin.
+        fixes: ``(n, 3)`` ENU fixes, metres; a row with a NaN is a missed
+            fix and is coasted through on the last estimate.
+        horizons: forecast steps ahead, in samples.
+        window: the window cap in samples.
+        order: the Legendre image order.
+        q_rate: process-noise variance added to each coefficient per second
+            between fixes.
+        adaptive_window: size the window from the data up to ``window``
+            (the default), or hold it at ``window``.
+
+    Returns:
+        ``(smoothed, pred)``: the ``(n, 3)`` estimate at each fix time and,
+        per horizon ``h``, the ``(n, 3)`` forecast of sample ``i + h`` made
+        at sample ``i`` by holding the smoothed track's last finite difference,
+        the rule of :func:`imu_track`; NaN where no forecast is defined.
+    """
+    n = t.size
+    sm = np.zeros((n, 3))
+    flts = [LocalTimeFilter(2, p0=[float(fixes[0, a]), 0.0, 0.0],
+                            window_size=window, order=order, q_rate=q_rate,
+                            adaptive_window=adaptive_window,
+                            drift_reset="inflate", basis="legendre")
+            for a in range(3)]
+    pred = {h: np.full((n, 3), np.nan) for h in horizons}
+    for i in range(n):
+        miss = np.any(np.isnan(fixes[i]))
+        for a in range(3):
+            if not miss:
+                flts[a].partial_fit(t[i], fixes[i, a])
+            sm[i, a] = float(flts[a].predict(np.array([t[i]]))[0])
         for h in horizons:
             if i >= 1 and i + h < n:
                 pred[h][i + h] = sm[i] + h * (sm[i] - sm[i - 1])

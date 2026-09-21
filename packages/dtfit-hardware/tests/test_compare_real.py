@@ -169,6 +169,46 @@ def test_config_rows_shift_reaches_the_tracker_alone(noisy_turn_log) -> None:
     assert by["ct_ekf"] == moved["ct_ekf"]
 
 
+def test_config_rows_threads_the_local_tracker_knobs(noisy_turn_log) -> None:
+    # A keyword dropped on the way into local_track makes its pair identical.
+    rows = C.config_rows(
+        noisy_turn_log, horizons=(2, 5),
+        local=[(3, 8, 0.1), (5, 8, 0.1), (3, 16, 0.1), (3, 8, 10.0)])
+    assert len(rows) == 4 * 2
+    assert all(np.isfinite(r["rmse"]) for r in rows)
+    base = _rmse(rows, "local", "order 3 window 8 q_rate 0.1")
+    assert base != _rmse(rows, "local", "order 5 window 8 q_rate 0.1")
+    assert base != _rmse(rows, "local", "order 3 window 16 q_rate 0.1")
+    assert base != _rmse(rows, "local", "order 3 window 8 q_rate 10")
+
+
+def test_config_rows_hands_the_window_switch_to_the_local_tracker(
+        noisy_turn_log, monkeypatch) -> None:
+    # Fails when local_adaptive is dropped on the way into local_track.
+    seen = []
+    track = C.G.local_track
+
+    def spy(*args, **kwargs):
+        seen.append(kwargs["adaptive_window"])
+        return track(*args, **kwargs)
+
+    monkeypatch.setattr(C.G, "local_track", spy)
+    C.config_rows(noisy_turn_log, horizons=(2,), local=[(3, 8, 0.1)])
+    C.config_rows(noisy_turn_log, horizons=(2,), local=[(3, 8, 0.1)],
+                  local_adaptive=False)
+    assert seen == [True, False]
+
+
+def test_config_rows_shift_leaves_the_local_tracker_in_place(noisy_turn_log) -> None:
+    # A local tracker that evaluates its model at the log's absolute times
+    # moves with the clock the way the tracker row of the test above does.
+    kw = dict(horizons=(2, 5), local=[(3, 8, 0.1)])
+    here = C.config_rows(noisy_turn_log, **kw)
+    there = C.config_rows(noisy_turn_log, t_shift=5000.0, **kw)
+    for a, b in zip(here, there):
+        assert a["rmse"] == pytest.approx(b["rmse"], rel=1e-6)
+
+
 def _cfg(drive, config, rmse, method="tracker", h=2):
     return dict(drive=drive, method=method, config=config, h=h, rmse=rmse)
 
