@@ -1,0 +1,5 @@
+build,scales,acov[0],acov[1],ar1 phi,aggvar Hurst
+whole record,16,1.56121,0.934894,0.598825,0.521242
+"SecondOrderStream, default scales",10,1.56121,0.934894,0.598825,0.584808
+"SecondOrderStream, pinned scales",16,1.56121,0.934894,0.598825,0.521242
+"SecondOrderStream, pinned scales, folded",16,1.56121,0.934894,0.598825,0.521242

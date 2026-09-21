@@ -1,0 +1,57 @@
+process,seed,expected,dtfit_regime,classical_regime,dtfit_hit,classical_hit
+white noise,0,white noise,white noise / random walk,white noise / random walk,True,True
+white noise,1,white noise,white noise / random walk,white noise / random walk,True,True
+white noise,2,white noise,white noise / random walk,white noise / random walk,True,True
+white noise,3,white noise,white noise / random walk,white noise / random walk,True,True
+white noise,4,white noise,white noise / random walk,white noise / random walk,True,True
+white noise,5,white noise,white noise / random walk,white noise / random walk,True,True
+white noise,6,white noise,white noise / random walk,white noise / random walk,True,True
+white noise,7,white noise,white noise / random walk,white noise / random walk,True,True
+random walk,0,random walk,random walk,random walk,True,True
+random walk,1,random walk,random walk,random walk,True,True
+random walk,2,random walk,random walk + drift,random walk + drift,True,True
+random walk,3,random walk,random walk,random walk,True,True
+random walk,4,random walk,random walk,random walk,True,True
+random walk,5,random walk,random walk,random walk,True,True
+random walk,6,random walk,cyclical,random walk,False,True
+random walk,7,random walk,random walk + drift,random walk + drift,True,True
+AR(1)/OU,0,mean-reverting,mean-reverting,mean-reverting,True,True
+AR(1)/OU,1,mean-reverting,mean-reverting,mean-reverting,True,True
+AR(1)/OU,2,mean-reverting,mean-reverting,mean-reverting,True,True
+AR(1)/OU,3,mean-reverting,mean-reverting,mean-reverting,True,True
+AR(1)/OU,4,mean-reverting,mean-reverting,mean-reverting,True,True
+AR(1)/OU,5,mean-reverting,mean-reverting,mean-reverting,True,True
+AR(1)/OU,6,mean-reverting,mean-reverting,mean-reverting,True,True
+AR(1)/OU,7,mean-reverting,mean-reverting,mean-reverting,True,True
+ARFIMA (long memory),0,long-memory,long-memory,long-memory,True,True
+ARFIMA (long memory),1,long-memory,long-memory,long-memory,True,True
+ARFIMA (long memory),2,long-memory,long-memory,long-memory,True,True
+ARFIMA (long memory),3,long-memory,long-memory,mean-reverting,True,False
+ARFIMA (long memory),4,long-memory,long-memory,long-memory,True,True
+ARFIMA (long memory),5,long-memory,long-memory,long-memory,True,True
+ARFIMA (long memory),6,long-memory,long-memory,long-memory,True,True
+ARFIMA (long memory),7,long-memory,long-memory,long-memory,True,True
+"GARCH(1,1)",0,vol-clustering,white-mean / vol-clustering,white-mean / vol-clustering,True,True
+"GARCH(1,1)",1,vol-clustering,white-mean / vol-clustering,white-mean / vol-clustering,True,True
+"GARCH(1,1)",2,vol-clustering,white-mean / vol-clustering,white-mean / vol-clustering,True,True
+"GARCH(1,1)",3,vol-clustering,white-mean / vol-clustering,white-mean / vol-clustering,True,True
+"GARCH(1,1)",4,vol-clustering,white-mean / vol-clustering,white-mean / vol-clustering,True,True
+"GARCH(1,1)",5,vol-clustering,white-mean / vol-clustering,white-mean / vol-clustering,True,True
+"GARCH(1,1)",6,vol-clustering,white-mean / vol-clustering,white-mean / vol-clustering,True,True
+"GARCH(1,1)",7,vol-clustering,white-mean / vol-clustering,white-mean / vol-clustering,True,True
+AR(2) cycle,0,cyclical,cyclical,cyclical,True,True
+AR(2) cycle,1,cyclical,cyclical,cyclical,True,True
+AR(2) cycle,2,cyclical,cyclical,cyclical,True,True
+AR(2) cycle,3,cyclical,cyclical,cyclical,True,True
+AR(2) cycle,4,cyclical,cyclical,cyclical,True,True
+AR(2) cycle,5,cyclical,mean-reverting,mean-reverting,False,False
+AR(2) cycle,6,cyclical,cyclical,cyclical,True,True
+AR(2) cycle,7,cyclical,cyclical,cyclical,True,True
+trend + cycle,0,trend+cycle,trend+seasonal,trend+seasonal,True,True
+trend + cycle,1,trend+cycle,trend+seasonal,trend+seasonal,True,True
+trend + cycle,2,trend+cycle,trend+seasonal,trend+seasonal,True,True
+trend + cycle,3,trend+cycle,trend+seasonal,trend+seasonal,True,True
+trend + cycle,4,trend+cycle,trend+seasonal,trend+seasonal,True,True
+trend + cycle,5,trend+cycle,trend+seasonal,trend+seasonal,True,True
+trend + cycle,6,trend+cycle,trend+seasonal,trend+seasonal,True,True
+trend + cycle,7,trend+cycle,trend+seasonal,trend+seasonal,True,True

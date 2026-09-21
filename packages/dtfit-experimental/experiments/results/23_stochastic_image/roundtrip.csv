@@ -1,0 +1,49 @@
+regime,seed,fitted_regime,refit_regime,recovered
+mean-reverting,0,mean-reverting,mean-reverting,True
+mean-reverting,1,mean-reverting,mean-reverting,True
+mean-reverting,2,mean-reverting,mean-reverting,True
+mean-reverting,3,mean-reverting,mean-reverting,True
+mean-reverting,4,mean-reverting,mean-reverting,True
+mean-reverting,5,mean-reverting,mean-reverting,True
+mean-reverting,6,mean-reverting,mean-reverting,True
+mean-reverting,7,mean-reverting,mean-reverting,True
+long-memory,0,long-memory,long-memory,True
+long-memory,1,long-memory,long-memory,True
+long-memory,2,long-memory,long-memory,True
+long-memory,3,long-memory,long-memory,True
+long-memory,4,long-memory,long-memory,True
+long-memory,5,long-memory,long-memory,True
+long-memory,6,long-memory,long-memory,True
+long-memory,7,long-memory,long-memory,True
+vol-clustering,0,white-mean / vol-clustering,white-mean / vol-clustering,True
+vol-clustering,1,white-mean / vol-clustering,white-mean / vol-clustering,True
+vol-clustering,2,white-mean / vol-clustering,white-mean / vol-clustering,True
+vol-clustering,3,white-mean / vol-clustering,white-mean / vol-clustering,True
+vol-clustering,4,white-mean / vol-clustering,white-mean / vol-clustering,True
+vol-clustering,5,white-mean / vol-clustering,white-mean / vol-clustering,True
+vol-clustering,6,white-mean / vol-clustering,white-mean / vol-clustering,True
+vol-clustering,7,white-mean / vol-clustering,white-mean / vol-clustering,True
+cyclical,0,cyclical,cyclical,True
+cyclical,1,cyclical,cyclical,True
+cyclical,2,cyclical,cyclical,True
+cyclical,3,cyclical,cyclical,True
+cyclical,4,cyclical,cyclical,True
+cyclical,5,mean-reverting,cyclical,True
+cyclical,6,cyclical,cyclical,True
+cyclical,7,cyclical,cyclical,True
+trend+cycle,0,trend+seasonal,trend+seasonal,True
+trend+cycle,1,trend+seasonal,trend+seasonal,True
+trend+cycle,2,trend+seasonal,trend+seasonal,True
+trend+cycle,3,trend+seasonal,trend+seasonal,True
+trend+cycle,4,trend+seasonal,trend+seasonal,True
+trend+cycle,5,trend+seasonal,trend+seasonal,True
+trend+cycle,6,trend+seasonal,trend+seasonal,True
+trend+cycle,7,trend+seasonal,trend+seasonal,True
+white noise,0,white noise / random walk,white noise / random walk,True
+white noise,1,white noise / random walk,white noise / random walk,True
+white noise,2,white noise / random walk,white noise / random walk,True
+white noise,3,white noise / random walk,white noise / random walk,True
+white noise,4,white noise / random walk,white noise / random walk,True
+white noise,5,white noise / random walk,white noise / random walk,True
+white noise,6,white noise / random walk,white noise / random walk,True
+white noise,7,white noise / random walk,white noise / random walk,True

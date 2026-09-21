@@ -1,0 +1,57 @@
+process,method,rmse,ratio
+white noise,dtfit merged,0.946464,1
+white noise,random walk,0.946464,1
+white noise,drift,0.948123,1.00175
+white noise,AR(1),0.929751,0.982342
+white noise,"ARIMA(2,1,2)",0.937131,0.990139
+white noise,ETS,0.936495,0.989467
+white noise,Theta,0.947002,1.00057
+white noise,classical twin,0.929838,0.982434
+random walk,dtfit merged,3.5006,1
+random walk,random walk,3.5006,1
+random walk,drift,3.23484,0.92408
+random walk,AR(1),3.49803,0.999266
+random walk,"ARIMA(2,1,2)",3.50617,1.00159
+random walk,ETS,3.23483,0.924079
+random walk,Theta,3.12092,0.891537
+random walk,classical twin,3.5006,1
+AR(1)/OU,dtfit merged,1.6153,1.25792
+AR(1)/OU,random walk,1.2841,1
+AR(1)/OU,drift,1.28503,1.00073
+AR(1)/OU,AR(1),1.61335,1.2564
+AR(1)/OU,"ARIMA(2,1,2)",1.69307,1.31849
+AR(1)/OU,ETS,1.36026,1.05931
+AR(1)/OU,Theta,1.35635,1.05626
+AR(1)/OU,classical twin,1.61522,1.25786
+ARFIMA (long memory),dtfit merged,0.866481,0.985468
+ARFIMA (long memory),random walk,0.879259,1
+ARFIMA (long memory),drift,0.877145,0.997595
+ARFIMA (long memory),AR(1),0.866372,0.985344
+ARFIMA (long memory),"ARIMA(2,1,2)",0.88513,1.00668
+ARFIMA (long memory),ETS,0.870985,0.99059
+ARFIMA (long memory),Theta,0.869457,0.988852
+ARFIMA (long memory),classical twin,0.866481,0.985468
+"GARCH(1,1)",dtfit merged,2.28774,1
+"GARCH(1,1)",random walk,2.28774,1
+"GARCH(1,1)",drift,2.30365,1.00695
+"GARCH(1,1)",AR(1),1.47453,0.644537
+"GARCH(1,1)","ARIMA(2,1,2)",1.48164,0.647645
+"GARCH(1,1)",ETS,1.48349,0.648453
+"GARCH(1,1)",Theta,1.4712,0.643079
+"GARCH(1,1)",classical twin,1.47255,0.643669
+AR(2) cycle,dtfit merged,8.29851,0.867856
+AR(2) cycle,random walk,9.56208,1
+AR(2) cycle,drift,9.59288,1.00322
+AR(2) cycle,AR(1),6.85169,0.716548
+AR(2) cycle,"ARIMA(2,1,2)",7.53852,0.788376
+AR(2) cycle,ETS,24.1298,2.52349
+AR(2) cycle,Theta,9.56344,1.00014
+AR(2) cycle,classical twin,6.4909,0.678817
+trend + cycle,dtfit merged,0.868666,0.253343
+trend + cycle,random walk,3.42881,1
+trend + cycle,drift,3.94304,1.14997
+trend + cycle,AR(1),3.14223,0.91642
+trend + cycle,"ARIMA(2,1,2)",4.44033,1.29501
+trend + cycle,ETS,9.57912,2.79372
+trend + cycle,Theta,3.59631,1.04885
+trend + cycle,classical twin,1.48106,0.431945

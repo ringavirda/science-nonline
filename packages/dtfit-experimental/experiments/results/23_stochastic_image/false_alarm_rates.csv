@@ -1,0 +1,4 @@
+process,mean_flags,max_flags
+white noise,0.1,1
+AR(1) phi=0.5,0.3,2
+AR(1) phi=0.9,0.9,3

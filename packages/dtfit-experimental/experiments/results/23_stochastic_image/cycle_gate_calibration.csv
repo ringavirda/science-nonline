@@ -1,0 +1,8 @@
+process,n,floor_only,floor_and_fisher_g
+white noise,60,0.465,0.08
+white noise,88,0.44,0.09
+white noise,120,0.305,0.075
+white noise,200,0.06,0.06
+white noise,309,0,0
+AR(1) phi=0.5,88,0.91,0.65
+AR(1) phi=0.5,200,0.725,0.725

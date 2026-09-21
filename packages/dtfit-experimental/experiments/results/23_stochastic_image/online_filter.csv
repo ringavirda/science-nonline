@@ -1,0 +1,2 @@
+persistence_jump_hit_rate,persistence_jump_mean_latency,volatility_switch_hit_rate,volatility_switch_mean_latency,max_false_alarms_per_3000,state_bytes_at_1000,state_bytes_at_100000,state_bytes_switching,flags_at_1000,flags_at_100000,flags_kept_switching,flags_tripped_switching,us_per_sample_at_1000,us_per_sample_at_100000
+1,72.875,1,28.75,1,640,2016,4736,0,172,512,1286,9.95129,9.7022

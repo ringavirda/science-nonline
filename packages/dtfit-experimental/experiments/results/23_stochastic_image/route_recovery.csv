@@ -1,0 +1,57 @@
+seed,functional,dtfit,dtfit_ols,foreign_rs,foreign_dfa,truth,foreign
+0,Hurst (aggregated variance),0.732254,0.732254,0.76174,0.78153,0.8,
+0,Hurst (spectral),0.721236,0.721236,0.76174,0.78153,0.8,
+0,mean reversion (AR(1) phi),0.677788,,,,0.7,0.67779
+0,volatility persistence,0.975402,,,,0.98,0.977533
+0,cycle period,15.7918,,,,16,16.129
+0,trend slope,0.0195765,,,,0.02,0.0195765
+0,cycle period (trend+cycle),50.0423,,,,50,50
+1,Hurst (aggregated variance),0.722022,0.722022,0.748653,0.757681,0.8,
+1,Hurst (spectral),0.774524,0.774524,0.748653,0.757681,0.8,
+1,mean reversion (AR(1) phi),0.70628,,,,0.7,0.706901
+1,volatility persistence,0.961775,,,,0.98,0.966581
+1,cycle period,16.1351,,,,16,15.3061
+1,trend slope,0.019175,,,,0.02,0.019175
+1,cycle period (trend+cycle),49.9029,,,,50,50
+2,Hurst (aggregated variance),0.694531,0.694531,0.780631,0.79527,0.8,
+2,Hurst (spectral),0.764391,0.764391,0.780631,0.79527,0.8,
+2,mean reversion (AR(1) phi),0.702039,,,,0.7,0.702842
+2,volatility persistence,0.970428,,,,0.98,0.973877
+2,cycle period,16.2001,,,,16,16.129
+2,trend slope,0.0192619,,,,0.02,0.0192619
+2,cycle period (trend+cycle),49.9101,,,,50,50
+3,Hurst (aggregated variance),0.807474,0.807474,0.791845,0.810498,0.8,
+3,Hurst (spectral),0.828897,0.828897,0.791845,0.810498,0.8,
+3,mean reversion (AR(1) phi),0.689478,,,,0.7,0.689483
+3,volatility persistence,0.967011,,,,0.98,0.976052
+3,cycle period,15.9021,,,,16,15.7895
+3,trend slope,0.019129,,,,0.02,0.019129
+3,cycle period (trend+cycle),49.9079,,,,50,50
+4,Hurst (aggregated variance),0.783779,0.783779,0.78554,0.813679,0.8,
+4,Hurst (spectral),0.824054,0.824054,0.78554,0.813679,0.8,
+4,mean reversion (AR(1) phi),0.745843,,,,0.7,0.746816
+4,volatility persistence,0.975248,,,,0.98,0.981214
+4,cycle period,15.683,,,,16,15.625
+4,trend slope,0.0191524,,,,0.02,0.0191524
+4,cycle period (trend+cycle),50.0162,,,,50,50
+5,Hurst (aggregated variance),0.768809,0.768809,0.810252,0.847503,0.8,
+5,Hurst (spectral),0.862571,0.862571,0.810252,0.847503,0.8,
+5,mean reversion (AR(1) phi),0.675433,,,,0.7,0.675433
+5,volatility persistence,0.975595,,,,0.98,0.98375
+5,cycle period,16.658,,,,16,16.8539
+5,trend slope,0.0189476,,,,0.02,0.0189476
+5,cycle period (trend+cycle),50.0279,,,,50,50
+6,Hurst (aggregated variance),0.809255,0.809255,0.759492,0.753298,0.8,
+6,Hurst (spectral),0.828869,0.828869,0.759492,0.753298,0.8,
+6,mean reversion (AR(1) phi),0.712207,,,,0.7,0.712347
+6,volatility persistence,0.976571,,,,0.98,0.97145
+6,cycle period,16.0795,,,,16,16.3043
+6,trend slope,0.0194671,,,,0.02,0.0194671
+6,cycle period (trend+cycle),50.0326,,,,50,50
+7,Hurst (aggregated variance),0.756537,0.756537,0.742536,0.727108,0.8,
+7,Hurst (spectral),0.771957,0.771957,0.742536,0.727108,0.8,
+7,mean reversion (AR(1) phi),0.710767,,,,0.7,0.711814
+7,volatility persistence,0.972606,,,,0.98,0.976816
+7,cycle period,16.6417,,,,16,16.8539
+7,trend slope,0.0189181,,,,0.02,0.0189181
+7,cycle period (trend+cycle),50.026,,,,50,50
