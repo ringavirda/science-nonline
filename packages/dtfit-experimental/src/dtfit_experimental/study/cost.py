@@ -24,7 +24,7 @@ def peak_memory(fn: Callable[[], object]) -> tuple[object, float]:
 
 # embedded: the streaming filter's deployable, no-malloc state size
 def embedded_footprint(n_params: int, window: int, kind: str = "block") -> dict:
-    """Words and bytes of the fixed streaming-filter C struct (Exp 9 formula).
+    """Words and bytes of the fixed streaming-filter C struct.
 
     Block-basis filter state is the window buffer (t, y) plus the covariance
     P (n^2), the estimate (n), scratch (n) and about 8 words of bookkeeping.
@@ -48,13 +48,14 @@ def embedded_footprint(n_params: int, window: int, kind: str = "block") -> dict:
     }
 
 
-# deployable footprint and latency: MCU SRAM budgets against the filters'
-# byte counts above.
+# MCU datasheet table: name, SRAM bytes, clock MHz, FPU present, MFLOP/s
+# (order-of-magnitude estimate, not a measurement).
 MCUS = [
-    ("AVR ATmega328 (Uno)", 2 * 1024, "no (soft)"),
-    ("ARM Cortex-M0+ (SAMD21)", 32 * 1024, "no (soft)"),
-    ("ARM Cortex-M4F (STM32F4)", 192 * 1024, "yes"),
-    ("ESP32 (LX6 FPU)", 520 * 1024, "yes"),
+    ("AVR ATmega328 (Uno)", 2 * 1024, 16, False, 0.05),
+    ("ARM Cortex-M0+ (SAMD21)", 32 * 1024, 48, False, 0.3),
+    ("ARM Cortex-M4F (STM32F4)", 192 * 1024, 168, True, 30.0),
+    ("ESP32 (LX6 FPU)", 520 * 1024, 240, True, 40.0),
+    ("nRF52840", 262144, 64, True, 10.0),
 ]
 
 
@@ -107,10 +108,11 @@ def footprint_rows(lat: dict, *, n: int = 3, W: int = 60) -> dict:
              latency_us=None),
     ]
     track32 = ea["sram_bytes_f32"] * 3        # a 3-axis tracker
-    mcu = [dict(MCU=name, SRAM_KB=sram // 1024, FPU=fpu,
+    mcu = [dict(MCU=name, SRAM_KB=sram // 1024, clock_MHz=clock,
+                FPU=("yes" if fpu else "no (soft)"), MFLOPs=mflops,
                 fits=("yes" if track32 < sram * 0.5
                       else ("tight" if track32 < sram else "no")))
-           for name, sram, fpu in MCUS]
+           for name, sram, clock, fpu, mflops in MCUS]
     Ws = np.arange(10, 110, 5)
     sweep = {nn: [embedded_footprint(nn, int(w))["sram_bytes_f32"] for w in Ws]
              for nn in (2, 3, 5)}

@@ -9,7 +9,7 @@ from dtfit_experimental.study.plants import (
     _MISMATCH_PAIRS, _mismatch_scores,
     make_multi, MergedTracker, run_tracker, kalman_multi,
 )
-from dtfit_experimental.study.cost import footprint_rows
+from dtfit_experimental.study.cost import MCUS, footprint_rows
 
 
 def test_gen_plant_outliers_replace_only_the_noisy_signal():
@@ -74,6 +74,37 @@ def test_footprint_rows_mcu_fit_table():
     by_mcu = {r["MCU"]: r["fits"] for r in rows["mcu"]}
     assert by_mcu["ARM Cortex-M4F (STM32F4)"] == "yes"
     assert by_mcu["AVR ATmega328 (Uno)"] == "tight"
+
+
+def test_mcus_is_the_five_field_form():
+    """`MCUS` carries name, SRAM bytes, clock MHz, FPU flag and MFLOP/s for
+    five parts including the rig's nRF52840; the mutation this catches is a
+    row losing a field during a widen, which unpacks silently into the wrong
+    column instead of raising."""
+    assert len(MCUS) == 5
+    assert MCUS[-1][0] == "nRF52840"
+    for name, sram_bytes, clock_mhz, fpu, mflops in MCUS:
+        assert isinstance(name, str)
+        assert sram_bytes > 0
+        assert clock_mhz > 0
+        assert isinstance(fpu, bool)
+        assert mflops > 0
+
+
+def test_footprint_rows_mcu_table_carries_clock_and_mflops():
+    """`footprint_rows`'s MCU table exposes the datasheet fields `MCUS` now
+    carries; the mutation this catches is `footprint_rows` unpacking `MCUS`
+    positionally without naming the new fields, which would drop them from
+    the row instead of failing."""
+    lat = {"dtfit block filter": 1.0, "dtfit Legendre filter": 1.0,
+           "EKF (params-as-state)": 1.0, "RLS (AR predictor)": 1.0}
+    rows = footprint_rows(lat, n=3, W=60)
+    by_mcu = {r["MCU"]: r for r in rows["mcu"]}
+    nrf = by_mcu["nRF52840"]
+    assert nrf["clock_MHz"] == 64
+    assert nrf["MFLOPs"] == 10.0
+    assert nrf["FPU"] == "yes"
+    assert by_mcu["AVR ATmega328 (Uno)"]["FPU"] == "no (soft)"
 
 
 def test_make_multi_shapes_and_finite():
