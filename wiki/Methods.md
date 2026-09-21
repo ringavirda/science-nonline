@@ -7,9 +7,9 @@ and where it is best applied. It is the deepest of the three doc layers -- for
 plain-language intuition see [../guides/](Guides), and for exact call signatures
 see [../api/](API).
 
-Every batch method is backed by a figure and a comparison table generated from
-real code on model *and* real data -- see
-[reproducing the figures](#reproducing-the-figures-and-tables).
+Every batch method page carries a figure of one fit, and the measured
+comparisons are the experiment notebooks' -- see
+[reproducing the tables](#reproducing-the-tables).
 
 ## The method catalog
 
@@ -129,8 +129,8 @@ methods go further and replace the monomial spectrum with a better-conditioned
   discrepancy of the two spectra on an orthogonal basis -- numeric, noise-tolerant,
   accurate; with an oscillatory recipe.
 - **EAC** matches **integrals (areas)** of model and data over windows rather than
-  spectra -- integration smooths noise, so it is the most robust; the robust
-  image is its outlier defense.
+  spectra -- local equations and a diagonal Gram; the robust image is the
+  outlier defense, in either basis.
 - **ImageFilter(basis="block") / ImageFilter(basis="legendre")** run EAC / LSI **recursively**, one sample at a time,
   through a shared `ImageFilter`, with drift detection and a calibrated
   `result()`; summing several filters' `nis_` pools their innovations into
@@ -169,22 +169,23 @@ suite runs all of these classical methods as **runnable baselines** -- see
 
 ---
 
-## Reproducing the figures and tables
+## Reproducing the tables
 
-All figures in `figures/` and every comparison table in these docs are produced by
-one script against real downloaded data plus clearly labelled model (synthetic)
-data. The script lives in the separate `dtfit-experimental` package (install with
-`pip install -e "packages/dtfit-experimental[bench]"`):
+The experiments are Jupyter notebooks in the separate `dtfit-experimental`
+package (install with `pip install -e "packages/dtfit-experimental[bench]"`).
+A notebook is the experiment and its report, and re-running it reproduces its
+tables and figures:
 
 ```bash
-python -m dtfit_experimental.experiments.download_data   # fetch COVID-19 + USD/UAH (once)
-python -m dtfit_experimental.experiments.benchmark        # write figures/*.png and print tables
+python -m dtfit_experimental.study.download_data   # fetch the public datasets (once)
+jupyter nbconvert --to notebook --execute --inplace \
+    packages/dtfit-experimental/experiments/method/15_families.ipynb
 ```
 
-Real datasets and the dissertation-domain rationale are documented in
-[the experiments README](Experiments);
-the full validation suites (per-adaptation `cases/` and per-domain `domains/`) and
-the established **baselines** each method is measured against are documented in
+The figures on the method pages are illustrations of one fit each. The
+notebooks, the datasets and a summary of each result are indexed on
+[the experiments page](Experiments); the adaptations in trial and the
+established **baselines** each method is measured against are documented in
 [../experimental/](Experimental). Baselines include SciPy `curve_fit`
 (Levenberg-Marquardt NLS, the gold standard), robust NLLS, `numpy.polyfit`, a
 Gaussian process, ARIMA/ETS/Theta, MLP/LSTM nets, an EKF, RLS and a

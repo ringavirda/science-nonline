@@ -47,7 +47,7 @@ return this **same** type -- including [`fit_many`](API-Scaling#fit_many).
 | `cost` | float \| None | final optimizer cost (typically `0.5 * rss` on the least-squares objective). `None` when not recorded |
 | `converged` | bool \| None | whether the underlying optimizer reported convergence; `None` when the method does not report it. **A successful call with `converged is False` is the silent-failure case to watch** -- a result came back but the solver did not settle |
 | `message` | str \| None | the optimizer's termination message, when available |
-| `x_range` | tuple[float, float] \| None | `(min, max)` of the training `x`, recorded so [`predict`](#predictx-return_stdfalse-warn_extrapolationfalse) can warn on extrapolation; `None` when unknown |
+| `x_range` | tuple[float, float] \| None | `(min, max)` of the training `x`, recorded so [`predict`](#predictx--return_stdfalse-warn_extrapolationfalse) can warn on extrapolation; `None` when unknown |
 | `label` | Any | optional tag carried through batch/parallel fits (a channel name, grid cell, ...); `None` for a plain single fit |
 | `error` | str \| None | set to a message instead of coefficients when a fit failed inside a batch ([`fit_many`](API-Scaling#fit_many)), so one bad problem does not abort the batch; `None` for a success |
 | `rss_source` | str \| None | where `rss` was computed: `"samples"` when the fit ran on an `Original`, `"image"` when it ran on an `Image`; `None` when not recorded |
@@ -97,7 +97,7 @@ Per-parameter confidence intervals (normal approximation) at the given level.
 
 <a name="fit-quality-diagnostics-v03"></a>
 ### Fit-quality diagnostics (`rsquared`, `aic`, `bic`, `residuals`)
-The iterative fitters ([`fit(basis="legendre")`](API-Fitting#fit(basis="legendre")), [`fit(basis="block")`](API-Fitting#fit(basis="block")))
+The iterative fitters ([`fit(basis="legendre")`](API-Fitting#fit-legendre), [`fit(basis="block")`](API-Fitting#fit-block))
 record the raw fit statistics (`n_obs`, `rss`, `tss`, plus the optimizer's `nfev`
 and `cost`) on the result, and three read-only properties derive the usual
 model-comparison numbers from them:
@@ -134,8 +134,8 @@ print(res.summary())
 ```
 
 ### Checking convergence
-The iterative fitters ([`fit(basis="legendre")`](API-Fitting#fit(basis="legendre")),
-[`fit(basis="block")`](API-Fitting#fit(basis="block"))) record whether the solver settled. A fit can
+The iterative fitters ([`fit(basis="legendre")`](API-Fitting#fit-legendre),
+[`fit(basis="block")`](API-Fitting#fit-block)) record whether the solver settled. A fit can
 return *successfully* yet not have converged -- on a misspecified model, a bad
 seed, or degenerate data -- so check the flag before trusting the parameters:
 

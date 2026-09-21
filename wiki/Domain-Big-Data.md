@@ -1,169 +1,64 @@
-# Domain -- Big-data processing (batch, streaming, distributed)
+# Domain -- Big-data processing
 
-> **Status (2026-09):** The estimators of the study live in
-> `dtfit_experimental.scale`; `ImageStream` covers the accumulator, merge and
-> channel forms. The sections below describe the study as it was run.
+Fit a model to a record that does not fit in memory, that arrives in shards on
+several machines, or that is one of thousands fitted at once -- and get the
+answer the resident fit would have given.
 
-*Compute in `big_data/backend.py`; report is the `big_data.ipynb` notebook.*
+**Notebook:**
+[22_scale](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit-experimental/experiments/technology/22_scale.ipynb).
+The same properties on two public archives: [Archive showcase](Domain-Image-Showcase).
 
-## Intent
+## Routes and baselines
 
-Test dtfit's map-reduce estimators (resident GEMM, fused streaming, distributed merge) and the streaming filter against the established big-data toolkit -- per-channel NLLS, vectorised polynomial lstsq, scikit-learn incremental SGD, recursive least squares -- on the concerns that decide survival at scale: exactness across routes and model shapes, throughput & flat memory, numerical stability of the streaming reduction, order-independent/fault-tolerant mergeability, and O(1)/sample online cost; on four synthetic panels plus 321 real electricity channels.
+- **dtfit:** `Image.merge` over chunk images, `ImageStream` as the one-pass
+  accumulator, `fit_many` over processes and threads, the channel projection
+  `Phi^T Y` as one GEMM on numpy and on cupy.
+- **Baselines:** the resident whole-record fit, a serial loop, one BLAS thread,
+  polynomial surrogates of degree 2 to 8.
 
-## Methods under test (dtfit)
+## What is measured
 
-- **whole-array GEMM** (`fit_lsi_batched` / `project_spectra`) -- all B channels' empirical spectra in one BLAS matmul `S = D^T (w * Y)`; maximal throughput, O(N*B) memory.
-- **fused streaming map-reduce** (`PartitionedBatchLSI`) -- folds each chunk's partial integrals into a `(B, n_coef)` accumulator: one pass, **flat O(B*order) memory**, exact, handles streams larger than RAM.
-- **distributed reduce** (`PartitionedBatchLSI.merge`, on the promoted `PartitionedLSI` #1) -- per-partition accumulators combined by an associative, order-independent `merge`.
-- **streaming filter** (`ImageFilter(basis="block")`) -- the online twin: an O(1)/sample recursive update tracking a model's parameters in bounded memory.
-All the reduce routes are the identical additive projection -> identical result.
+**The reduce is exact.** Eight chunk images merged in either order reproduce
+the whole-data fit to 4.92e-14 relative in the coefficients and 2.07e-15 in the
+parameters; reordering the merge moves the coefficients by 1.16e-12. A fit
+missing one of eight shards moves the two parameters by 0.01 and 0.02 of a
+standard error: a lost shard costs data, not an error.
 
-## Baseline methods (established big-data toolkit)
+**Numerics.** On an integrand chosen to be hard the float64 accumulation stays
+at 1.9e-15 at every chunk count. Naive float32 sits at 1.3e-06; a Kahan float32
+sum across chunks reaches 5.2e-08 at 1024 chunks, 24 times better, and does
+nothing at one chunk.
 
-Established big-data approaches a practitioner actually uses:
-- **per-channel SciPy `curve_fit` loop** -- B independent nonlinear least-squares fits; the accuracy gold standard (batch only).
-- **vectorised polynomial `lstsq`** -- one `np.linalg.lstsq` over all channels; the fast batched *surrogate* (no physical parameters, poor extrapolation).
-- **scikit-learn `SGDRegressor.partial_fit`** -- the canonical incremental / streaming-ML regressor, fed chunk-by-chunk on polynomial / lagged features.
-- **recursive least squares (RLS)** -- the classical online adaptive-filter one-step predictor (AR model).
-- **per-channel projection loop** -- the same Legendre projection as the batched GEMM but one channel at a time; isolates the batching speed-up.
+**Memory.** On a million-sample 32-channel panel `ImageStream` peaks at 80.1
+MiB against 335.7 MiB resident, and between the two record lengths tried its
+peak moves by -4.5 MiB while the resident one grows by 400 percent.
 
-## Scenarios tested
+**Many fits.** 200 fits take 1.93 s in a serial loop, 0.52 s on 4 processes
+(3.5 to 3.8 times) and 0.20 s on 12.
 
-Four realistic multi-channel **panels** (sensor arrays / multivariate streams), each a different model shape and a different big-data concern. Every channel shares the sampling grid (the requirement for the batched / fused reduce); each panel is generated and consumed chunk-by-chunk so nothing assumes the data fits in RAM.
+**The surrogate trap.** A polynomial surrogate matches or beats the structured
+fit in sample at 4 of 6 degrees and extrapolates 3.3 to 9431 times worse on
+the held-out half, on a record that holds one exponential decay.
 
-| scenario | model | channels x samples | concern |
-|---|---|---|---|
-| exp_growth | a*exp(b*t) | 8 x 15,000 | sensor-drift / epidemic panel (growth) |
-| exp_decay | a*exp(-b*t) | 8 x 15,000 | RC-discharge / relaxation array (decay) |
+## Where dtfit loses
 
-## 1. Exactness & accuracy across scenarios
+- Chunking does not pay in time: imaging eight chunks of a million samples and
+  merging takes 0.074 s against 0.045 s whole. The reduce buys exactness under
+  splitting, not speed against the resident route.
+- On a short record `ImageStream` costs more memory than the resident fit (84.6
+  against 67.1 MiB); its fixed cost is what buys the flat growth.
+- `fit_many` on a thread pool is 1.11 times slower than the serial loop. The
+  GIL owns that; nothing in the image route is a compiled kernel, and
+  throughput comes from the process pool.
+- With the host transfer counted, the cupy projection is slower than one BLAS
+  thread at every width (1.14 to 1.95 times); warm on the device it takes 0.20
+  of the numpy time at the widest. The projection is a device win only once
+  the data is already there.
+- The legacy map-reduce accumulators of `dtfit-legacy` reduce 16 to 48 times
+  faster than the image merge
+  ([notebook 17](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit-experimental/experiments/method/17_evolution_matrix.ipynb));
+  what they reduce to is a different estimator, 1e-4 and 1e-7 away from the
+  whole-data fit.
 
-For each panel: max |Delta| of the streaming / distributed coefficients vs the resident whole-array GEMM (do the routes agree?), and the mean parameter-recovery error of the dtfit fit vs the per-channel SciPy NLLS gold standard (is it as accurate?).
-
-| scenario | Delta streaming vs resident | Delta distributed vs resident | dtfit err % vs true | NLLS err % vs true |
-|---|---|---|---|---|
-| exp_growth | 6.578e-11 | 0.0007042 | 0.02036 | 0.02036 |
-| exp_decay | 1.62e-11 | 0.0004344 | 0.02147 | 0.02152 |
-
-The streaming route is bit-identical to the resident GEMM to round-off; the distributed route differs only by one trapezoid per partition seam (~1e-4); and across all four model shapes the dtfit fit recovers the parameters as accurately as the per-channel NLLS gold standard. The map-reduce is one estimator with three execution profiles, exact by construction (the projection is linear across channels, additive over the domain).
-
-## 2. Throughput & memory scaling vs the established toolkit
-
-Same job (fit `B` channels), measured against the methods a practitioner would otherwise use. Throughput is samplesxchannels per second; peak memory is the new-allocation high-water mark (`tracemalloc`).
-
-| method | kind | time (s) | M*elem/s | peak mem (MiB) | recovers |
-|---|---|---|---|---|---|
-| dtfit resident GEMM | batch (dtfit) | 0.01389 | 8.64 | 3 | physical a,b |
-| dtfit streaming | stream (dtfit) | 0.01492 | 8.04 | 0.6 | physical a,b |
-| per-channel SciPy NLLS | batch (established) | 0.008348 | 14.37 | - | physical a,b |
-| vectorised polynomial lstsq | batch (established) | 0.001645 | 72.96 | - | surrogate (no params) |
-| sklearn SGD partial_fit | stream (established) | 0.05409 | 2.218 | - | surrogate (no params) |
-
-The batched dtfit reduce beats the per-channel NLLS loop (~2x) and the incremental SGD net (~3x) while recovering the **physical** parameters; only the polynomial `lstsq` surrogate is faster, and it fits no parameters and extrapolates poorly (next section). The streaming route holds memory flat. The NLLS speed-up grows with channel count and points-per-channel; the projection-batching win is shown cleanly on the 321-channel real data in Part 6.
-
-![Flat streaming memory (left); dtfit batched throughput vs the established batch/stream methods (right).](figures/memory_throughput.png)
-
-*Flat streaming memory (left); dtfit batched throughput vs the established batch/stream methods (right).*
-
-## 2b. The memory wall at GB scale (resident vs streaming)
-
-The headline big-data argument, at real scale. The resident GEMM must hold the whole `(N, B)` panel (plus a same-size weighted temporary); the streaming reduce never materialises more than one chunk. Peak memory (`tracemalloc`) projecting a `B=64`-channel panel as the sample count grows into the **hundreds of millions of elements** (multi-GB resident):
-
-| elements | NxB | resident array (GB) | resident peak (MiB) | streaming peak (MiB) | memory ratio |
-|---|---|---|---|---|---|
-| 16,000,000 | 250,000x64 | 0.128 | 246.1 | 159.5 | 1.543 |
-| 64,000,000 | 1,000,000x64 | 0.512 | 984.3 | 159.5 | 6.172 |
-
-At 256M elements the resident route peaks in the **GiB range** (3.8 GiB) while the streaming reduce stays at **159 MiB** -- a ~25x reduction, and *flat* as N grows. This box's 64 GiB holds the resident array here; a smaller node would hit the wall, where only the streaming/distributed route runs at all -- the whole point of the map-reduce structure.
-
-![Resident peak memory climbs linearly into the GiB range; the streaming reduce is flat -- the structural reason it survives at scale.](figures/memory_wall.png)
-
-*Resident peak memory climbs linearly into the GiB range; the streaming reduce is flat -- the structural reason it survives at scale.*
-
-## 3. Structured fit vs the established surrogates (the extrapolation trap)
-
-Fit each channel on the **first half** of the domain and predict the held-out **second half**. This isolates *what each approach buys*. The fast batched / streaming established methods fit **polynomial surrogates**: they reconstruct the window but recover no physical parameters and extrapolate poorly. The methods that recover the physics (dtfit, per-channel NLLS) extrapolate along the true model -- and only dtfit also batches *and* streams.
-
-| approach | kind | recovers | in-window R^2 | extrapolation R^2 |
-|---|---|---|---|---|
-| dtfit fused streaming | structured + streaming | physical a,b | 0.9804 | 0.9854 |
-| per-channel NLLS | structured, batch only | physical a,b | 0.9804 | 0.9854 |
-| polynomial lstsq (deg 6) | surrogate, batch | no params | 0.9804 | -30.48 |
-| sklearn SGD partial_fit | surrogate, streaming | no params | 0.9797 | -2.264 |
-
-The surrogates match in-window but their **extrapolation R^2 collapses** (a degree-6 polynomial diverges outside its fit window; the SGD net has no model to extend) -- whereas the structured fits carry the true model forward. dtfit is the only row that is structured **and** batched **and** streaming.
-
-![In-window everyone fits; out-of-window only the structured (physical-parameter) fits hold up -- the polynomial / SGD surrogates collapse below zero.](figures/surrogate_trap.png)
-
-*In-window everyone fits; out-of-window only the structured (physical-parameter) fits hold up -- the polynomial / SGD surrogates collapse below zero.*
-
-## 4. Numerical stability of the streaming reduction
-
-A streaming reduce sums billions of partial integrals; floating-point accumulation error is the concern that bites at scale. We accumulate the projection integral `integral y.phi` of a high-dynamic-range signal in a growing number of chunks, comparing a naive **float32** sum, the dtfit **float64** additive reduce, and a compensated **Kahan** sum, against an exact (`math.fsum`) reference. Reported as max relative error vs exact.
-
-| # chunks (over 8000000 samples) | naive float32 | dtfit float64 | Kahan (compensated) |
-|---|---|---|---|
-| 16 | 2.265e-08 | 0 | 0 |
-| 256 | 1.308e-07 | 2.015e-16 | 2.015e-16 |
-| 4,096 | 1.937e-07 | 1.612e-15 | 0 |
-
-The dtfit **float64** additive reduce stays at ~1e-14 regardless of how finely the stream is chunked -- numerically sound for realistic volumes. A naive **float32** accumulation (e.g. a careless GPU kernel) drifts orders of magnitude worse (3e-06 at 65,536 chunks) and *grows* with the chunk count; **Kahan** compensation buys back full precision essentially for free. The honest guidance: the default float64 reduce is fine to ~10^9 elements; beyond that, or on float32 hardware, use a compensated accumulator.
-
-![float64 additive reduce stays at round-off; float32 drifts and grows with chunk count; Kahan restores full precision.](figures/numerics.png)
-
-*float64 additive reduce stays at round-off; float32 drifts and grows with chunk count; Kahan restores full precision.*
-
-## 5. Robustness & mergeability -- what distributed pipelines require
-
-Production reduces combine shards in arbitrary order, on uneven shards, and over imperfect data. We test the three guarantees the additive structure actually provides, against the in-order whole-array reference:
-
-| condition | max \|Delta\| vs reference | param err % vs true |
-|---|---|---|
-| merge partitions in a different order | 2.066e-11 | 0.04404 |
-| uneven contiguous shards (1 / 1/4 / rest) | 0.0006239 | 0.06076 |
-| 20% of samples missing (uniform) | 0.000362 | 0.04143 |
-
-The `merge` is **associative and order-independent** (combining partitions in any order is identical to round-off -- the distributed guarantee), uneven shard sizes change nothing beyond the trapezoid seam (~1e-4), and dropping a fifth of the samples barely moves the estimate (the fit is an *area*, robust to missing points). **Honest limitation:** the trapezoidal reduce connects consecutive samples, so within a single partition the chunks must arrive in **domain order** (shuffling a partition's own chunks injects spurious seam trapezoids); it is the *partition merge* that is order-free, which is what distributed execution actually needs.
-
-## 6. Online filter vs the established online estimators
-
-The streaming *filter* is the real-time twin of the reduce: an O(1)/sample recursive update. We track a sinusoid with a **mid-stream frequency jump** one sample at a time, comparing dtfit's `ImageFilter(basis="block")` against the established online toolkit -- recursive least squares (RLS) and an incremental SGD net -- on per-sample cost, memory, one-step prediction error, and whether the **physical frequency** is recovered.
-
-| online method | us / sample | memory | one-step RMSE (post-jump) | recovers physics |
-|---|---|---|---|---|
-| dtfit block filter | 344.2 | bounded (2.7 MB) | 0.301 | yes (w err 18.2%) |
-| recursive least squares (AR6) | 5.55 | bounded | 0.3274 | no (black-box AR) |
-| sklearn SGD partial_fit (lag-8) | 72.03 | bounded | 0.3235 | no (black-box) |
-
-All three update in microseconds at bounded memory -- the table-stakes for streaming. The established AR/SGD predictors are competitive (often better) at the **black-box one-step prediction** they are built for, but they recover **no physical parameters**. dtfit's filter is the only one that tracks the **interpretable model parameter** (the frequency) online and flags the regime change -- the streaming counterpart of the batch domain's structured-vs-surrogate distinction. (A batch re-fit would be O(N) per step -> O(N^2); only a recursive O(1)/sample update is feasible.)
-
-![dtfit's streaming filter tracks the physical frequency online through a mid-stream jump at O(1)/sample.](figures/figures-online_tracking.png)
-
-*dtfit's streaming filter tracks the physical frequency online through a mid-stream jump at O(1)/sample.*
-
-## 7. Real data -- 321-channel electricity load (LTSF)
-
-Order-6 Legendre spectral features for **all 321 real channels** (9,000 timesteps each), the projection underneath every batched fit. The batched GEMM, per-channel loop and streaming accumulator must be identical; the established polynomial `lstsq` is timed for scale:
-
-| method | time (s) | peak mem (MiB) | max \|Delta\| vs batched | speed-up |
-|---|---|---|---|---|
-| dtfit batched GEMM (project_spectra) | 0.005207 | 0.5 | 0 (ref) | 1x (ref) |
-| vectorised NumPy projection (FAIR baseline) | 0.001019 | 0.7 | 4.0e-10 | 0.20x |
-| dtfit streaming accumulator | 0.01482 | 1.7 | 2.4e-10 | flat memory |
-| polynomial lstsq (established) | 0.006536 | - | n/a (surrogate) | 1.26x |
-
-On real sensor data the batched route is ~43x the per-channel loop and bit-identical to it; the streaming route is identical at flat memory. The map-reduce delivers the same exactness and speed on measured data as on the synthetic panels.
-
-![Left: batched/streaming project all 321 channels far faster than the per-channel loop (log scale). Right: sample real channels -- the shared-grid multi-channel panel the batched reduce targets.](figures/realdata.png)
-
-*Left: batched/streaming project all 321 channels far faster than the per-channel loop (log scale). Right: sample real channels -- the shared-grid multi-channel panel the batched reduce targets.*
-
-## Reading it
-
-- **Exact & accurate, every route, every shape.** Across all four model panels the streaming route is bit-identical to the resident GEMM and the distributed route differs only by a trapezoid per seam; all recover the parameters as accurately as the per-channel NLLS gold standard. The map-reduce is one estimator with three execution profiles.
-- **Faster than the established structured methods, and it keeps the physics.** The batched reduce beats the per-channel NLLS loop and the incremental SGD net by large factors while recovering physical parameters; the only faster method is the polynomial `lstsq` surrogate, which fits no parameters and **extrapolates poorly** (its held-out R^2 collapses while the structured fits carry the model forward). dtfit is the one approach that is structured **and** batched **and** streaming.
-- **Numerically sound at scale.** The float64 additive reduce holds ~1e-14 error regardless of chunking; a naive float32 accumulation drifts and grows with chunk count, and Kahan compensation restores full precision -- the honest guidance for 109-element or float32-hardware reductions.
-- **Mergeable the way distributed pipelines need.** The reduce is order-independent and shard-size-independent (associative `merge`), and degrades gracefully when a partition is lost -- because each partition adds an additive share of the same integral, not an irreplaceable slice of a global solve.
-- **Online, with interpretable output.** The streaming filter tracks a physical parameter (the frequency) through a regime change at O(1)/sample and bounded memory; the established RLS / SGD online predictors are competitive at black-box one-step prediction but recover no parameters. A batch re-fit would be O(N^2) -- only a recursive update is feasible.
-- **Honest limits.** Streaming trades throughput for bounded memory (per-chunk overhead); it needs a **shared sampling grid** and the global domain fixed up front (heterogeneous grids fall back to independent fits); thread scaling is sub-linear (bandwidth-bound); and -- per case Experiment 8 -- a GPU helps only the *resident* route, a single streamed pass being PCIe-bound ~= CPU.
-- **Current home.** The estimators above now live in `dtfit_experimental.scale`; `ImageStream` covers the accumulator, merge and channel forms.
+One machine, synthetic panels, wall-clock numbers with the spread the notebook
+prints beside them.

@@ -1,63 +1,70 @@
-# Domain -- Stochastic series (dtfit on random data)
+# Domain -- Stochastic series
 
-The validation behind the promoted [stochastic-series API](API-Stochastic) and
-[methods](Methods-Stochastic). Full runnable report: the
-[`stochastic_series` notebook](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit-experimental/src/dtfit_experimental/experiments/domains/stochastic_series/stochastic_series.ipynb)
-in `dtfit-experimental`.
+Characterise a series that has no deterministic model: read its regime (random
+walk, mean reversion, long memory, trend, cycle, volatility clustering),
+estimate the parameters of that regime, forecast accordingly, and do it from a
+fixed-size statistic that merges.
 
-## Intent
+**Notebooks:**
+[23_stochastic_image](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit-experimental/experiments/technology/23_stochastic_image.ipynb)
+(synthetic processes),
+[36_stochastic_real](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit-experimental/experiments/realdata/36_stochastic_real.ipynb)
+(seven real records). Method and API: [Methods-Stochastic](Methods-Stochastic),
+[API-Stochastic](API-Stochastic).
 
-Can dtfit -- a *deterministic* curve fitter -- be put to work on genuinely random
-series (economic / financial data)? A martingale path has no `y = f(t)` to fit. But
-a stochastic process has **deterministic functionals** -- its autocovariance,
-spectrum, aggregated variance and trend/cycle -- whose forms (damped
-exponentials/cosines, power laws) are exactly the shapes dtfit excels at. So the
-domain fits the **functional**, not the **path**, on processes with *known*
-parameters, merges the routes into one solution, and tests it on real economic data
-against the established toolkit -- reported honestly.
+## Routes and baselines
 
-## Methods under test (dtfit)
+- **dtfit:** the second-order image (lagged sums, dyadic block sums, a
+  fixed-grid DFT, trend sums), the estimators read from it, the regime router,
+  the merged forecaster, the streaming filter, `simulate`.
+- **Baselines:** a classical twin of the whole tier -- ADF, OLS AR(1), the
+  periodogram, R/S and DFA, a GARCH quasi-MLE -- and for the forecasts the
+  random walk, ETS, AR(1) and ARIMA.
 
-- **estimators** -- `hurst_spectral` / `hurst_aggvar` (long memory), `ar1_reversion`
-  (mean reversion), `garch_persistence` (volatility), `cycle_period` (stochastic
-  cycle), `decompose_trend_cycle`; each feeds a functional to `fit(basis="legendre")` / `fit(basis="block")`.
-- **`fit_stochastic`** -- the merged solution: a gated, ordered pipeline (an ADF
-  unit-root gate off the image's autocovariances -> deterministic mean -> whiten ->
-  long memory on the innovations -> mean reversion -> volatility) returning a
-  `StochasticModel` with the detected regime, a backtest-selected forecast, and a
-  generator.
-- **`StochasticModel.simulate`** -- draws fresh realizations from the detected
-  components (the model is a tunable generator, not just a summary).
-- **`StochasticFilter`** -- the per-input streaming twin (EWMA autocovariances read
-  by the EAC equal-areas criterion + a fused change-point detector).
+## What is measured
 
-## Baseline methods (established)
+- **The image merges exactly** once the scale budget is pinned: a record
+  imaged whole and imaged in blocks then merged agree to floating-point noise.
+- **Estimators by route.** Mean reversion and volatility persistence are at
+  parity with OLS AR(1) and the GARCH quasi-MLE. The cycle period is decided by
+  whether the true period lands on a periodogram bin: on one the classical
+  route is exact, off it dtfit wins.
+- **The regime router** ties its classical twin at 96.4 percent over 56 cases,
+  with one miss in common (an AR(2) cycle read as mean-reverting). A
+  finite-order AR process never routes as long memory, including the
+  persistent AR(1) at 0.9 whose pre-veto Hurst statistic clears the threshold
+  in every draw.
+- **The streaming filter** flags a persistence jump and a volatility switch at
+  flat per-sample cost with its state under a fixed cap; the generator
+  round-trips every regime.
+- **Seven real records.** Every detected regime matches the literature's
+  reading: GDP, two FX levels and the T-bill as random walks, CO2 as trend plus
+  a seasonal cycle, sunspots as a cycle in the 8 to 14 year band, the Nile as
+  trend. The held-out forecast never trails the random walk (worst ratio
+  1.0000) and beats it by more than half on CO2 and GDP. USD/UAH is a
+  random-walk level with long memory in its absolute returns that four
+  estimators agree on.
 
-- **Hurst:** OLS log-log slope, rescaled-range (R/S) analysis, detrended fluctuation
-  analysis (DFA).
-- **Mean reversion:** the lag-1 autocorrelation; **cycle:** the FFT periodogram peak.
-- **Forecasting:** random walk, drift, AR(1), ARIMA(2,1,2), Holt-Winters ETS, Theta,
-  seasonal-naive.
-- **Streaming reference:** dtfit's own `ImageFilter(basis="legendre")` (per-sample cost), the bar for the
-  filter's flat-memory / bounded-speed characteristics.
+## Where dtfit loses
 
-## What it shows
+- The two Hurst read-outs trail R/S and DFA.
+- The forecast loses on the AR(2) cycle and on GARCH(1,1), where both routes
+  read the same regime and the textbook forecaster that regime selects beats
+  the one the merged model falls back to; on mean reversion it ties.
+- ETS, AR(1) and ARIMA each win a real series outright.
+- The cycle gate's significance test assumes a white-noise null and opens far
+  more often on red noise; its effect-size floor and two other constants are
+  hand-set. On the Nile the 19.7-year cycle is the 1899 level shift read
+  through a line, and the significance test is what rejects it; the router has
+  no test that a level shift beats a slope, so the Nile's trend is still
+  reported.
+- The Nile's Hurst read-out is not stable across the record: adding the 12
+  held-out years moves DFA from 0.88 to 0.61.
 
-| claim | result |
-|---|---|
-| **parameter recovery works** | E1-E6 all VIABLE at full sample size; the ACF-fit cycle route beats its trivial (FFT periodogram) baseline; mean reversion's `acf1` baseline is the same read-out as `ar1_reversion`'s own `yw` default, not a foreign method, and the default now beats it; the spectral Hurst is competitive with R/S and DFA |
-| **regime identification works** | the router lands on the correct regime ~95% of the time; reports "no structure" on white noise (no hallucinated components) |
-| **forecasting is honest** | beats the random walk where structure extrapolates -- **CO2 (trend+seasonal) ~0.15x, GDP (drift) ~0.41x, sunspots (cyclical) ~0.72x** -- and ties it on a near-martingale (FX level, T-bill rate); never loses badly (a rolling-origin holdout guard falls back to persistence) |
-| **reproduces the literature** | Nelson-Plosser's random-walk-with-drift US GDP, the ~11-year sunspot cycle, Mauna Loa CO2 as trend+season, Hurst's Nile at `H ~ 0.9` (agreeing with R/S and DFA), near-unit-root interest rates, FX as a random walk with volatility clustering (long memory in `\|returns\|`) |
-| **it generates, not just summarizes** | the fit -> simulate -> refit round-trip recovers the regime **100%** across every process type |
-| **streaming works** | online phi tracking MAE ~0.03, structural-break detection 100% at ~78-step latency, ~0.7 false alarms / 3000 samples; flat memory and ~11 us/sample (faster than `ImageFilter(basis="legendre")`'s ~36 us) |
+## Reading it
 
-## The honest ceiling
-
-None of this predicts the *innovation* -- the martingale component is unfittable by
-any deterministic curve. What the solution delivers is a coherent characterization
-of a series' *structured* part (memory, reversion, persistence, cycle, trend,
-volatility) plus a forecast and a generator that are appropriately humble when there
-is no structure to exploit. That, validated across six process families, a 7-series
-real gallery, the generative round-trip and the streaming filter, is what cleared
-the bar to [promote the solution into stable `dtfit`](API-Stochastic).
+Near a random walk there is nothing to win, and the measure is whether the
+router declines to invent structure: on the real records it never trails
+persistence. The image form adds what the classical estimators do not have --
+one fixed-size statistic that merges across blocks and machines and feeds
+every read-out.

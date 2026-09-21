@@ -159,10 +159,10 @@ the complete list across the stable API.
 | **LSI (default)** | `fit(..., basis="legendre")` | accurate batch fit on the Legendre image; `k_star=None`/`"auto"` (an omitted `order`) takes `order_for`'s default |
 | **LSI, global search** | `fit(..., bounds=..., basis="legendre")` | trust-region local solve, with a differential-evolution stage when it's poor -- escapes bad local minima |
 | **LSI oscillatory recipe** | `fit(..., freq_param="w", basis="legendre")` or `oscillatory=True` | order raised to resolve a cycle, frequency seeded from the FFT -- recovers sinusoids to <1% |
-| **EAC (default)** | `fit(..., basis="block")` | overdetermined block image, most robust/fastest |
+| **EAC (default)** | `fit(..., basis="block")` | overdetermined block image: local windows, a diagonal Gram that stays well conditioned on any grid |
 | **Robust image** | `robust=True` on `fit`, `fit(basis="legendre")`, `fit(basis="block")` | Huber-reweights the image before any model is fit -- self-scaling, no scale to tune |
 | **EAC, bounded** | `fit(..., bounds=..., basis="block")` | constrained trust-region fit |
-| **Missing data** | `fit_lsi/fit(..., nan_policy="omit", basis="block")` | drop NaNs instead of raising |
+| **Missing data** | `Original(x, y, nan_policy="omit")` | drop NaNs instead of raising |
 | **DSB** | `fit_dsb(...)` (in `dtfit_legacy.dsb`) | symbolic exact balance (reference only) |
 | **EACFilter** | `ImageFilter(..., basis="block")` | streaming EAC (area measurement) |
 | **LSIFilter** | `ImageFilter(..., basis="legendre")` | streaming LSI (spectrum measurement) -- for oscillatory plants |
@@ -195,28 +195,31 @@ kept experimental until it proves itself. Here is the complete list with status.
 
 | # | adaptation | in `dtfit` as | what it is & how it works |
 |---|---|---|---|
-| **#1** | one-pass / distributed map-reduce | `ImageStream` accumulator | the image is **additive over the domain** (a sum of per-chunk projections), so a dataset too big for memory is reduced chunk-by-chunk in one pass, and distributed workers' partial images `merge()` exactly on contiguous chunks of a uniform grid (or `grid="explicit"` for other sample sets); the estimators of the original study live in `dtfit_experimental.scale`. -> [../api/scaling.md](API-Scaling) |
-| **--** | GEMM-batched projection | `ImageStream(channels=B)` | the image is **linear across channels**, so `B` channels' projections are one matrix multiply over one shared Gram, on CPU/GPU by swapping only the backend; the estimators of the original study live in `dtfit_experimental.scale`. -> [../api/scaling.md](API-Scaling) |
-| **--** | LSI oscillatory recipe | `fit(oscillatory=..., freq_param=..., basis="legendre")`, `fft_frequency_seed` | high order + FFT-seeded frequency, so a cycle isn't erased. -> [../api/fitting.md#fit_lsi](API-Fitting#fit_lsi) |
+| **#1** | one-pass / distributed map-reduce | `ImageStream` accumulator | the image is **additive over the domain** (a sum of per-chunk projections), so a dataset too big for memory is reduced chunk-by-chunk in one pass, and distributed workers' partial images `merge()` exactly on contiguous chunks of a uniform grid (or `grid="explicit"` for other sample sets); the estimators of the original study live in `dtfit_legacy.scale`. -> [../api/scaling.md](API-Scaling) |
+| **--** | GEMM-batched projection | `ImageStream(channels=B)` | the image is **linear across channels**, so `B` channels' projections are one matrix multiply over one shared Gram, on CPU/GPU by swapping only the backend; the estimators of the original study live in `dtfit_legacy.scale`. -> [../api/scaling.md](API-Scaling) |
+| **--** | LSI oscillatory recipe | `fit(oscillatory=..., freq_param=..., basis="legendre")`, `fft_frequency_seed` | high order + FFT-seeded frequency, so a cycle isn't erased. -> [../api/fitting.md#fit_lsi](API-Fitting#fit-legendre) |
 
 ### Still experimental (in `dtfit-experimental`)
 
-| # | adaptation | function | what it is & how it works |
-|---|---|---|---|
-| **#2** | pluggable basis LSI | `fit_lsi_basis` | keep LSI's criterion but choose the basis -- **Fourier** for periodic signals (a wiggle is 2-3 harmonics, not many polynomial orders), **Laguerre** for decays, Chebyshev/Legendre otherwise |
-| **#4** | joint shared-parameter fit | `fit_joint` | stack several channels' area equations into one system with **shared** parameters (a common frequency/rate) plus per-channel **private** ones -- more equations per shared unknown |
-| **#5** | stage-wise residual boosting | `boosted_fit` | fit stage 1 (e.g. an LSI trend), subtract it, fit stage 2 (e.g. an EAC cycle) on the residual; the sum is more expressive than either alone (the fingerprint is linear, so component fits add up) |
-| **--** | inverse-covariance fusion primitive | `InformationFilter` | information-form (inverse-covariance) recursive linear estimator: additive updates, exact/associative `fuse()` for sensor fusion and streaming map-reduce. Shares **no code** with the nonlinear EAC/LSI filters (they run the covariance form directly); exercised by no domain study, so it has **not cleared the >=2-domain promotion gate** and was moved out of stable `dtfit` |
-| **--** | multi-stream filter bank | `FilterBank`, `FusedChiSquareDetector` | run many `ImageFilter` instances in lockstep and pool their per-stream innovations into one `chi2(K)` statistic; the stable equivalent for one filter type is summing several `ImageFilter.nis_` values directly. -> [Methods-Filter-Bank](Methods-Filter-Bank) |
+| adaptation | names | what it is & how it works |
+|---|---|---|
+| image bases | `FourierBasis`, `ChebyshevBasis`, `LaguerreBasis` | keep the image criterion but choose the basis, passed as `fit(..., basis=FourierBasis(K))` -- **Fourier** for periodic signals (a cycle is a few harmonics, not many polynomial orders), **Laguerre** for decays, Chebyshev for the Legendre span with a better-conditioned Gram |
+| windows with explicit edges | `EdgeBlockBasis`, `SegmentBasis` | the block basis with the equal-window constraint dropped: a window edge placed on a known jump epoch, windows left out, or a Legendre polynomial per segment |
+| data known as window totals | `aggregated_image`, `fit_aggregated` | per-window totals and counts *are* the block image, so the model's window sums are fitted to them directly -- the equal-areas criterion on aggregated data |
+| window alignment | `fit_aligned`, `detect_jumps` | find level jumps at unknown epochs from a fine block image, leave the windows that hold them out, refit with one shift per epoch |
+| weak-form rate laws | `weak_operators`, `fit_logistic`, `fit_michaelis_menten`, `fit_damped_oscillator`, `fit_lotka_volterra_prey`, `seed_nlls` | identify an ODE's constants from projections against test functions that vanish at the record's ends: no ODE solve, no starting guess; the estimate seeds the solved fit |
+| a tracker in local time | `LocalTimeFilter`, `shift_matrix` | `ImageFilter` on a polynomial whose origin moves onto every new sample, exact under the coefficient shift map, so the clock's zero does not condition the window |
+| information-form fusion | `InformationFilter` | inverse-covariance recursive linear estimator: additive updates, associative `fuse()` for sensor fusion and streaming map-reduce. Shares no code with `ImageFilter`, which runs the covariance form |
+| several streams | `FilterBank`, `FusedChiSquareDetector` (in `dtfit_experimental.streaming`) | run many `ImageFilter` instances in lockstep and pool their per-stream innovations into one chi-square statistic; the stable equivalent is summing several `ImageFilter.nis_` values directly. -> [Methods-Filter-Bank](Methods-Filter-Bank) |
 
-Full signatures and usage for the experimental five:
+Full signatures and usage:
 [../experimental/adaptations-api.md](Experimental-Adaptations-API). The
-conceptual write-up and the math each rests on:
+conceptual write-up, the math each rests on and what its experiment reads:
 [../experimental/README.md](Experimental).
 
 ### How promotion works
 
-An adaptation graduates only after the **domain validation suite** shows it helps
+An adaptation graduates only after the experiment notebooks show it helps
 across a *range* of applications, not one cherry-picked case. On promotion it is
 **moved** into `dtfit` and imported from there (no re-export shim -- the dependency
 points one way only). The validation methodology and the baselines each
@@ -230,15 +233,15 @@ adaptation is measured against are in
 
 ```
 dtfit (stable, public)
-+-- batch fitting          fit . fit_lsi . fit_eac
-|   support                find_degree . fft_frequency_seed
++-- batch fitting          fit   (basis="legendre" | "block" | "auto", robust=, freq_param=)
+|   support                Original . Image . order_for . image.fft_frequency_seed
 +-- result type            FittingResult
-+-- sklearn estimator      NonlineRegressor
++-- sklearn estimator      sklearn.NonlineRegressor
 +-- one-call entry points  auto_forecast
-+-- model framework        models.<family> . Model . suggest_models
-+-- streaming / online     EACFilter . LSIFilter
-|                          (coast/coast_cov dead-reckon through gaps)
-+-- stochastic (random)    fit_stochastic . StochasticModel . StochasticFilter . Stochastic
++-- model framework        models.<family> . models.Model . suggest_models
++-- streaming / online     ImageFilter   (basis="legendre" | "block")
+|                          (coast/coast_cov dead-reckon through gaps; inflate/rearm hooks)
++-- stochastic (random)    fit_stochastic . StochasticModel . StochasticFilter . models.Stochastic
 |                          estimators: hurst_aggvar/spectral . ar1_reversion . garch_persistence
 |                          cycle_period . decompose_trend_cycle . ar_order . fit_ar . fractional_difference
 +-- scaling backends       fit_many . ImageStream
@@ -246,10 +249,22 @@ dtfit (stable, public)
 +-- diagnostics            fit_report . residual_diagnostics . residual_stats . FitDisplay . ResidualsDisplay
 
 dtfit-experimental (separate; promotes into dtfit when validated)
-+-- adaptations in trial   fit_lsi_basis(#2) . fit_joint(#4) . boosted_fit(#5)
-+-- fusion primitive       InformationFilter   (info-form; not yet through the gate)
++-- image bases            FourierBasis . ChebyshevBasis . LaguerreBasis
++-- explicit windows       EdgeBlockBasis . SegmentBasis . aggregated_image . fit_aggregated
+|                          fit_aligned . detect_jumps
++-- weak-form rate laws    weak_operators . fit_logistic . fit_michaelis_menten
+|                          fit_damped_oscillator . fit_lotka_volterra_prey . seed_nlls
++-- streaming              LocalTimeFilter . InformationFilter
+|                          streaming.FilterBank . streaming.FusedChiSquareDetector
 +-- backend helpers        available_backends . resolve_backend . Backend
-+-- experiments            cases/ (each lever) . domains/ (vs the real toolkit)
++-- study tier             study.families . study.baselines . study.montecarlo . ...
++-- experiments/           method/ . technology/ . realdata/   (the notebooks)
+
+dtfit-legacy (separate; the historical stages, for the evolution matrix)
++-- source forms           dsb.fit_dsb . dsb.find_degree . integral.fit_lsi . integral.fit_eac
++-- recursive filters      streaming.EACFilter . streaming.LSIFilter
++-- map-reduce             scale.PartitionedLSI . scale.PartitionedEAC . scale.PartitionedBatchLSI
+|                          scale.fit_lsi_batched . scale.project_spectra
 ```
 
 Where to go next:

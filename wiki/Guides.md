@@ -160,10 +160,11 @@ strictly* they match it. From strictest/most-fragile to most-relaxed/robust:
   -> [methods-explained.md#lsi](Guides-Methods-Explained#lsi)
 
 - **EAC -- Equal-Areas Criterion.** Matches the simplest possible integral
-  fingerprint: the **area** under the curve over a handful of windows. Because it
-  only ever integrates the data (never differentiates, never builds a high-order
-  polynomial), it is the **most noise-robust** and the **fastest** batch method.
-  Best for few-parameter transient and saturating shapes.
+  fingerprint: the **area** under the curve over a handful of windows. Each
+  equation is local: it sums the data of one window and nothing else. That
+  makes it the basis for records whose level jumps at known epochs and for
+  data that arrives as per-window totals; on a smooth record LSI spends the
+  same number of coefficients better.
   -> [methods-explained.md#eac](Guides-Methods-Explained#eac)
 
 - **ImageFilter(basis="block") / ImageFilter(basis="legendre") -- the streaming versions.** Run EAC's (or LSI's)

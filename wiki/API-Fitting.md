@@ -17,8 +17,8 @@ return a
 - [`Original`](#original) -- the sampled signal
 - [`Image`](#image) -- the basis projection of an `Original`
 - [`order_for`](#order_for), [`coverage`](#coverage) -- picking and checking the order
-- [`fit(basis="legendre")`](#fit(basis="legendre")) -- `fit` in the Legendre basis
-- [`fit(basis="block")`](#fit(basis="block")) -- `fit` in the block basis
+- [`fit(basis="legendre")`](#fit-legendre) -- `fit` in the Legendre basis
+- [`fit(basis="block")`](#fit-block) -- `fit` in the block basis
 - [`fit_dsb`](#fit_dsb) -- Differential Spectra Balance (the reference method, in `dtfit_legacy.dsb`)
 - [`find_degree`](#find_degree) -- polynomial degree selection (DSB support, in `dtfit_legacy.dsb`)
 - [`fft_frequency_seed`](#fft_frequency_seed) -- frequency seed for oscillatory fits
@@ -343,7 +343,7 @@ print(k, coverage("a0 + a1*exp(a2*x)", params, img, var="x"))
 
 ---
 
-<a name="fit(basis="legendre")"></a>
+<a name="fit-legendre"></a>
 ## `fit(basis="legendre")`
 
 ```python
@@ -404,7 +404,7 @@ print({k: round(v, 3) for k, v in res.params.items()})
 
 ---
 
-<a name="fit(basis="block")"></a>
+<a name="fit-block"></a>
 ## `fit(basis="block")`
 
 ```python
@@ -533,7 +533,7 @@ real FFT of the detrended signal, with the DC bin ignored, returned as
 when `x` already is one) and the least-squares straight line is removed, which
 is what lets a cycle riding on a trend be seen: the trend's own leakage
 otherwise owns the lowest non-zero bin and the peak lands there. This is the
-seed [`fit(basis="legendre")`](#fit(basis="legendre"))'s oscillatory recipe uses for `freq_param`; a
+seed [`fit(basis="legendre")`](#fit-legendre)'s oscillatory recipe uses for `freq_param`; a
 sinusoid's frequency can't be recovered without it.
 
 ```python

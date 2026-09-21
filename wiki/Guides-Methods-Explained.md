@@ -212,9 +212,10 @@ every window's model-area equals its data-area. That's it -- "equal areas."
 
 Why does so crude a quantity work? Because area is an *integral*, and (from the
 guide) integrals average out noise. EAC never differentiates the data and never
-builds a wobbly high-order polynomial; it only ever sums the data up. That makes
-it the **most noise-robust** of the batch methods and, because each window is one
-cheap equation, the **fastest**.
+builds a wobbly high-order polynomial; it only ever sums the data up. Measured
+over sixteen model families its parameter error is 1.025 times that of
+pointwise least squares. It has no robustness to outliers of its own: that
+comes from the robust image (`robust=True`), in either basis.
 
 ### How it works
 
@@ -418,8 +419,9 @@ to forecast to generator.
 |---|---|---|---|---|
 | **Matches** | exact fingerprint | image (least-squares, Legendre) | image (block, window sums) | area / spectrum, one sample at a time |
 | **Mode** | symbolic, offline | batch, offline | batch, offline | streaming, online |
-| **Best at** | derivation / reference | accurate general fitting | robust, fast, few-parameter | real-time tracking + drift detection |
-| **Noise** | fragile | tolerant | most robust | robust (integral measurement) |
+| **Best at** | derivation / reference | accurate general fitting | local structure: jumps at known epochs, per-window totals | real-time tracking + drift detection |
+| **Noise** | fragile | at parity with pointwise least squares | at parity with pointwise least squares | averaged over the window |
+| **Outliers** | fragile | `robust=True` | `robust=True` | `robust=True` |
 | **Use for production?** | no | yes (default) | yes | yes (real-time) |
 
 Where to go next:

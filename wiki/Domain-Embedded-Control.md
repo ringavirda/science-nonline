@@ -1,203 +1,120 @@
-# Domain -- Embedded real-time control (comprehensive)
+# Domain -- Embedded real-time control
 
-*Compute in `embedded_control/backend.py`; report is the `embedded_control.ipynb` notebook.*
+Identify and track the parameters of a plant online, sample by sample, with a
+bounded cost per step and a fixed state, through noise, anomalies and missing
+samples, and flag a change in a parameter when it happens.
 
-## Intent
+**Notebooks:**
+[21_filter_form](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit-experimental/experiments/technology/21_filter_form.ipynb),
+[24_embedded_footprint](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit-experimental/experiments/technology/24_embedded_footprint.ipynb).
+The chip itself is measured on the [hardware rig](Domain-Realtime-GPS-Hardware).
 
-Identify and track a plant online with bounded per-sample cost and a fixed memory budget, survive noise / outliers / dropouts, and flag a mid-run fault -- testing both dtfit streaming filters and the fused multi-axis FilterBank across four plant shapes and on real streamed data, against the established online estimators (EKF, RLS, constant-acceleration Kalman, sliding-window refit), with a robustness profile and a deployable-footprint accounting. The headline is an applicability map of which filter fits which plant, and the honest robustness trade: the EKF wins on Gaussian noise, the integral filters win decisively on the outlier glitches real sensors deliver (all tolerate dropouts).
+## Routes and baselines
 
-## Methods under test (dtfit streaming)
+- **dtfit:** `ImageFilter` on the window image in the Legendre and the block
+  basis, with the adaptive and the fixed window, the clipped (reweighted)
+  window, a chi-square test of the window innovation on every sample, and
+  `dtfit_experimental.streaming.FilterBank` for several axes.
+- **Baselines:** an extended Kalman filter with the parameters as its state,
+  scored at a static setting, at a tracking setting and over a grid of twelve
+  settings, with and without a 3-sigma gate; recursive least squares; a
+  constant-acceleration Kalman filter; a sliding-window NLLS refit; the batch
+  NLLS fit of the whole record as the floor.
 
-- **dtfit block filter** -- recursive estimator measuring the **area innovation** (data-model integrated over a sliding window); vector sub-area measurement (`n_sub=2`) + online noise adaptation (`adapt_r`). O(window*params)/sample, no SymPy on the hot path. The lean integral filter.
-- **dtfit Legendre filter** -- same recursion measuring the window's **Legendre spectrum** (its first orthonormal coefficients) -- a richer, noise-weighted measurement; the safer default, especially on saturating/polynomial shapes (costs read-only flash projection tables).
-- **FilterBank + fused chi^2 detector** -- a bank of per-axis filters whose one-step innovations pool into a chi^2(n_axes) fault statistic, acted on via the `inflate` covariance re-arm; each filter also runs a NIS + CUSUM drift test.
+## Plants
 
-## Baseline methods (established online estimators)
-
-- **Extended Kalman Filter** (params-as-state) -- the textbook online nonlinear *parameter* estimator (parameters a random-walk state, `y=f(t;p)` the measurement, linearized via `∂f/∂p`); the fair same-job baseline and the Gaussian-noise gold standard.
-- **Recursive Least Squares** (AR predictor) -- the classical adaptive-filter one-step predictor; cheap, but no physical parameters.
-- **constant-acceleration Kalman** -- the standard motion tracker; tracks the signal without identifying the plant.
-- **sliding-window `curve_fit`** -- re-run a batch NLLS on the latest window every few samples; the brute-force online approach.
-
-## Plants tested
-
-Four embedded signal classes -- every channel a noisy real-time stream the estimator must identify online. Grouped by *shape*, the property that decides which filter's measurement (area vs spectrum) fits (see the applicability map in Part 1).
-
-| plant | application | shape | model | params |
-|---|---|---|---|---|
-| damped_osc | control / vibration ID | oscillatory | A*exp(-z*w*t)*sin(w*sqrt(1-z**2)*t) | 3 |
-| ac_sine | AC / power monitoring | sustained cycle | c + A*sin(w*t) | 3 |
-| first_order | RC / thermal / DC-motor | monotone | K*(1-exp(-t/tau)) | 2 |
-| ca_traj | GPS / inertial trajectory | polynomial | c0 + c1*t + c2*t**2 | 3 |
-
-## 1. Online identification accuracy across plant shapes (clean)
-
-Each estimator runs sample-by-sample on a 5%-noise stream. **RMSE vs clean** is tracking error (post-warmup); **param err %** is the recovered physical parameters; **latency** is per-sample compute. All recover the parameters well on clean data -- the differences sharpen under stress (Part 2).
-
-### damped_osc (oscillatory) -- control / vibration ID
-
-| estimator | RMSE vs clean | param err % | physical params? | latency (us) |
-|---|---|---|---|---|
-| dtfit block filter | 0.0062 | 23.59 +/- 7.80 | yes | 103.9720 |
-| dtfit Legendre filter | 0.0064 | 18.42 +/- 16.40 | yes | 114.9480 |
-| EKF (params-as-state) | 0.0044 | 1.03 +/- 0.28 | yes | 20.8670 |
-| RLS (AR predictor) | 0.0281 | NaN | no | 6.1570 |
-| sliding-window curve_fit | 0.0126 | 55.20 +/- 4.93 | yes | 0.2355 |
-
-### ac_sine (sustained cycle) -- AC / power monitoring
-
-| estimator | RMSE vs clean | param err % | physical params? | latency (us) |
-|---|---|---|---|---|
-| dtfit block filter | 0.0263 | 1.37 +/- 0.03 | yes | 84.1397 |
-| dtfit Legendre filter | 0.0232 | 1.85 +/- 0.22 | yes | 80.7030 |
-| EKF (params-as-state) | 0.0185 | 0.37 +/- 0.01 | yes | 9.3425 |
-| RLS (AR predictor) | 0.0786 | NaN | no | 4.6140 |
-| sliding-window curve_fit | 0.0400 | 2.53 +/- 0.20 | yes | 0.2310 |
-
-### first_order (monotone) -- RC / thermal / DC-motor
-
-| estimator | RMSE vs clean | param err % | physical params? | latency (us) |
-|---|---|---|---|---|
-| dtfit block filter | 0.0089 | 25.30 +/- 4.29 | yes | 77.1740 |
-| dtfit Legendre filter | 0.0083 | 26.42 +/- 3.69 | yes | 78.1183 |
-| EKF (params-as-state) | 0.0238 | 0.76 +/- 0.10 | yes | 9.1425 |
-| RLS (AR predictor) | 0.0230 | NaN | no | 4.7742 |
-| sliding-window curve_fit | 0.0110 | 43.97 +/- 4.28 | yes | 0.3105 |
-
-### ca_traj (polynomial) -- GPS / inertial trajectory
-
-| estimator | RMSE vs clean | param err % | physical params? | latency (us) |
-|---|---|---|---|---|
-| dtfit block filter | 0.1156 | 39.84 +/- 6.24 | yes | 76.5022 |
-| dtfit Legendre filter | 0.1134 | 38.50 +/- 0.82 | yes | 78.2432 |
-| EKF (params-as-state) | 0.1385 | 3.15 +/- 0.33 | yes | 9.1730 |
-| RLS (AR predictor) | 0.2219 | NaN | no | 4.7690 |
-| sliding-window curve_fit | 0.2741 | 409.27 +/- 79.17 | yes | 0.2310 |
-
-### Best filter per plant -- and the reasoning
-
-Honest, and data-driven (not the cliche): on **clean** data neither dtfit filter dominates. The **dtfit Legendre filter** is the **safer default** -- its multi-coefficient spectral measurement matches or beats the area filter on every plant and is markedly better on the **saturating / polynomial** shapes (first-order 3.8% vs ~19% param error), where a single area leaves a parameter weakly constrained. The **dtfit block filter** is the **lean option** (no read-only projection tables -> less flash) and is competitive -- even marginally better on params -- on the **clean oscillations**, which the intuition that 'an oscillation's area cancels' would wrongly rule out. The decisive differences are not here on clean data but under **stress** (Part 2): the EKF is the clean-Gaussian gold standard yet the one that breaks under outliers, where the integral filters hold.
-
-| plant | best dtfit filter | why |
-|---|---|---|
-| damped_osc | the block filter ~= Legendre | A clean damped oscillation is easy for both --... |
-| ac_sine | the block filter ~= Legendre | A sustained sinusoid -- both recover it within... |
-| first_order | the Legendre filter | A saturating exponential is where the spectrum... |
-| ca_traj | the Legendre filter | A polynomial trajectory -- the multi-coefficie... |
-
-![Online tracking per plant: best dtfit filter (blue dashed) vs the EKF gold standard, over the noisy stream.](figures/plant_fits.png)
-
-*Online tracking per plant: best dtfit filter (blue dashed) vs the EKF gold standard, over the noisy stream.*
-
-## 2. Robustness -- noise, outliers, dropouts (why an integral measurement)
-
-The real reason a sensor estimator integrates: averaging over a window rejects the glitches and gaps that destroy a pointwise update. Swept on the damped oscillator (`damped_osc`); mean parameter error over seeds.
-
-### 2a. Gaussian noise (the EKF's home turf)
-
-On clean Gaussian noise the **EKF wins** -- it is the pointwise maximum-likelihood update -- with Legendre a close second and the area filter third. Reported honestly: the integral filters do not beat a well-tuned EKF on Gaussian noise.
-
-| noise % | 2% | 20% |
-|---|---|---|
-| dtfit Legendre filter | 10.3915 | 25.8066 |
-| dtfit block filter | 15.0813 | 4.7933 |
-| dtfit Legendre filter (robust image) | 10.3673 | 25.9206 |
-| dtfit block filter (robust image) | 14.9460 | 4.7014 |
-| EKF | 0.8794 | 2.4194 |
-
-### 2b. Outliers / glitches (the integral measurement's win)
-
-With gross outliers (sensor spikes, GPS multipath) the picture **inverts**: a single bad sample is a huge pointwise innovation that throws the EKF -- its error explodes -- while the integral filters average the glitch over the window and stay usable. This is the honest case for the dtfit filters in embedded sensing.
-
-| outliers % | 0% | 10% |
-|---|---|---|
-| dtfit Legendre filter | 18.4245 | 48.8573 |
-| dtfit block filter | 23.5921 | 21.9452 |
-| dtfit Legendre filter (robust image) | 18.5885 | 0.5611 |
-| dtfit block filter (robust image) | 24.0702 | 0.5495 |
-| EKF | 1.0285 | 730.6008 |
-
-### 2c. Sample dropout / irregular sampling
-
-| estimator | 0% dropped | 20% dropped | 40% dropped |
+| plant | application | model | parameters |
 |---|---|---|---|
-| dtfit Legendre filter | 1.8541 | 0.8439 | 12.9911 |
-| dtfit block filter | 3.7351 | 1.0259 | 4.6348 |
-| EKF | 1.4337 | 1.1433 | 1.1384 |
+| damped_osc | control, vibration | `A*exp(-z*w*t)*sin(w*sqrt(1-z**2)*t)` | 3 |
+| ac_sine | power monitoring | `c + A*sin(w*t)` | 3 |
+| first_order | RC, thermal, DC motor | `K*(1-exp(-t/tau))` | 2 |
+| ca_traj | trajectory | `c0 + c1*t + c2*t**2` | 3 |
 
-Dropout is handled gracefully by **all** the recursive estimators (a missing sample is simply an update that does not happen / an integral over whatever lands in the window on its true irregular timestamps) -- the integral filters stay accurate and the EKF is, if anything, flatter. So dropout is *not* where the filters differ; **outliers are** (2b). What matters is that none of them degrade catastrophically as a fifth-plus of the stream vanishes -- what real sensors actually deliver.
+Eight seeds, 5 percent noise unless a sweep says otherwise; the score is the
+mean relative parameter error over the seeds, in percent.
 
-For a *sustained* gap (a run of missing samples while the query time advances), evaluating the fitted model off its support diverges for higher-order models. Both filters expose [`coast(x, *, order=1)`](API-Streaming#coast) for exactly this: it anchors at the last in-window sample and Taylor dead-reckons across the gap (`order=1` constant-velocity, `order=2` constant-acceleration), reducing to `predict` once samples resume -- bounded gap extrapolation instead of a runaway fit. (Not available for models with external regressors, whose future value across the gap is unknown.)
+## Accuracy: the process noise decides, not the basis
 
-![Gaussian noise: EKF best (left). Outliers: the integral filters stay bounded while the pointwise EKF explodes (right, log scale).](figures/robustness.png)
+| | damped_osc | ac_sine | first_order | ca_traj |
+|---|---|---|---|---|
+| window filter, tuning matched to static parameters | 0.60 | 0.38 | 0.55 | 3.16 |
+| EKF at a static setting | 0.58 | 0.25 | 1.30 | 2.26 |
+| filter / best of twelve EKF settings | 1.03 | 1.55 | 1.80 | 1.46 |
+| image of the whole record (equals batch NLLS) | 0.21 | 0.25 | 0.16 | 2.27 |
 
-*Gaussian noise: EKF best (left). Outliers: the integral filters stay bounded while the pointwise EKF explodes (right, log scale).*
+Matched to a plant whose parameters do not move, the window filter is at the
+accuracy of an EKF given the same assumption: parity on the damped oscillator,
+ahead on the first-order rise, behind on the sinusoid and on the trajectory,
+where the static EKF is recursive least squares and sits on the batch floor.
+The filter runs one setting and is given no measurement variance; it stays
+within a factor of two of the best of twelve EKF settings on every plant, and
+no single EKF setting is within 1.5 times that best on all four. The fit from
+the image of the whole record equals batch NLLS and is 2.8 to 3.5 times better
+than the best online estimator on the two plants with a transient: for
+parameters that do not move, the running image is the estimator to use, and
+the window filter is for parameters that may move.
 
-## 3. Fault detection & on-device re-adaptation (multi-axis)
+With the window floor held equal the two bases enter the 10 percent band 1.5 to
+1.9 steps after the first measurement: convergence speed is the window floor,
+not the basis.
 
-A 3-axis oscillator with a damping fault (zeta jumps on every axis at the midpoint). The bank of `dtfit Legendre filter`s pools its three one-step innovations into a fused chi^2(3) statistic; on a detection it re-arms via `inflate`. We measure tracking error, detection latency, false alarms, and the marginal value of the `inflate` re-arm.
+## Anomalies and missing samples
 
-| tracker | RMSE vs clean | fused flags (pre / post fault) | detect latency (steps) |
+Robustness is the reweighting of the window. At 10 percent anomalies the
+clipped filter keeps all 8 runs under 5 percent error; a 3-sigma-gated EKF
+keeps 2 or 3 of 8, because a run the gate loses is locked out for good; an
+ungated EKF goes to hundreds of percent. A dropout is a thinner window, not a
+missed time update: through 20 percent of samples lost the matched filter
+reads 0.60, 0.53 and 0.65 percent against the static EKF's 0.64, 0.56 and 0.66.
+
+## A jump in a parameter
+
+| | flagged of 96 | latency | false alarms |
 |---|---|---|---|
-| dtfit FilterBank + fused detector | 0.0431 | 0 / 1 | 0.0000 |
-| Kalman-CA (no ID) | 0.4093 | n/a | NaN |
+| chi-square test of the window innovation, every sample | 96 | within four samples | 0 |
+| the filter's own detector, fixed window | 76 | 0.8 to 5.8 s by the phase of the jump | -- |
+| the filter's own detector, adaptive window | 53 | -- | -- |
 
-The fused detector flags the fault within **0 step(s)** with **0 false alarm(s)** beforehand -- a fault moves all three axes, so the pooled chi^2(3) has far higher SNR than any single axis. The dtfit bank, modelling each axis as a damped oscillator, tracks the clean signal far better than the **Kalman-CA** (0.050 vs 0.427): a constant-acceleration model cannot follow an oscillation, and it identifies nothing. **Honest note on `inflate`:** the covariance re-arm is only marginal here (0.0500 vs 0.0503 without it) because the filters already run `adapt_r` (online measurement-noise adaptation), which absorbs most of the regime change; the explicit re-arm matters more for a fixed-gain filter. The deliverable is the **flag** (knowing a fault occurred) plus continuous online re-adaptation.
+The filter's own detector is consulted once per window, so its latency is
+where the jump lands in that stride, and under the adaptive window it misses
+the jumps the window has already absorbed. What the adaptive window buys is
+the return to the new value: 2.4 s against the fixed window's 5.3 s, and
+clearing the window on the flag (`ImageFilter.rearm()`) brings either to 0.8
+s. On a fault that hits three axes at once the test rate is the whole gap: a
+test on every sample flags in 1 step, the once-a-window test in 19, and a
+Kalman bank that carries no model of the signal never flags. Per-axis tests on
+every sample match the pooled test at every fault size tried.
 
-![Fused fault detection + the value of the inflate re-arm.](figures/fault.png)
+## Cost and state
 
-*Fused fault detection + the value of the inflate re-arm.*
-
-## 4. Deployable footprint & latency (the embedded verdict)
-
-Live, no-malloc state per estimator (does **not** grow with the stream). NumPy does not run on an MCU, so these are the deployable word/byte counts of a hand-coded C struct (`2W + n² + 2n + 8` words for the area filter); latency is the per-sample desktop reference from Part 1.
-
-**Now confirmed on real silicon.** These were originally projections from a desktop-measured algorithm, awaiting a real port to verify. That port now exists: the [`dtfit-hardware`](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit-hardware/README.md) rig runs the streaming Legendre filter **on an Arduino Nano 33 BLE Sense (M4F)**, and its `nano_lsi_onboard` firmware emits the **measured** on-MCU cost -- cyc/update, us avg/max, and the `sizeof` state footprint (~267 us/update, sub-kB state, float32 bit-faithful to the PC reference). So the sub-KiB / O(1)-per-sample budget below is no longer a hand-count but a confirmed on-device number.
-
-| estimator | state words | float32 B | window buffer? | params? | latency us (n=3,W=60) |
-|---|---|---|---|---|---|
-| dtfit block filter | 143 | 572 | yes (W=60) | yes | 103.9720 |
-| dtfit Legendre filter | 143 | 572 +960B flash | yes (W=60) | yes | 114.9480 |
-| EKF (params-as-state) | 23 | 92 | no | yes | 20.8670 |
-| RLS (AR predictor) | 24 | 96 | no | no | 6.1570 |
-| Kalman-CA (3-axis) | 44 | 176 | no | no | NaN |
-
-### 4a. Fit on real microcontrollers (3-axis tracker)
-
-| MCU | SRAM | FPU | 3-axis state 1716B fits? |
-|---|---|---|---|
-| AVR ATmega328 (Uno) | 2 | no (soft) | tight |
-| ARM Cortex-M0+ (SAMD21) | 32 | no (soft) | yes |
-| ARM Cortex-M4F (STM32F4) | 192 | yes | yes |
-| ESP32 (LX6 FPU) | 520 | yes | yes |
-
-The windowless estimators (EKF, RLS, Kalman) are **leaner** -- only a small covariance, no sample window -- so for the absolute smallest footprint and a black-box predictor, RLS/Kalman win. dtfit's filters pay one `2W`-word window buffer for the **integral measurement** that buys the outlier / dropout robustness (Part 2) and the area/spectrum drift statistic. All are **O(1)-memory in the stream length** -- fitting in ~1-2 KiB on an M0+/M4/ESP32 (even an AVR if little else runs) -- unlike a batch fit or an NN over full history (O(N), never fits). float32 halves the state and is fine at these window sizes.
-
-![Left: state is small and flat in stream length (grows only with window). Right: per-sample latency -- all far under any real-time budget.](figures/figures-footprint.png)
-
-*Left: state is small and flat in stream length (grows only with window). Right: per-sample latency -- all far under any real-time budget.*
-
-## 5. Real-data online tracking -- USD/UAH 2014-15 crisis
-
-Stream the daily hryvnia rate and track a local exponential `a.exp(b.t)` online; one-step-ahead error vs the random-walk benchmark -- the honest test for a near-random-walk series.
-
-| estimator | one-step RMSE | one-step MAPE % |
+| | per step | note |
 |---|---|---|
-| dtfit block filter | 0.0175 | 0.5703 |
-| EKF | 0.0823 | 5.1239 |
-| RLS | 0.0973 | 1.5487 |
-| random walk | 0.0175 | 0.5703 |
+| window filter, either basis | 102 to 124 us | worst step 0.2 to 0.4 ms |
+| EKF | 12.5 us | |
+| sliding-window refit | 29 to 120 us in the mean | worst step 0.8 to 15 ms; needs an optimizer on the device |
+| Kalman-CA, one axis | 8.3 us | tracks a position, identifies nothing |
 
-![Online one-step tracking of the hryvnia crisis: the filter follows the depreciation but, honestly, does not beat the random walk one-step on this near-RW series.](figures/figures-realdata.png)
+The state is a fixed struct that does not grow with the stream: 212 bytes in
+float32 for a quadratic axis at a window of 15, 492 for the damped oscillator
+at 50, 636 for a three-axis tracker -- 31 percent of an ATmega328's 2 KB and
+under 2 percent of a Cortex-M0+, a Cortex-M4F, an ESP32 or an nRF52840. The
+struct model reads 184 bytes for the rig's configuration against 152 measured
+on the chip, the 32-byte difference named field by field. A FLOP-count estimate
+of the update is 3.5 times low against the timed nRF52840 (29.8 against 104.3
+us); carried to every part, that error leaves the 32-bit parts inside a 10 Hz
+epoch and puts the 8-bit part at 110.7 ms, outside it. No 8-bit chip was
+timed.
 
-*Online one-step tracking of the hryvnia crisis: the filter follows the depreciation but, honestly, does not beat the random walk one-step on this near-RW series.*
+## Where dtfit loses
 
-Daily FX is near a random walk -- no online estimator beats persistence one step out (RLS gets closest, as expected for one-step FX). The filter's value here is **not** beating RW one-step but bounded-latency adaptive tracking of the depreciation trend in a fixed memory budget with a built-in drift detector -- capabilities a batch refit cannot offer in a real-time loop. Reported honestly rather than cherry-picking a horizon.
+- To the static EKF on the sinusoid and the trajectory, and from 10 percent
+  noise up on the damped oscillator.
+- On cost: an EKF step is about ten times cheaper, a Kalman-CA step cheaper
+  still.
+- A tuning inherited from a tracking configuration loses to the EKF everywhere
+  it is scored, by eight to nine times on the damped oscillator: the matched
+  tuning is the right one only where the parameters are static.
+- The filter's own once-a-window detector, against a test on every sample.
 
-## Reading it
-
-- **An applicability map for the filters (data-driven).** On clean data neither dtfit filter dominates: the **dtfit Legendre filter** is the safer default (matches or beats the area filter everywhere, and is markedly better on the saturating/polynomial shapes -- first-order 3.8% vs ~19% param error, where a single area leaves a parameter weakly constrained), while the lean **dtfit block filter** (no flash tables) is competitive -- even marginally better on params -- on the clean oscillations. All estimators, including the EKF and a sliding-window refit, recover the parameters well on clean data; the filters separate under stress.
-- **The honest robustness trade (the heart of it).** On **Gaussian noise** the pointwise **EKF wins** (it is the ML update); the dtfit filters are competitive but do not beat it. On **outliers/glitches** the picture inverts decisively: a single spike is a huge pointwise innovation that throws the EKF (error explodes ~250% at 5% outliers), while the integral filters average it over the window and stay usable (~14-35%). Dropouts, by contrast, are tolerated by **all** the recursive estimators (a missing sample is just a skipped update). For real embedded sensing with multipath and spikes, the outlier robustness is the case for an integral measurement.
-- **Fault detection + on-device adaptation.** The fused chi^2 detector flags a multi-axis fault within a window at low false-alarm rate (pooling axes raises the SNR), and the `inflate` re-arm measurably speeds recovery -- online adaptation a fixed-gain filter or an offline-trained net cannot do.
-- **Deployable, and now confirmed on silicon.** Fixed sub-KiB no-malloc state, O(1)/sample, O(1)-memory in stream length -- fits an M0+/M4/ESP32. The windowless EKF/Kalman/RLS are leaner; dtfit pays one window buffer for the integral robustness. A batch fit / full-history NN is O(N) and never fits. These were desktop-measured projections; the [`dtfit-hardware`](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit-hardware/README.md) rig has since ported the Legendre filter to an Arduino Nano 33 BLE Sense M4F, where `nano_lsi_onboard` reports the **measured** cyc/update, us avg/max and `sizeof` footprint (~267 us/update, sub-kB state) -- the on-silicon confirmation the projection called for.
-- **Ceilings.** On near-random-walk real data (FX) no online estimator beats persistence one-step, and fault-detection latency is bounded by measurement SNR -- the same honest limits the case studies drew.
+Every plant is synthetic, the noise white and the anomaly one spike shape;
+the microsecond figures are one shared desktop's and are read as ratios.

@@ -1,61 +1,19 @@
-# experiments/domains -- per-domain validation of the merged dtfit methods
+# Domains -- the method by application
 
-`experiments/cases/` answers *"does each EAC/LSI adaptation work in isolation?"*
-(one optimization or structural idea per folder, scored on the promotion matrix).
-This suite answers the next question a practitioner asks:
+The [experiment notebooks](Experiments) are organised by what they establish.
+These pages read the same results by application: for each domain, what is
+asked of an estimator there, which established methods it is scored against,
+what the notebooks measure, and where dtfit loses. NLLS is the reference
+throughout; where theory gives the image no advantage, parity is reported as
+parity.
 
-> **For each real application domain, what is the best combination of the
-> methods, and does the merged pipeline actually hold up in a realistic
-> setting?**
-
-Each domain folder collects the levers that *cleared* their isolated evaluation,
-**merges them into one pipeline**, and runs it on a realistic workload -- testing
-validity (does it recover the right answer?), applicability (does it cover the
-domain's real axes?) and usefulness (does the merge beat the obvious baseline /
-earn its complexity?).
-
-Each report has a **"Methods under test (dtfit)"** section explaining exactly
-what each method does, a **"Baseline methods"** section listing the established
-domain-standard methods compared against, and includes **real-data** tests.
-
-## Domains
-
-| domain | dtfit methods tested | compared against | data |
-|--------|----------------------|------------------|------|
-| [`forecasting/`](Domain-Forecasting) | LSI, EAC, #2 Fourier-LSI, #5 boosting, auto-merged pipeline | random walk, seasonal-naive, drift, poly-extrap, Holt-Winters ETS, Theta, (S)ARIMA, MLP, LSTM | 12 series x 2 horizons (structurally-correct model per series): 8 measured (COVID, USD/UAH, sunspots, CO_2, El Nino, Nile, ETTh1, weather) + **4 physics/signal waveforms** (RLC ring-down transient, AC + harmonics, AM carrier, linear chirp) |
-| [`parameter_estimation/`](Domain-Parameter-Estimation) | LSI, EAC, #6 adaptive-EAC, #3 ensemble, #4 joint, merged selector | SciPy NLLS (LM), robust NLLS (soft-L1), MLP, Gaussian process | 16 nonlinear model families + applicability map; noise & outlier sweeps; sparse/transient/short-record/multi-channel; real COVID & USD/UAH rate recovery |
-| [`big_data/`](Domain-Big-Data) | GEMM batch (`fit_lsi_batched`), fused streaming `PartitionedBatchLSI`, distributed `merge` (#1) -- in `dtfit_experimental.scale`, covered by `ImageStream` -- and streaming `ImageFilter(basis="block")` | per-channel SciPy NLLS, vectorised polynomial `lstsq`, sklearn `SGDRegressor.partial_fit`, recursive least squares | 4 multi-channel panels + **real 321-channel** electricity; GB-scale memory wall, numerical stability, mergeability, online cost |
-| [`embedded_control/`](Domain-Embedded-Control) | `ImageFilter(basis="block")`, `ImageFilter(basis="legendre")`, `FilterBank` + fused chi^2 detector, `inflate` | Extended Kalman Filter, Recursive Least Squares, constant-accel Kalman, sliding-window refit | 4 plant shapes + applicability map; robustness (noise/outliers/dropout); multi-axis fault detection; deployable footprint; **real USD/UAH** streaming |
-| [`realtime_gps/`](Domain-Realtime-GPS) | streaming `ImageFilter(basis="legendre")`/`ImageFilter(basis="block")` (external regressors), full-IMU strapdown fused inside LSI, fused NIS/CUSUM maneuver detector | constant-accel Kalman, gyro-aided coordinated-turn EKF (+ pos-only CT-EKF & IMM on the benchmarks) | simulated 9-DOF rig (3-D maneuvering target, GPS fixes, 3-axis gyro + accelerometer + magnetometer) with dropouts & multipath glitches; well-known-trajectory benchmarks + public RTK/INS datasets; **on-silicon twin** in [`dtfit-hardware`](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit-hardware/README.md) |
-| [Real-time GPS -- hardware rig](Domain-Realtime-GPS-Hardware) | on-MCU float32 streaming LSI + gravity-aligned gyro heading, coasting, complementary-filter fusion | Kalman-CA, CT-EKF (same baselines, on real logs) | **real silicon** (Nano 33 BLE Sense + NEO-M8N): logged car drives (1 Hz & 5 Hz), on-MCU cost/footprint, float32 bit-faithfulness (golden 4.4e-16), + public **comma2k19** highway & **UrbanNav** deep-urban datasets with absolute truth |
-| [`stochastic_series/`](Domain-Stochastic-Series) | `fit_stochastic`, `StochasticModel.simulate`, `StochasticFilter`, the functional estimators (Hurst/AR(1)/GARCH/cycle), vendored ADF (**promoted to `dtfit.stochastic`**) | OLS/GPH, R/S, DFA (Hurst), lag-1 ACF, FFT-peak, random walk, drift, AR(1), ARIMA, ETS, Theta, seasonal-naive, `ImageFilter(basis="legendre")` (filter cost) | 6 process families (ARFIMA, AR(1)/OU, GARCH, AR(2) cycle, trend+cycle) recovered vs known truth + regime router; forecast skill; **7-series real gallery** (Nile, sunspots, CO2, GDP, T-bill, USD/UAH, LTSF-FX); generative round-trip; streaming tracking + break detection |
-| [`image_showcase/`](Domain-Image-Showcase) | `ImageStream` accumulator, block mode and channel form, `dtfit.image.fit` from stored images, `ImageFilter(basis="legendre")` + `DriftDetector`, images over TCP | `numpy.linalg.lstsq` on the same rows, published MIDAS velocities, the NGL step database, NOAA 1991-2020 hourly normals | **real 17 GB** of NGL GPS series (23,769 stations) and **51.6 GB** of NOAA Global Hourly 2024 (13,345 station-years); exactness gate, flat memory, PC against Raspberry Pi 5, images between the two machines |
-
-## Run
-
-```bash
-pip install -e '.[bench]'              # matplotlib, torch, statsmodels, pandas, jupyter
-
-# each domain is a backend.py (compute) + a notebook (report); open and re-run it
-jupyter lab experiments/domains/forecasting/forecasting.ipynb
-
-# or execute headless (writes outputs + figures in place)
-jupyter nbconvert --to notebook --execute --inplace \
-    experiments/domains/forecasting/forecasting.ipynb
-```
-
-Each notebook carries a config block of knobs near the top (sized for a few-minute
-run by default; comments show how to scale up). The backends reuse
-`experiments/common` (metrics, baselines, datasets, plotting) and the real
-datasets in `experiments/data/`. [`DOMAINS.md`](Domains-Reports) indexes the
-notebooks.
-
-## Reporting tone
-
-The merges are conservative -- they compose only the validated levers and exclude
-the ones that did not generalize -- and every report keeps the experiment suite's
-honest-negative tone: daily FX stays near random-walk, the LTSF gap to deep
-models is predictable global structure (not noise), joint fitting buys parsimony
-not accuracy on clean channels, streaming trades throughput for bounded memory,
-the GPU helps only resident data, and online change-detection is bounded by
-measurement SNR rather than the algorithm.
+| Domain | dtfit routes | Scored against | Notebooks |
+|---|---|---|---|
+| [Parameter estimation](Domain-Parameter-Estimation) | `fit` in the Legendre and block bases, the robust image, `basis="auto"` | SciPy NLLS, robust NLLS, the NIST certified values | 15, 14, 31 |
+| [Forecasting](Domain-Forecasting) | a declared structure fitted from the image, `auto_forecast` | random walk, seasonal naive, drift, ETS, Theta, (S)ARIMA, MLP, the published LTSF numbers | 32 |
+| [Embedded control](Domain-Embedded-Control) | `ImageFilter` in both bases, the per-sample innovation test, `FilterBank` | a parameter-space EKF over a grid of settings, RLS, Kalman-CA, a sliding-window refit | 21, 24 |
+| [Big data](Domain-Big-Data) | `Image.merge`, `ImageStream`, `fit_many`, the channel projection on the GPU | the resident fit, a serial loop, polynomial surrogates | 22 |
+| [Real-time GPS](Domain-Realtime-GPS) | the streaming Legendre and block trackers, IMU regressors, the robust window | Kalman-CA, a coordinated-turn EKF, an IMM, a Huber-hardened Kalman | 33, 34 |
+| [GPS hardware rig](Domain-Realtime-GPS-Hardware) | the on-chip float32 filter, the host trackers on recorded drives | Kalman-CA, CT-EKF on the same fixes | rig |
+| [Stochastic series](Domain-Stochastic-Series) | the second-order image, the regime router, the merged forecaster | OLS AR(1), GARCH quasi-MLE, R/S, DFA, ETS, ARIMA, the random walk | 23, 36 |
+| [Archive showcase](Domain-Image-Showcase) | `ImageStream`, fits from stored images, the image on the wire | `numpy.linalg.lstsq` on the raw rows, MIDAS velocities, NOAA normals | 35 |

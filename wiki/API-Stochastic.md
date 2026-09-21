@@ -212,7 +212,7 @@ Each takes a series, an `Original` or a [`SecondOrderImage`](#image) --
 `as_image` builds one if it is not one already, none of these estimators
 taking lag or frequency budgets of its own. Most recover a stochastic-model
 parameter by feeding a functional read off the image to
-[`fit(basis="legendre")`](API-Fitting#fit(basis="legendre")) / [`fit(basis="block")`](API-Fitting#fit(basis="block")).
+[`fit(basis="legendre")`](API-Fitting#fit-legendre) / [`fit(basis="block")`](API-Fitting#fit-block).
 `method="lsi"` (default) / `"eac"` pick the engine; `"ols"` / `"acf1"` /
 `"yw"` are plain baselines. The AR helpers (`ar_order` / `fit_ar`) are direct
 Yule-Walker instead, `fractional_difference` is a transform on the raw

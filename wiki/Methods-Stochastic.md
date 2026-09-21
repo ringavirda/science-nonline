@@ -165,7 +165,7 @@ tracked AR(1) coefficient, the filter reaches RMSE 0.032 and block images 0.028.
 A two-timescale **fused statistic** (a fast/slow EWMA of the persistence and log
 volatility, normalized by a frozen in-control gap variance) flags a structural break
 once per change, at a low false-alarm rate -- the streaming counterpart of the
-[`FusedChiSquareDetector`](API-Streaming#fused). Memory and per-sample cost are flat
+[`FusedChiSquareDetector`](API-Streaming#several-streams). Memory and per-sample cost are flat
 (independent of the stream length), matching the characteristics of
 [`ImageFilter(basis="block")` / `ImageFilter(basis="legendre")`](Methods-Equal-Areas-Filter).
 

@@ -1,7 +1,10 @@
 # Domain -- The image showcase (two public datasets larger than RAM)
 
-*Compute in `image_showcase/` (modules behind `backend.py`); report is the
-`image_showcase.ipynb` notebook.*
+**Notebook:**
+[35_archive_showcase](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit-experimental/experiments/realdata/35_archive_showcase.ipynb).
+The legs run from the command line, `python -m dtfit_experimental.study.showcase.cli`;
+the notebook reads the tables they write and reruns a sample of stations when
+the archives are on disk.
 
 ## Intent
 

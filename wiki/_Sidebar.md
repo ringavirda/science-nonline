@@ -59,7 +59,13 @@
 **Validation**
 
 - [Experiments](Experiments)
-- [Cases - reports](Cases-Reports)
-- [Cases - analysis](Cases-Analysis)
+- [Method studies](Experiments-Method)
 - [Domains](Domains)
-- [Domains - reports](Domains-Reports)
+  - [Parameter estimation](Domain-Parameter-Estimation)
+  - [Forecasting](Domain-Forecasting)
+  - [Big data](Domain-Big-Data)
+  - [Embedded control](Domain-Embedded-Control)
+  - [Real-time GPS](Domain-Realtime-GPS)
+  - [GPS hardware rig](Domain-Realtime-GPS-Hardware)
+  - [Stochastic series](Domain-Stochastic-Series)
+  - [Archive showcase](Domain-Image-Showcase)

@@ -8,8 +8,9 @@ For the *ideas* behind these functions read [../guides/](Guides); for the
 *math* read [../methods/](Methods). This reference is for looking up exact
 signatures, arguments, return types, and behavior.
 
-> **Looking for the experimental adaptations** (`fit_lsi_basis`, `fit_joint`,
-> `boosted_fit`)? Those live in the separate `dtfit-experimental` package -- see
+> **Looking for the experimental adaptations** (the Fourier, Chebyshev and
+> Laguerre bases, `fit_aggregated`, `fit_aligned`, the weak-form fitters,
+> `LocalTimeFilter`)? Those live in the separate `dtfit-experimental` package -- see
 > [../experimental/adaptations-api.md](Experimental-Adaptations-API). The
 > `InformationFilter` fusion primitive lives there too (`from
 > dtfit_experimental import InformationFilter`), not in the stable streaming

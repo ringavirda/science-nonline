@@ -5,8 +5,9 @@ sinusoids, logistic curves, saturating and peak shapes -- to noisy data, and
 recovers the *physical parameters* (a growth rate, a frequency, an asymptote),
 not just an opaque curve. It does this through **differential (non-Taylor)
 transformations**: instead of comparing the model to the data sample-by-sample,
-it compares *integral fingerprints* of the two, which is what makes it robust to
-noise.
+it compares their *images* -- a fixed-size statistic of projections onto a
+basis. The image is additive over samples, so one fit runs in one shot, chunk
+by chunk, across workers, or one sample at a time.
 
 This folder is the documentation. Pick the door that matches what you need:
 
@@ -18,16 +19,19 @@ This folder is the documentation. Pick the door that matches what you need:
 | **Look up a function or class** -- signatures, arguments, return types | [api/](API) -- complete reference for the public `dtfit` API |
 | **See the rigorous math** -- the formal derivations and proofs | [methods/](Methods) -- the mathematical reference, one file per method |
 | **Learn by running code** -- copy-paste examples | [examples/](Examples) -- quickstart -> methods -> models -> sklearn -> streaming -> scaling -> diagnostics |
-| **Understand the research** -- the experimental adaptations and how they were validated | [experimental/](Experimental) -- the `dtfit-experimental` package, the experiment suite, and every baseline it is compared against |
+| **Understand the research** -- the experimental adaptations and how they were validated | [experimental/](Experimental) -- the `dtfit-experimental` package, the adaptations in trial, and every baseline the methods are compared against |
+| **See what is measured** -- every claim with its numbers, wins and losses | [Experiments](Experiments) -- the experiment notebooks with a summary of each, and [Domains](Domains) -- the same results by application |
 
 ## The shortest possible introduction
 
 There are **three core fitting methods**, plus a streaming one. They are all the
-same idea (match integral fingerprints) applied differently:
+same idea (match the images of the model and the data) applied differently:
 
-- **LSI** -- the accurate, general-purpose batch fitter. *Start here.*
-- **EAC** -- the fast, most noise-robust batch fitter, best for few-parameter
-  transient/saturating shapes.
+- **LSI** -- the batch fit in the Legendre basis: accurate and
+  general-purpose, at parity with pointwise least squares. *Start here.*
+- **EAC** -- the batch fit in the block basis of equal windows: local, the
+  basis for records with jumps at known epochs and for data known only as
+  per-window totals.
 - **DSB** -- a symbolic *reference* method, used to derive and check the others;
   not for production.
 - **ImageFilter** -- the streaming version: feed one sample at a time, track

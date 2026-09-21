@@ -241,4 +241,4 @@ block of the coarse domain also claims its right endpoint.
 
 The map-reduce and GEMM-batched estimators of the experiment notebooks --
 `PartitionedLSI`, `PartitionedEAC`, `PartitionedBatchLSI`, `fit_lsi_batched`,
-`project_spectra` -- live in `dtfit_experimental.scale`.
+`project_spectra` -- live in `dtfit_legacy.scale`.

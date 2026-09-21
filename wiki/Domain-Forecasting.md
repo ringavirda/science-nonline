@@ -1,306 +1,59 @@
-# Domain -- Forecasting (comprehensive cross-method study)
+# Domain -- Forecasting
 
-*Compute in `forecasting/backend.py`; report is the `forecasting.ipynb` notebook.*
+Extrapolate a series past its record by fitting a declared structure to the
+training part, and find out how much knowing the structure is worth.
 
-## Intent
+**Notebook:**
+[32_forecasting](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit-experimental/experiments/realdata/32_forecasting.ipynb).
 
-Test every applicable dtfit forecasting method (LSI, EAC, #2 Fourier-basis LSI, #5 boosting, and the auto-merged pipeline) against the standard forecasting toolkit (random walk, seasonal naive, drift, polynomial extrapolation, Holt-Winters ETS, Theta, (S)ARIMA, MLP, LSTM) across twelve series spanning measured data (growth, currency, solar, climate, ocean, hydrology, energy-load) AND physics / signal-processing waveforms (an RLC ring-down transient, an AC power waveform with harmonics, an AM carrier and a linear chirp), at a short and a long horizon. Reported honestly.
+## Routes and baselines
 
-## Methods under test (dtfit)
+- **dtfit:** a declared model per series fitted from the image; the blind
+  `auto_forecast` search over its five classes (logistic, linear,
+  linear-seasonal, polynomial, random walk).
+- **Baselines:** random walk, seasonal naive, drift, polynomial extrapolation,
+  Holt-Winters ETS, Theta, (S)ARIMA, an MLP; for the long-horizon protocol the
+  published DLinear, TimesNet and Time-LLM numbers.
 
-- **LSI** (`fit(basis="legendre")`) -- integral least-squares in the reconditioned Legendre differential-transformation scheme: projects the data onto an orthonormal Legendre basis (its *empirical spectrum*) and solves for the model parameters whose analytic spectrum matches. A smoothing spectral fit. Applied to each series' structural model -- exponential/quadratic for the measured datasets, and the **correct physical waveform model** for the signals: a **damped sinusoid** for the RLC ring-down, a **Fourier series** (fundamental + harmonics) for the AC waveform, an **AM model** `(1+m.cos ω_m x).sin(ω_c x+φ)` for the modulated carrier, and a **chirp** `A.sin(ω₀x + k x² + φ)` for the sweep -- fitted at a Fourier-basis order high enough to resolve the highest harmonic.
-- **EAC** (`fit(basis="block")`) -- the equal-areas criterion: matches the model's *integrated area* to the data's over a set of windows (overdetermined -> noise-averaging). The batch twin of the streaming equal-areas filter.
-- **#2 Fourier-basis LSI** (`fit_lsi_basis`, `basis="fourier"`) -- the LSI spectral match on a **Fourier** basis, the natural orthogonal basis for periodic data; a few harmonics express a cycle cleanly.
-- **#5 stage-wise boosting** (`boosted_fit`) -- additive stages each fit to the previous residual: a structured **trend** stage (LSI) then a **seasonal** stage (LSI sine), composing trend+season from two simple fits.
-- **merged (auto)** (`merged_forecaster`) -- one pipeline, no per-series hand-tuning: it routes the model class (logistic for saturating growth; a joint linear+seasonal fit when an FFT gate finds a cycle; a quadratic level otherwise; physics classes passed through), then applies a **divergence guard** (drop a runaway quadratic to linear) and a **no-structure guard** (persist when the fit cannot beat a random walk on a held-out training tail).
+## What is measured
 
-## Baseline methods (established forecasting toolkit)
+Twelve series: eight measured (COVID-19 Ukraine, USD/UAH, sunspots, Mauna Loa
+CO2, El Nino SST, Nile flow, ETTh1 oil temperature, a weather channel) and four
+generated from a known equation (an RLC transient, AC with harmonics, an AM
+signal, a linear chirp). The score is nRMSE on a held-out tail.
 
-All are methods a forecasting practitioner routinely uses:
-- **random walk** -- persist the last value; the canonical hard-to-beat benchmark.
-- **seasonal naive** -- repeat the last full season; the seasonal benchmark.
-- **drift** -- random walk with the average historical slope (Hyndman drift).
-- **polynomial extrapolation** -- fit a global degree-2 polynomial and extend it; a *surrogate* fit with no parametric structure (the foil for dtfit's structured fit).
-- **ETS / Holt-Winters** (`ExponentialSmoothing`) -- exponentially-weighted level + trend + season; the classical workhorse.
-- **Theta** (`ThetaModel`) -- the M3-competition-winning decomposition forecaster; robust and widely deployed.
-- **(S)ARIMA** -- (seasonal) autoregressive integrated moving average; the standard statistical model for autocorrelated / seasonal series.
-- **MLP / LSTM** -- a feed-forward and a recurrent neural net (recursive multi-step); the general learners.
+- **A governing equation is worth an order of magnitude.** On the four
+  generated waveforms the declared structure beats the blind search by 14.0,
+  5.9, 22.9 and 25.6 times.
+- **Without one it is worth close to nothing.** On the eight measured series
+  the declared structure wins four, ties two to six figures and loses two (El
+  Nino SST 13.15 against 12.68, sunspots 35.10 against 31.60).
+- **The negative control holds.** On all three pairs tried the wrong structure
+  is worse in RMSE and flagged by its in-sample R2 (chirp 0.9983 against
+  0.0442).
+- **Traffic, twelve hourly sensors.** The image fit, the same fit polished by a
+  pointwise solve and a plain pointwise fit land within 0.05 percent of each
+  other (9.681, 9.687 and 9.687 percent median nRMSE): parity on a real record.
 
-## Series tested
+## Where dtfit loses
 
-Measured real datasets plus **physics / signal-processing waveforms** (generated from their governing equations + measurement noise -- a legitimate physical-process forecasting task; the electrical-wave / signal regime, not economics or medicine).
-
-| series | domain | length | model class | seasonal (period) |
-|---|---|---|---|---|
-| COVID-19 UA | epidemic growth | 30 | logistic | no |
-| USD/UAH | currency depreciation | 730 | linear_wave | no |
-| Sunspots | solar ~11y cycle | 309 | sine | yes (11) |
-| Mauna Loa CO2 | climate trend+season | 571 | poly_seasonal | yes (12) |
-| RLC transient | physics: electrical ring-down | 360 | damped | no |
-| AC + harmonics | physics: power waveform | 360 | fourier_series | yes (60) |
-
-## Best model per series -- and the reasoning
-
-The single biggest lever in this study is **picking the structurally correct model** for each series -- the same lesson the AC-harmonics case taught (a single sine cannot represent a multi-harmonic signal). The table below states the model fitted to each series and *why*, chosen from the structure of the process, not from the holdout. Three classes of correction drove the gains: the right **growth law** (logistic, not exponential, for an epidemic); the right **trend/cycle coupling** (a *joint* trend+seasonal fit, not a bare sine on a Fourier basis); the right **trend shape** (a settling `x.e^{-c.x}` trend for a mean-reverting oscillation, not a runaway slope); and the right **seed** (the chirp's frequency from the Hilbert phase). One series -- FX -- has **no extrapolable structure** (a near-random-walk with a permanent regime shift); there the honest model is persistence, reported as the negative result it is.
-
-| series | model fitted | why this model |
-|---|---|---|
-| COVID-19 UA | logistic L/(1+e^{-k(x-x0)}) | Epidemic growth saturates toward a carrying ca... |
-| USD/UAH | random walk (no structure) | Looks exponential, but the 2014 crash (a spike... |
-| Sunspots | level + sine c + A*sin(w*x+p) | No trend -- a single ~11-year cycle. Fitted on... |
-| Mauna Loa CO2 | quadratic + seasonal (joint) | A genuinely accelerating trend + a clean annua... |
-| RLC transient | damped sinusoid A*e^{-zwx}*sin(...) | The exact physical ring-down form -- it extrap... |
-| AC + harmonics | Fourier series c+sum ak sin+bk cos | A distorted power waveform = fundamental + 3rd... |
-
-## Accuracy at the long horizon (25% holdout)
-
-### COVID-19 UA (logistic)
-
-| method (best *) | RMSE | MAPE % | R^2 |
-|---|---|---|---|
-| dtfit (best oracle) * | 305.5 | 3.14 | 0.894 |
-| poly extrap | 350.7 | 3.40 | 0.860 |
-| ETS (Holt-Winters) | 462.4 | 5.05 | 0.757 |
-| ARIMA | 532.1 | 5.67 | 0.678 |
-| drift | 1037 | 11.18 | -0.223 |
-| Theta | 1599 | 17.11 | -1.908 |
-| dtfit merged (auto, blind) | 1621 | 18.97 | -1.990 |
-| MLP | 1636 | 17.23 | -2.045 |
-| random walk | 2169 | 23.15 | -4.355 |
-
-### USD/UAH (linear_wave)
-
-| method (best *) | RMSE | MAPE % | R^2 |
-|---|---|---|---|
-| Theta * | 0.5622 | 2.03 | 0.575 |
-| drift | 1.194 | 4.63 | -0.916 |
-| random walk | 1.554 | 5.66 | -2.248 |
-| ARIMA | 1.586 | 5.83 | -2.382 |
-| ETS (Holt-Winters) | 1.622 | 6.02 | -2.536 |
-| MLP | 1.684 | 6.32 | -2.811 |
-| dtfit (best oracle) | 2.866 | 9.76 | -10.042 |
-| poly extrap | 6.269 | 26.77 | -51.831 |
-| dtfit merged (auto, blind) | 8.724 | 29.25 | -101.297 |
-
-### Sunspots (sine, seasonal)
-
-| method (best *) | RMSE | MAPE % | R^2 |
-|---|---|---|---|
-| MLP * | 50.62 | 102.78 | 0.016 |
-| ETS (Holt-Winters) | 50.89 | 71.05 | 0.006 |
-| Theta | 51.25 | 71.04 | -0.009 |
-| ARIMA | 55.34 | 94.32 | -0.176 |
-| seasonal naive | 61.4 | 86.17 | -0.447 |
-| dtfit (best oracle) | 65.75 | 135.66 | -0.660 |
-| drift | 68.23 | 86.47 | -0.787 |
-| poly extrap | 69.2 | 83.51 | -0.839 |
-| random walk | 70.03 | 82.01 | -0.883 |
-| dtfit merged (auto, blind) | 86.03 | 102.11 | -1.842 |
-
-### Mauna Loa CO2 (poly_seasonal, seasonal)
-
-| method (best *) | RMSE | MAPE % | R^2 |
-|---|---|---|---|
-| drift * | 3.058 | 0.70 | 0.695 |
-| dtfit (best oracle) | 3.796 | 0.96 | 0.530 |
-| poly extrap | 4.378 | 1.02 | 0.375 |
-| Theta | 6.068 | 1.40 | -0.200 |
-| ETS (Holt-Winters) | 8.373 | 1.88 | -1.286 |
-| ARIMA | 9.473 | 2.16 | -1.925 |
-| dtfit merged (auto, blind) | 9.704 | 2.23 | -2.070 |
-| random walk | 9.704 | 2.23 | -2.070 |
-| seasonal naive | 10.53 | 2.37 | -2.612 |
-| MLP | 10.56 | 2.40 | -2.632 |
-
-### El Nino SST (linear_seasonal, seasonal)
-
-_Not re-run on 2026-09-09: this series' data was not available in the rerun environment; the table below is from the previous run._
-
-| method (best *) | RMSE | MAPE % | R^2 |
-|---|---|---|---|
-| Theta * | 1.23 | 3.58 | 0.716 |
-| ETS (Holt-Winters) | 1.234 | 3.60 | 0.714 |
-| ARIMA | 1.241 | 3.85 | 0.711 |
-| SARIMA | 1.25 | 3.63 | 0.706 |
-| dtfit Fourier-LSI (#2) | 1.262 | 4.06 | 0.701 |
-| dtfit Legendre | 1.304 | 4.16 | 0.681 |
-| dtfit merged (auto) | 1.304 | 4.16 | 0.681 |
-| LSTM | 1.387 | 4.18 | 0.639 |
-| seasonal naive | 1.417 | 4.47 | 0.623 |
-| MLP | 1.535 | 4.94 | 0.558 |
-| dtfit boosted (#5) | 2.296 | 8.61 | 0.010 |
-| poly extrap | 2.356 | 8.93 | -0.043 |
-| random walk | 3.67 | 11.91 | -1.530 |
-| drift | 4.01 | 13.39 | -2.020 |
-| dtfit block | 6.103 | 23.62 | -5.996 |
-
-### Nile flow (poly)
-
-_Not re-run on 2026-09-09: this series' data was not available in the rerun environment; the table below is from the previous run._
-
-| method (best *) | RMSE | MAPE % | R^2 |
-|---|---|---|---|
-| dtfit Legendre * | 130.7 | 11.76 | -0.308 |
-| dtfit boosted (#5) | 130.7 | 11.76 | -0.308 |
-| dtfit merged (auto) | 130.7 | 11.76 | -0.308 |
-| poly extrap | 135.5 | 11.99 | -0.405 |
-| ARIMA | 135.9 | 11.75 | -0.413 |
-| MLP | 138.2 | 12.30 | -0.461 |
-| random walk | 140.2 | 12.05 | -0.503 |
-| ETS (Holt-Winters) | 165.8 | 13.56 | -1.104 |
-| Theta | 174 | 14.28 | -1.317 |
-| drift | 177.7 | 14.83 | -1.416 |
-| LSTM | 182.4 | 16.48 | -1.544 |
-| dtfit block | 208.1 | 18.51 | -2.313 |
-
-### ETTh1 oil-temp (linear_seasonal, seasonal)
-
-_Not re-run on 2026-09-09: this series' data was not available in the rerun environment; the table below is from the previous run._
-
-| method (best *) | RMSE | MAPE % | R^2 |
-|---|---|---|---|
-| dtfit Legendre * | 1.678 | 15.56 | 0.244 |
-| dtfit merged (auto) | 1.678 | 15.56 | 0.244 |
-| dtfit Fourier-LSI (#2) | 1.745 | 16.22 | 0.182 |
-| poly extrap | 1.912 | 17.35 | 0.018 |
-| ETS (Holt-Winters) | 1.95 | 18.09 | -0.022 |
-| seasonal naive | 2.042 | 18.92 | -0.120 |
-| Theta | 2.062 | 18.93 | -0.142 |
-| ARIMA | 2.298 | 20.26 | -0.419 |
-| LSTM | 2.314 | 23.96 | -0.438 |
-| dtfit block | 2.341 | 20.15 | -0.472 |
-| random walk | 2.39 | 21.03 | -0.535 |
-| drift | 2.395 | 21.08 | -0.541 |
-| dtfit boosted (#5) | 3.979 | 39.28 | -3.252 |
-| MLP | 91.41 | 843.21 | -2243.597 |
-
-### Weather LTSF (transient_seasonal, seasonal)
-
-_Not re-run on 2026-09-09: this series' data was not available in the rerun environment; the table below is from the previous run._
-
-| method (best *) | RMSE | MAPE % | R^2 |
-|---|---|---|---|
-| dtfit Legendre * | 2.237 | 0.20 | 0.822 |
-| dtfit Fourier-LSI (#2) | 2.581 | 0.21 | 0.763 |
-| dtfit block | 2.582 | 0.22 | 0.763 |
-| ARIMA | 9.103 | 0.88 | -1.946 |
-| ETS (Holt-Winters) | 13.01 | 1.26 | -5.021 |
-| dtfit merged (auto) | 13.2 | 1.33 | -5.188 |
-| random walk | 16.23 | 1.57 | -8.362 |
-| MLP | 17 | 1.64 | -9.274 |
-| LSTM | 18.59 | 1.82 | -11.287 |
-| seasonal naive | 19.04 | 1.87 | -11.880 |
-| Theta | 19.09 | 1.83 | -11.955 |
-| dtfit boosted (#5) | 22.79 | 1.90 | -17.460 |
-| drift | 22.87 | 2.18 | -17.587 |
-| poly extrap | 51.87 | 4.93 | -94.638 |
-
-### RLC transient (damped)
-
-| method (best *) | RMSE | MAPE % | R^2 |
-|---|---|---|---|
-| dtfit (best oracle) * | 0.02208 | 68.67 | 0.840 |
-| dtfit merged (auto, blind) | 0.02219 | 67.41 | 0.838 |
-| MLP | 0.02752 | 109.86 | 0.751 |
-| random walk | 0.06564 | 136.89 | -0.415 |
-| drift | 0.06671 | 148.56 | -0.462 |
-| Theta | 0.07824 | 233.52 | -1.010 |
-| ETS (Holt-Winters) | 0.1101 | 379.99 | -2.981 |
-| ARIMA | 0.1529 | 543.24 | -6.674 |
-| poly extrap | 0.3102 | 1167.83 | -30.606 |
-
-### AC + harmonics (fourier_series, seasonal)
-
-| method (best *) | RMSE | MAPE % | R^2 |
-|---|---|---|---|
-| dtfit (best oracle) * | 0.03601 | 7.57 | 0.997 |
-| MLP | 0.03797 | 7.49 | 0.997 |
-| dtfit merged (auto, blind) | 0.04216 | 8.76 | 0.996 |
-| seasonal naive | 0.05898 | 15.86 | 0.993 |
-| ETS (Holt-Winters) | 0.07342 | 21.01 | 0.989 |
-| Theta | 0.08204 | 22.84 | 0.987 |
-| random walk | 0.761 | 101.64 | -0.158 |
-| drift | 0.7639 | 102.23 | -0.167 |
-| ARIMA | 0.7751 | 121.33 | -0.201 |
-| poly extrap | 1.428 | 252.80 | -3.076 |
-
-### AM signal (am)
-
-_Not re-run on 2026-09-09: this series' data was not available in the rerun environment; the table below is from the previous run._
-
-| method (best *) | RMSE | MAPE % | R^2 |
-|---|---|---|---|
-| dtfit Fourier-LSI (#2) * | 0.03027 | 20.55 | 0.998 |
-| dtfit Legendre | 0.03033 | 20.42 | 0.998 |
-| dtfit boosted (#5) | 0.03033 | 20.42 | 0.998 |
-| dtfit merged (auto) | 0.03033 | 20.42 | 0.998 |
-| dtfit block | 0.03222 | 22.14 | 0.997 |
-| MLP | 0.3622 | 99.02 | 0.659 |
-| ARIMA | 0.3992 | 230.22 | 0.586 |
-| LSTM | 0.4433 | 119.80 | 0.490 |
-| poly extrap | 0.6906 | 228.59 | -0.238 |
-| random walk | 1.583 | 911.07 | -5.502 |
-| Theta | 1.602 | 926.15 | -5.658 |
-| drift | 1.83 | 1102.37 | -7.690 |
-| ETS (Holt-Winters) | 2.564 | 1598.01 | -16.071 |
-
-### Linear chirp (chirp)
-
-_Not re-run on 2026-09-09: this series' data was not available in the rerun environment; the table below is from the previous run._
-
-| method (best *) | RMSE | MAPE % | R^2 |
-|---|---|---|---|
-| dtfit Fourier-LSI (#2) * | 0.03132 | 17.10 | 0.998 |
-| dtfit Legendre | 0.03363 | 20.55 | 0.998 |
-| dtfit boosted (#5) | 0.03363 | 20.55 | 0.998 |
-| dtfit merged (auto) | 0.03363 | 20.55 | 0.998 |
-| dtfit block | 0.03846 | 24.62 | 0.997 |
-| poly extrap | 0.7558 | 207.28 | -0.177 |
-| LSTM | 0.8613 | 424.20 | -0.528 |
-| ARIMA | 0.9109 | 347.27 | -0.709 |
-| random walk | 0.987 | 511.29 | -1.007 |
-| Theta | 1.017 | 541.98 | -1.129 |
-| MLP | 1.033 | 577.53 | -1.196 |
-| drift | 1.07 | 594.28 | -1.358 |
-| ETS (Holt-Winters) | 1.678 | 1051.94 | -4.800 |
-
-### Who wins where
-
-| series | overall best | best dtfit | best baseline |
-|---|---|---|---|
-| COVID-19 UA | dtfit Legendre | dtfit Legendre (143) | poly extrap (351) |
-| USD/UAH | Theta | dtfit merged (auto) (1.55) | Theta (0.562) |
-| Sunspots | dtfit Legendre | dtfit Legendre (44.2) | LSTM (48.5) |
-| Mauna Loa CO2 | drift | dtfit Legendre (3.9) | drift (3.06) |
-| El Nino SST | Theta | dtfit Fourier-LSI (#2) (1.26) | Theta (1.23) |
-| Nile flow | dtfit Legendre | dtfit Legendre (131) | poly extrap (136) |
-| ETTh1 oil-temp | dtfit Legendre | dtfit Legendre (1.68) | poly extrap (1.91) |
-| Weather LTSF | dtfit Legendre | dtfit Legendre (2.24) | ARIMA (9.1) |
-| RLC transient | dtfit block | dtfit block (0.0221) | MLP (0.0275) |
-| AC + harmonics | dtfit Fourier-LSI (#2) | dtfit Fourier-LSI (#2) (0.036) | MLP (0.038) |
-| AM signal | dtfit Fourier-LSI (#2) | dtfit Fourier-LSI (#2) (0.0303) | MLP (0.362) |
-| Linear chirp | dtfit Fourier-LSI (#2) | dtfit Fourier-LSI (#2) (0.0313) | poly extrap (0.756) |
-
-![Forecasts vs holdout: the best dtfit model per series (blue dashed) vs ETS / Theta / random walk.](figures/figures-forecasts.png)
-
-*Forecasts vs holdout: the best dtfit model per series (blue dashed) vs ETS / Theta / random walk.*
-
-## Short vs long horizon (extrapolation distance)
-
-| series | horizon | best method | dtfit merged RMSE | ETS RMSE | RW RMSE |
-|---|---|---|---|---|---|
-| Mauna Loa CO2 | 10% | MLP | 5.298 | 9.108 | 5.298 |
-| Mauna Loa CO2 | 25% | drift | 9.704 | 8.373 | 9.704 |
-| RLC transient | 10% | dtfit block [structure given] | 0.05002 | 0.07658 | 0.03091 |
-| RLC transient | 25% | dtfit boosted (#5) [structure given] | 0.02219 | 0.1101 | 0.06564 |
-| AC + harmonics | 10% | dtfit Legendre [structure given] | 0.03015 | 0.07671 | 1.479 |
-| AC + harmonics | 25% | dtfit Fourier-LSI (#2) [structure given] | 0.04216 | 0.07342 | 0.761 |
+- Random-walk persistence beats the declared structure on USD/UAH, a crash and
+  partial recovery no smooth trend-plus-cycle form captures, and beats the
+  blind route on four series (USD/UAH 205.4 against 50.9, the RLC transient,
+  ETTh1, weather).
+- Against the published long-horizon benchmark a trend-plus-seasonal
+  heuristic is not competitive: at H=96 its MSE is 4.8, 5.0 and 3.2 times the
+  best published number on ETTh1, ETTm1 and weather, and worse than repeating
+  the last value. That heuristic is written inline in the notebook and calls
+  nothing from dtfit; the section bounds what a structural extrapolation can
+  do on those datasets, not the library.
+- nRMSE normalised by the holdout's own range makes a shorter holdout read as
+  harder on seven of the twelve series; the notebook reports it as a property
+  of the metric.
 
 ## Reading it
 
-- **dtfit is the overall-best method on 9 of 12 series, and its best method beats the best baseline on 9** (COVID-19 UA, Sunspots, Nile flow, ETTh1 oil-temp, Weather LTSF, RLC transient, AC + harmonics, AM signal, Linear chirp). Where it wins, the series has a real, extrapolable structure its fit projects forward -- a known physical waveform (RLC transient, AC harmonics, AM) or a smooth, structurally-correct trend/cycle (the logistic epidemic curve, the sunspot cycle, the Nile level, the ETTh1 trend+daily cycle); on the irregular / near-RW rest it is a close, interpretable second to the classical toolkit.
-- **Model selection is the whole game -- most of this study's gains came from fitting the *structurally correct* model, not from a better solver.** Three corrections moved series from catastrophic to winning, each a textbook model choice (see the *Best model per series* table): the **epidemic curve is logistic, not exponential** (COVID: a pure exponential compounds and overshoots the deceleration, R^2 -4.9 -> **+0.98**, now the best method); **a cyclic series with no trend wants a level+sine, not a polynomial trend** (Sunspots: 92 -> **44**, now beats the LSTM); and **a trended seasonal series wants the trend and the cycle fitted *jointly*, not a bare sine on a Fourier basis** (the old #2 fit a single sine with no trend term and diverged: CO2 R^2 -32, Weather -187, sunspots -12; the joint linear/quadratic+seasonal fits are now R^2 0.4-0.7). This is the same lesson the AC-harmonics bug taught -- a single sine cannot represent a multi-harmonic signal -- generalised across the whole panel.
-- **Two model-class lessons recur.** (1) *Do not extrapolate a trend the data does not support*: a quadratic that only fits in-sample noise, or a local slope that the series later reverts from, drifts the whole long-horizon forecast off. El Nino/ETTh1 want a *linear* (not quadratic) trend under their cycle; **Weather** ends in a trough and a linear trend extrapolates the decline (forecast ~13 below actual, right shape wrong level) -- a **settling `x.e^{-c.x}` trend** that returns to a stable level fixes it (13.2 -> **2.24**, now beating ARIMA). Whether to extrapolate a trend at all is genuinely unidentifiable from the training window (Nile and Weather look similar in-sample yet need opposite treatment -- Nile *needs* its quadratic to capture the post-dam level, Weather must *not* extrapolate its slope), so the structurally-correct trend is set per series and the merged pipeline defaults to the safe linear trend under a cycle. (2) The **#2 Fourier basis is for periodic structure only** -- it now declines on pure-trend series instead of diverging, and is the winning method exactly where the structure is a clean cycle (AC, AM, El Nino).
-- **The classical toolkit is strong and still wins where there is no extrapolable structure.** On daily FX nothing beats the random-walk floor (the slow-wave fit cuts dtfit's error from 6.4 -> 2.9 but FX is ~=unforecastable); Theta/ETS edge the seasonal series by a hair (El Nino 1.26 vs 1.23) and drift wins CO2 because its trend is locally linear over the holdout. dtfit is a *structured extrapolator*, competitive-to-winning when a model matches the physics and an honest, interpretable second otherwise.
-- **Physics / signal-processing waveforms are where the structured fit shines** -- all four are now dtfit wins: the RLC ring-down (damped sinusoid, extrapolates the decaying envelope no pattern-repeater can), the AC waveform (Fourier series, fundamental + 3rd + 5th, beating the MLP), the AM carrier (`(1+m.cos ω_m x).sin ω_c x`, ~=12x under the MLP) and -- once a seeding bug was fixed -- the **linear chirp**. The chirp was *not* inherently hard: its frequency seed was being read off an averaged FFT peak (wrong magnitude, even wrong *sign* of the sweep), so the fit failed in-sample. Seeding omega_0 and the sweep rate k from the **Hilbert instantaneous-phase** (whose quadratic fit reads them off exactly) takes the chirp from R^2 -0.17 to **R^2 0.998** -- the sharpest illustration in the panel that the *model and its seed*, not the solver, decide the result.
-- **Among dtfit methods**, the auto-merged pipeline now routes the model itself -- logistic for saturating growth, a joint seasonal fit under the FFT gate, a linear trend under a cycle, a divergence guard against runaway curvature, and a **no-structure guard** that persists when the fit cannot beat a random walk on held-out training data (this is what stops the FX and weather-sensor forecasts overshooting). It matches the hand-chosen model on most series; #2 (Fourier) and #5 (boosting) help specifically the clean cycles, with the joint LSI fit beating the staged booster on the coupled trend+season series (CO2 3.9 vs 4.4).
+dtfit forecasts by identifying parameters of a structure the user states. Where
+the structure is physics the forecast is an order of magnitude better than a
+blind search; where it is a guess, dtfit sits among the established forecasters
+and the random walk, ahead on some series and behind on others.

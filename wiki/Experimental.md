@@ -1,191 +1,243 @@
 # The experimental package -- adaptations and validation
 
-`dtfit-experimental` is a **separate package** that sits on top of stable
-`dtfit`. It is where new ways of *composing* the core methods are prototyped,
-evaluated across a large experiment suite, and -- if they prove themselves --
-**promoted** into the stable `dtfit` API (where they then physically live).
+`dtfit-experimental` is a **separate package** on top of stable `dtfit`. It
+holds the adaptations in trial, the study tier the experiments stand on, and
+the experiment notebooks that carry every measured claim of the project.
 Nothing here ships inside the published `dtfit` wheel, so the public API stays
 lean.
 
-This page explains, accessibly:
+This page covers:
 
-- [the promotion model](#promotion) -- how an idea graduates from experimental to stable;
-- [the adaptations](#adaptations) -- the structural extensions still in trial,
-  each with intuition + the math it rests on;
-- [the experiment suite](#suite) -- the *cases* and *domains* studies that decide
-  promotion;
-- and, in a companion file, [every baseline](Experimental-Baselines) the methods are
-  compared against and **why each was selected**.
+- [the promotion model](#promotion) -- how an adaptation graduates from
+  experimental to stable;
+- [the adaptations in trial](#adaptations) -- what each one is, the math it
+  rests on, and what its experiment reads;
+- [the experiments](#suite) -- the notebooks and the tier of helpers under
+  them;
+- and, on a companion page, [every baseline](Experimental-Baselines) the
+  methods are compared against and **why each was selected**.
 
 Source: [`packages/dtfit-experimental/`](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit-experimental).
 
 ---
 
 <a name="promotion"></a>
-## 1. The promotion model -- why two packages
+## 1. The promotion model -- why separate packages
 
 The project separates **what is proven** from **what is being tried**:
 
-- `dtfit` (stable) -- the methods and adaptations that have been validated across
-  multiple application domains. This is the lean, public, supported API.
-- `dtfit-experimental` -- new adaptations, the full benchmark/validation suite,
-  and the datasets. It *depends on* `dtfit`; it is never depended on *by* it.
+- `dtfit` (stable) -- the image core, the streaming filter, the stochastic
+  tier, the model catalog. The lean, public, supported API.
+- `dtfit-experimental` -- adaptations in trial, the study tier, the experiment
+  notebooks and the datasets. It *depends on* `dtfit`; it is never depended on
+  *by* it.
+- `dtfit-hardware` -- the embedded rig; it depends on `dtfit-experimental`.
+- `dtfit-legacy` -- the historical stages of the method (the source-form
+  criteria, the integral fitters, the recursive filters, the map-reduce
+  accumulators), kept for the
+  [evolution matrix](Experiments-Method#17----the-evolution-matrix). Only
+  the study tier imports it.
 
-An adaptation graduates only after the experiment suite shows it helps across a
-*range* of applications, not just one cherry-picked case. On promotion it is
-**physically moved** into `dtfit` and imported from there -- there is no
-re-export shim, so the dependency only ever points one way.
+An adaptation is held to one rule, applied in
+[notebook 19](Experiments-Method#19----adaptations-in-trial): a win over the
+plain route on its own signal class, outside the seed scatter, or parity where
+no plain route exists. An adaptation that clears it across more than one
+application is **physically moved** into `dtfit` and imported from there --
+there is no re-export shim, so the dependency only ever points one way.
 
-**Promoted** (in stable `dtfit`):
+**In stable `dtfit` by this route:**
 
 | adaptation | in `dtfit` as |
 |---|---|
-| the LSI oscillatory recipe | `fit(oscillatory=..., freq_param=..., basis="legendre")`, `fft_frequency_seed` |
-| fused multi-axis fault detection | `FusedChiSquareDetector` |
-| #3 overlapping-window ensemble | retired -- the robust image (`fit(robust=True, basis="block")`) |
-
-The map-reduce estimators (`PartitionedLSI`, `PartitionedEAC`) and the
-GEMM-batched projection (`fit_lsi_batched`, `project_spectra`,
-`PartitionedBatchLSI`) live in `dtfit_experimental.scale`, covered by
-`ImageStream` and its channel axis; the curvature-adaptive windows are
-retired, `fit(basis="block")` places equal windows.
-
-**Still experimental** (the three adaptations below): `fit_lsi_basis`,
-`fit_joint`, `boosted_fit`. The inverse-covariance **`InformationFilter`** (an
-information-form fusion primitive) also lives in this tier -- it was **moved out of
-stable `dtfit`** because it is exercised by no domain study and shares no code with
-the covariance-form `ImageFilter(basis="block")` / `ImageFilter(basis="legendre")`, so it has not cleared the
->=2-domain promotion gate (`from dtfit_experimental import InformationFilter`).
+| the oscillatory recipe | `fit(..., oscillatory=True)` or `fit(..., freq_param="w")`, `dtfit.image.fft_frequency_seed` |
+| one-pass and distributed reduction | `ImageStream`, `Image.merge` |
+| batched multi-channel projection | `ImageStream(channels=B)` |
 
 ---
 
 <a name="adaptations"></a>
-## 2. The adaptations still in trial
+## 2. The adaptations in trial
 
-Every adaptation is grounded in the *same* math the core methods use -- the
-**linearity of integration**, **orthogonal-basis projection**, and the
-**additivity of areas**. None of them is an ad-hoc trick; each is a structural
-recombination of the existing fingerprint machinery.
+Every adaptation rests on the *same* statistic the core uses: the image
+`S = Phi^T y`, `G = Phi^T Phi` of a record in a basis `Phi`, additive over
+samples and fitted by `dtfit.fit`. An adaptation changes the basis, the way
+the image is formed, or the way a filter carries it; none changes the
+criterion. Signatures are on the
+[adaptations API page](Experimental-Adaptations-API).
 
-### #2 -- Pluggable basis LSI (`fit_lsi_basis`)
+### Image bases -- `FourierBasis`, `ChebyshevBasis`, `LaguerreBasis`
 
-**Intuition.** LSI matches fingerprints on the Legendre (polynomial) basis. But
-the "best measuring sticks" depend on the signal: a **periodic** signal needs
-*many* polynomial orders to express a wiggle, whereas a **Fourier** basis
-(sines/cosines) captures it in two or three harmonics; a pure **decay** is
-natural in a **Laguerre** basis. This adaptation keeps LSI's exact criterion but
-lets you choose the basis to match the signal -- fewer coefficients, better
-conditioning.
+**Intuition.** The coefficients of an image are spent best in a basis that
+matches the signal: a periodic record is a few harmonics but many polynomial
+orders, a transient is natural in decaying functions. Each class is a basis
+object passed as `dtfit.fit(..., basis=FourierBasis(K))`; the fit, the
+covariance and the merge are those of the core.
 
-**The math it rests on.** The LSI derivation (see
-[../methods/lsi.md](Methods-LSI)) only needs the basis to be *orthogonal*
-on the interval; nothing about it is specific to Legendre. Swap in any orthogonal
-family and the same diagonal least-squares match holds.
+**The math it rests on.** The image fit needs no orthogonality: `G` carries
+the correlation of the basis functions on the sample grid exactly, so any
+family with `evaluate(u)` and `n_coef` is a valid basis.
 
-### #3 -- Overlapping-window ensemble -- **retired**
+**What is measured.** On a periodic signal the Fourier basis reaches a 1e-6
+reconstruction at 9 coefficients against Legendre's 26. On a decay the
+Laguerre basis needs 9 against Legendre's 10, which is parity.
 
-Retired: the robust image (`fit(robust=True, basis="block")`) covers the same
-contamination at a twelfth of the cost and a pooled median recovery error of
-0.008 against the ensemble's 0.065 (five families, 4 percent of samples
-replaced by 8-sigma spikes, six draws).
+### Windows with explicit edges -- `EdgeBlockBasis`, `SegmentBasis`
 
-### #4 -- Joint shared-parameter fit (`fit_joint`)
+**Intuition.** The block basis of the core places equal windows. A record
+whose level jumps at a known epoch is better served by a window edge on the
+epoch, so that no window averages across it. `EdgeBlockBasis` takes the edges
+as given and lets windows be left out; `SegmentBasis` puts a Legendre
+polynomial on each segment between the edges.
 
-**Intuition.** Often several channels share structure -- the x/y/z axes of a
-trajectory share a common frequency; several regions share a growth rate; a
-multi-output plant shares a time constant. Fitting each channel alone throws that
-coupling away. `fit_joint` stacks **all** channels' area equations into one big
-system, with the **shared** parameters estimated jointly from every channel and
-the **per-channel private** parameters estimated locally, solved in a single pass.
-More equations per shared unknown means you observe it better than any channel
-could alone.
+**The math it rests on.** Indicators of disjoint windows give a diagonal
+Gram of sample counts whatever the edges are; polynomials on disjoint
+segments give a block-diagonal one.
 
-**The math it rests on.** EAC's area equations are just rows of a least-squares
-system; rows from different channels referring to the same shared parameter
-simply stack. The stacked system is still linear in the residual/Jacobian
-structure EAC already builds.
+**What is measured.** With one edge on each epoch the jump terms reach an
+efficiency of 0.989 to 0.991 at 32 windows where Legendre is at 0.895; on
+120 GPS station series the offsets are recovered to 0.032 standard errors
+against 0.393 for Legendre and 0.435 for equal windows.
+On a gapped record the block basis loses: its Gram stays under 200 where
+Legendre's passes 1e12, and it still reads 1.05 to 3.19 times the pointwise
+RMSE where Legendre reads 1.00.
 
-### #5 -- Stage-wise residual boosting (`boosted_fit`)
+### Data known as window totals -- `aggregated_image`, `fit_aggregated`
 
-**Intuition.** One parametric form may not capture *both* a trend and a cycle.
-Boosting stages the methods: fit stage 1 (say an LSI exponential/polynomial
-trend), subtract its prediction, fit stage 2 (say an EAC-fitted oscillatory
-residual) to what's left, and sum the stages. Each stage stays a cheap,
-well-posed fit, but the composite is more expressive than either method alone.
+**Intuition.** A meter that reports one total per interval, or an archive
+that keeps only window means, has already formed the block image: the totals
+are `S` and the counts are the diagonal of `G`. Fitting the model's window
+sums to them is the equal-areas criterion in its direct form. Reading each
+mean as a sample at the window centre is a different, biased fit.
 
-**The math it rests on.** Because the fingerprint transform is **linear**, the
-fingerprint of a sum of components is the sum of their fingerprints -- so fitting
-components one at a time and adding them is consistent with matching the whole
-signal's fingerprint. (This is the additive, gradient-boosting idea applied to
-parametric curve components.)
+**The math it rests on.** The window totals are the exact sufficient
+statistic of the record in the window basis; the model is projected onto the
+same windows on the sample grid.
 
-**Full signatures, arguments and return types** for the four experimental
-adaptations (plus the array-backend helpers) are in
-[adaptations-api.md](Experimental-Adaptations-API); the promoted ones are in
-[../api/](API).
+**What is measured.** The fit on the totals removes the midpoint reading's
+bias of -6.1 to +6.6 percent (under 0.053 percent after). On temperature
+records read as 3 h and 6 h means it returns the hourly amplitudes to 1.0001
+to 1.0048 where the midpoint reading returns 0.906 to 0.978.
+
+### Jumps at unknown epochs -- `fit_aligned`, `detect_jumps`
+
+**Intuition.** When the epochs are not known the windows are aligned to them
+from the data. A fine block image carries the residual of a first fit; a
+skip-one local-linear test on the fine window means finds the windows that
+hold a jump; those windows are left out, the rest are merged to the coarse
+count, and the model is refitted with one level shift per epoch.
+
+**The math it rests on.** The detector reads the fine image alone -- counts,
+position sums and residual sums per window -- so detection costs one pass
+over the data; coarsening a block image is a 0/1 aggregation of its windows.
+
+**What is measured.** On generated records the jump terms of `fit_aligned`
+reach 0.955 to 0.969 of the accuracy of the fit that is told the epochs, in
+every case where detection finds all of them; at jumps of two noise standard
+deviations detection recalls 0.46 and decides the result. On the station
+archive detection decides the answer and the basis does not.
+
+### Weak-form rate laws -- `weak_operators` and the four fitters
+
+**Intuition.** A rate law that is linear in its constants can be identified
+without solving it: multiply by test functions that vanish at the ends of the
+record, integrate by parts, and the derivatives move from the noisy data onto
+the smooth test functions. What remains is a linear system in the constants.
+No starting guess, no ODE solve.
+
+**The math it rests on.** The test functions are
+`(1 - u^2)^order * P_k(u)` with `P_k` the Legendre polynomials; the boundary
+terms of the integration by parts vanish with the window factor.
+
+**What is measured.** A call takes about 1 ms against 31 to 205 ms for the
+solved fit. It is less accurate than the solved fit from a good start, by
+1.69 to 4.39 times, and ahead of finite-difference regression at every law
+and noise level. Used as the start of the solved fit (`seed_nlls`) it reaches
+the good-start accuracy to within 0.005 percentage points, and on
+Michaelis-Menten removes the 97 to 100 percent failure rate of a start at
+three times the truth. It breaks on a stiff pair: 88 percent error on roots
+-1 and -10 where the solved fit is at 1.3 percent.
+
+### A tracker in the time of its newest sample -- `LocalTimeFilter`
+
+**Intuition.** A polynomial tracker on absolute time stamps conditions its
+window on the clock's zero. `LocalTimeFilter` moves the polynomial's origin
+onto every new sample, so the coefficients are the value, the rate and the
+curvature *now*, and the process noise is a rate per unit of time that
+carries across sampling rates.
+
+**The math it rests on.** A shift of a polynomial's origin is an exact linear
+map of its coefficients (`shift_matrix`), applied to the state and its
+covariance between samples.
+
+**What is measured.** On the rig's drives a 10000 s shift of the time stamps
+moves the absolute-time tracker's two-sample RMSE from 1.73 m to 8.91 m; with
+the window held it moves no score of the re-centred one, and with the adaptive
+window the 5 Hz drive reads 1.40 m or 1.44 m by the shift. The re-centred tracker takes the 1 Hz
+drive from 5.85 m to 4.14 m at two samples; it is 1 to 7 percent behind the
+absolute-time tracker on the 5 Hz drive and a fifth behind it on the walk.
+
+### Information-form fusion -- `InformationFilter`
+
+**Intuition.** A recursive *linear* estimator that keeps the inverse
+covariance: absorbing a measurement is an addition, and two estimators that
+saw different data fuse by adding their information, in any order.
+
+**What is measured.** Fusion agrees with a single undivided pass to 7e-15
+relative, and with the merged-image `dtfit.fit` route to 8e-9. It has no
+plain route to lose to, so parity keeps it.
+
+### Several streams -- `FilterBank`, `FusedChiSquareDetector`
+
+`dtfit_experimental.streaming` drives several `dtfit.ImageFilter` instances in
+lockstep and pools their innovations into one chi-square test; see
+[the filter bank page](Methods-Filter-Bank). On the three-axis fault of
+[notebook 21](Domain-Embedded-Control) a test on every sample flags in 1 step
+against 19 for the once-a-window test, and per-axis tests on every sample
+match the pooled test at every fault size tried.
 
 ---
 
 <a name="suite"></a>
-## 3. The experiment suite -- how adaptations are judged
+## 3. The experiments -- how claims are measured
 
-There are **two** complementary suites, both driven by one shared runner:
+The experiments are Jupyter notebooks under
+[`packages/dtfit-experimental/experiments/`](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit-experimental/experiments),
+in three groups: `method/` (what the image is and where each form stops),
+`technology/` (filtering, scale, the stochastic image, the embedded
+footprint) and `realdata/` (reference datasets, forecasting, GPS, the archive
+showcase, measured stochastic series). A notebook is the experiment and its
+report: the code, the tables, the figures, the findings and the limits, in
+one file that runs top to bottom. The index with a summary of each is on
+[Experiments](Experiments); the application view is on [Domains](Domains).
 
-### `cases/` -- each lever in isolation
+Under the notebooks sits the study tier, `dtfit_experimental.study`: the
+model families and their truth, the [baselines](Experimental-Baselines), the
+Monte-Carlo grid, the plants, the GPS simulator and benchmark loaders, the
+historical stages, the dataset paths. It is imported module by module and is
+not part of the package's public names.
 
-Ten focused experiments, each isolating *one* optimization or adaptation
-(control systems, big-data streaming, noise robustness, real-world forecasting,
-GPS trajectory, an LTSF deep-learning benchmark, parallel scaling, GPU-batched
-projection, embedded footprint, fused partitioned-batched). The point is to
-measure each lever cleanly, on its own.
-
-Each case is a self-contained folder with a `backend.py` (the compute) and a
-Jupyter notebook (the report); open/run the notebook directly (index:
-`cases/REPORTS.md`).
-
-### `domains/` -- the levers together, against the real toolkit
-
-Six **application-domain** studies, each testing *every applicable dtfit method*
-against the **established methods a practitioner in that domain actually uses**,
-on synthetic *and real* data. This is the suite that decides whether an
-adaptation earns promotion. The six domains and their honest headline results:
-
-| domain | what it tests | headline result |
-|---|---|---|
-| **Forecasting** | LSI, EAC, Fourier-LSI, boosting, the auto-merged pipeline -- on 12 series x 2 horizons -- vs random walk, seasonal-naive, drift, poly-extrap, Holt-Winters, Theta, (S)ARIMA, MLP, LSTM | dtfit wins where the series has real *extrapolable nonlinear structure*; trails the general learners on near-random-walk / irregular series (and says so) |
-| **Parameter estimation** | LSI, EAC, adaptive-EAC, ensemble, joint, the merged selector -- across 15+ nonlinear model families, noise/outlier/sparse/short/multi-channel regimes, real recovery -- vs NLLS, robust NLLS, MLP, Gaussian process | with the **shape-matched variant**, dtfit's integral estimators **tie the NLLS gold standard** across the families; pointwise NLLS keeps a slight edge only on the heavy-tailed Lorentzian |
-| **Big-data processing** | GEMM batch, fused streaming, distributed merge, streaming filter -- multi-channel panels + a real 321-channel set -- exactness, memory/throughput scaling, numerical stability, mergeability, online cost -- vs per-channel NLLS, vectorized poly lstsq, SGD `partial_fit`, RLS | the additive projection is exact across batch/streaming/distributed routes and scales with bounded memory; trades peak throughput for that bounded memory |
-| **Embedded control** | ImageFilter(basis="block"), ImageFilter(basis="legendre"), FilterBank + fused chi^2 detector -- 4 plant shapes, robustness profile, multi-axis fault detection, sub-KiB footprint, real streaming -- vs EKF, RLS, constant-accel Kalman, sliding-window refit | the *integral* measurement wins under outliers/dropouts at fixed O(1)/sample cost; online fault detection is SNR-limited (and reported as such) |
-| **Real-time GPS/inertial** | streaming LSI/EAC with external regressors + a full-IMU strapdown fused *inside* the LSI filter + fused NIS/CUSUM maneuver detector -- 9-DOF maneuvering-target rig, dropouts/multipath, plus well-known-trajectory benchmarks and a hardware rig (`dtfit-hardware`) -- vs constant-accel Kalman and the gyro-aided coordinated-turn EKF | the integral trackers match/beat the constant-accel Kalman and hold up in benign (static/pedestrian) regimes, but structurally **trail the CT-EKF on aggressive maneuvers**; the coast/glitch/on-MCU results de-risk the embedded paper |
-| **Stochastic series** | the stochastic tier (`fit_stochastic` / `StochasticModel` / `StochasticFilter`) recovering long-memory Hurst, AR(1) reversion, GARCH persistence, stochastic-cycle period and trend+cycle from a process's *functionals* -- vs the standard estimator for each (aggregated-variance/GPH, ACF-exp, GARCH-QMLE, ...) | dtfit recovers the **regime and its parameters** with a single coherent estimator->forecast->generator API; it cannot out-forecast a martingale and a dedicated MLE (GARCH-QMLE) stays a touch sharper on the raw parameter (reported per possibility as VIABLE / MARGINAL / NOT VIABLE) |
-
-Each domain is a self-contained folder with a `backend.py` (the compute) and a
-Jupyter notebook (the report); open/run the notebook directly (index:
-`domains/DOMAINS.md`).
-
-Every report keeps an **honest-negative tone**: where dtfit trails the classical
-toolkit, the report says so and explains why (near-random-walk series, weakly
-identifiable parameters, the area filter being the wrong measurement for
-oscillations, etc.). That honesty is the point of the suite -- promotion requires a
-*broad* win, not a cherry-picked one.
+Where dtfit trails a baseline the notebook says so and names the cause; each
+domain page closes with a section of those cases.
 
 ---
 
-## 4. Install & run
+## 4. Install and run
 
 ```bash
 pip install -e packages/dtfit                       # stable dtfit
-pip install -e packages/dtfit-experimental          # this package
-pip install -e "packages/dtfit-experimental[bench]" # + matplotlib/torch/statsmodels/pandas
+pip install -e "packages/dtfit-experimental[bench]" # this package + matplotlib/torch/statsmodels/pandas
+pip install -e packages/dtfit-legacy                # for the evolution matrix
 
-python -m dtfit_experimental.experiments.download_data       # fetch real datasets
+python -m dtfit_experimental.study.download_data    # fetch the public datasets
 
-# the experiments are Jupyter notebooks -- open one and re-run it, or headless:
+jupyter lab packages/dtfit-experimental/experiments/method/12_discrete_image.ipynb
+# or headless:
 jupyter nbconvert --to notebook --execute --inplace \
-    packages/dtfit-experimental/src/dtfit_experimental/experiments/cases/01_control_systems/01_control_systems.ipynb
+    packages/dtfit-experimental/experiments/method/12_discrete_image.ipynb
 ```
 
-Each notebook has a config block of knobs near the top (sized for a few-minute run
-by default; comments show how to scale up). Next:
-**[baselines.md](Experimental-Baselines)** -- what every comparison method is and why it was
-chosen.
+`DTFIT_QUICK=1` runs a notebook at a reduced size (the package's tests run
+every notebook that way); `DTFIT_DATA` points the loaders at a dataset
+directory other than `experiments/data`. Next:
+**[the baselines](Experimental-Baselines)** -- what every comparison method is
+and why it was chosen.
