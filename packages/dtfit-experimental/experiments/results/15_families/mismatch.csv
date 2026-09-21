@@ -1,0 +1,4 @@
+case,correct model,wrong model,Legendre correct R2,Legendre wrong R2,NLLS correct R2,NLLS wrong R2,R2 gap,wrong/correct RMSE,correct lag-1 autocorr,wrong lag-1 autocorr
+biexp as one decay,a*exp(-b*t) + c*exp(-d*t),c + a*exp(-b*t),0.951126,0.939183,0.951133,0.939183,0.0119429,1.11538,0.0438068,0.178255
+damped as exp growth,A*exp(-z*w*t)*sin(w*sqrt(1-z**2)*t),a*exp(b*t),0.959012,-0.0703902,0.959012,-0.0703902,1.0294,5.11265,0.0385517,0.955619
+logistic as exp growth,K/(1+exp(-r*(t-t0))),a*exp(b*t),0.985127,0.847389,0.985128,0.847389,0.137737,3.2062,0.0411328,0.897491

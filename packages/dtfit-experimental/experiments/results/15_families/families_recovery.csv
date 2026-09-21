@@ -1,0 +1,17 @@
+family,domain,shape,NLLS,Legendre,block,auto,Legendre/NLLS,block/NLLS,better basis
+damped,mechanical / control,oscillatory,1.32659,1.32665,0.986077,1.32665,1.00005,0.743317,block
+sine,signal / vibration,oscillatory,0.548271,0.548261,0.533402,0.548261,0.999981,0.972879,parity
+firstorder,electrical / RC,saturating-exp,0.656598,0.658035,0.938573,0.658035,1.00219,1.42945,Legendre
+biexp,pharmacokinetics,multi-exp,5.97995,5.50052,5.60668,5.50052,0.919827,0.93758,parity
+decay_offset,thermal / sensor (Newton cooling),decay-to-baseline,1.31718,1.31845,1.31716,1.31845,1.00096,0.999982,parity
+expgrow,growth / finance,monotone,1.28582,1.26973,1.37197,1.26973,0.987487,1.067,parity
+power,physics / scaling law,monotone,1.33504,1.31527,1.61201,1.31527,0.985194,1.20746,Legendre
+stretched,disordered relaxation (KWW),multi-exp,1.02491,1.02484,1.52798,1.02484,0.99993,1.49084,Legendre
+gauss,spectroscopy,peak,0.445187,0.450401,0.441704,0.450401,1.01171,0.992176,parity
+lorentz,spectroscopy (resonance),peak,0.463756,0.463065,0.58325,0.463065,0.998511,1.25767,Legendre
+double_gauss,chromatography,peak,0.613131,0.615989,0.598699,0.615989,1.00466,0.976461,parity
+logistic,epidemiology,sigmoid,0.726583,0.663763,0.746998,0.663763,0.913541,1.0281,Legendre
+gompertz,tumour / population growth,sigmoid,1.17905,1.33532,1.55805,1.33532,1.13254,1.32144,Legendre
+weibull,reliability (failure CDF),sigmoid,0.853959,0.85106,0.860598,0.85106,0.996605,1.00777,parity
+mm,enzyme kinetics,rational-saturating,1.14542,1.13726,1.32559,1.13726,0.992877,1.15729,Legendre
+hill,pharmacology (dose-response),rational-saturating,1.00238,1.03991,1.02362,1.03991,1.03744,1.02119,parity

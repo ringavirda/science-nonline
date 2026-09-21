@@ -40,7 +40,6 @@ jupyter nbconvert --to notebook --execute --inplace \
 ```bash
 python -m dtfit_experimental.study.download_data          # fetch datasets into data/
 python -m dtfit_experimental.experiments.benchmark       # method docs: wiki/figures + comparison tables
-python -m dtfit_experimental.experiments.accuracy_explore # recovery-accuracy sweep over the test SCENARIOS
 python -m dtfit_experimental.experiments.validate_methods # quick real-data smoke test (COVID/FX)
 python -m dtfit_experimental.experiments.streaming_lsi_benchmark  # the Legendre filter vs the block filter micro-benchmark
 ```
@@ -51,8 +50,6 @@ python -m dtfit_experimental.experiments.streaming_lsi_benchmark  # the Legendre
 - **`validate_methods.py`** is a lightweight smoke check on two real series
   (COVID-19 growth, USD/UAH depreciation); the rigorous forecasting/parameter
   studies live in `domains/forecasting` and `domains/parameter_estimation`.
-- **`accuracy_explore.py`** drives the recovery-accuracy corpus (the Phase-0
-  measurement feeding the promotion-gate thresholds).
 
 Only `numpy`, `scipy`, `scikit-learn` are needed for the core scripts (already
 `dtfit` deps); downloads use the stdlib, no API keys. Plotting/notebooks need the
