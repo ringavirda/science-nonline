@@ -1,0 +1,4 @@
+sketch,flash_bytes,flash_pct,ram_bytes,ram_pct,state_bytes,avg_us,max_us,updates
+nano_lsi_onboard,91760,9,44928,17,152,104.32,139.27,93
+nano_lsi_replay,162224,16,44856,17,304,181.92,235.03,6103
+nano_lsi_log,392856,39,74120,28,,,,
