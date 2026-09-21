@@ -111,7 +111,7 @@ batch NLLS is not a natural fit for a per-sample real-time loop.
 | Live / recursive tracking, drifting parameters | **dtfit** streaming filters |
 | Data too big for memory, or distributed | **dtfit** `ImageStream` |
 | Embedded / real-time, fixed per-step budget | **dtfit** streaming filters |
-| Noisy / outlier-prone, no guess to give | **dtfit** self-seeding models + robust EAC / ensemble |
+| Noisy / outlier-prone, no guess to give | **dtfit** self-seeding models + the robust image (`robust=True`) |
 
 ## A note on lmfit
 

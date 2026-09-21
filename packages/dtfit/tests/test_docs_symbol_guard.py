@@ -49,13 +49,7 @@ GROUP2 = re.compile(
     + r"|re-exported from `?dtfit`?|PROMOTED as `?dtfit\."
 )
 
-# Group 3: old EAC-robustness claims, scoped to the method/guide pages.
-GROUP3_PAGES = {
-    WIKI / "Methods-EAC.md", WIKI / "Methods-LSI.md",
-    WIKI / "Guides-Choosing-a-Method.md",
-    DOCS / "guide" / "eac.md", DOCS / "guide" / "lsi.md",
-    DOCS / "guide" / "choosing-a-method.md",
-}
+# Group 3: old EAC-robustness claims.
 GROUP3 = re.compile(
     r"most noise-robust|noise-robust batch|Why it is robust"
     r"|EAC[^\n]*\b(?:the noise-robust|the outlier-robust)\b"
@@ -68,11 +62,20 @@ GROUP4_PAGES = {
     WIKI / "Methods-EAC.md", WIKI / "Methods-LSI.md",
     WIKI / "Guides-Choosing-a-Method.md", WIKI / "API-Fitting.md",
     WIKI / "API.md", WIKI / "Comparison.md",
-    WIKI / "Cases-Analysis-06-Adaptive-Window-EAC.md",
     DOCS / "guide" / "eac.md", DOCS / "guide" / "lsi.md",
     DOCS / "guide" / "choosing-a-method.md", DOCS / "comparison.md",
 }
 GROUP4 = re.compile(r"\b(window_mode|active_ratio|f_scale)\b")
+
+# Group 5: the removed experiments tree, its report pages and the
+# adaptations removed from dtfit_experimental. The experiments are the
+# notebooks under packages/dtfit-experimental/experiments.
+GROUP5 = re.compile(
+    r"dtfit_experimental[./]experiments\b|dtfit_experimental\.scale\b"
+    r"|cases/REPORTS\.md|domains/DOMAINS\.md|domains/\*/report\.md"
+    r"|\b(fit_lsi_basis|fit_joint|boosted_fit|JointResult|BoostedModel)\b"
+    r"|\]\((?:Cases-[A-Za-z0-9-]+|Domains-Reports)[)#]"
+)
 
 
 def _hits(pattern, pages):
@@ -96,8 +99,15 @@ def test_no_core_qualified_experimental_symbol():
 
 
 def test_no_old_eac_robustness_claim():
-    assert _hits(GROUP3, sorted(GROUP3_PAGES)) == []
+    assert _hits(GROUP3, ALL_PAGES) == []
 
 
 def test_no_legacy_keyword_as_core_argument():
     assert _hits(GROUP4, sorted(GROUP4_PAGES)) == []
+
+
+def test_no_removed_experiments_tree():
+    """Fails under a page that links a Cases-* or Domains-Reports page,
+    names dtfit_experimental.experiments or dtfit_experimental.scale, or
+    documents fit_lsi_basis, fit_joint or boosted_fit."""
+    assert _hits(GROUP5, ALL_PAGES) == []
