@@ -126,7 +126,7 @@ def test_embed_names_no_retired_symbol() -> None:
         "fit_lsi_batched", "ensemble_fit", "auto_estimate", "FilterBank",
         "FusedChiSquareDetector", "fit_eac_adaptive", "window_mode",
         "active_ratio", "f_scale", "adapt_r", "adapt_noise",
-        "param_cov_", "stderr_",
+        "param_cov_", "stderr_", "imu_lsi_track", 'kind="lsi"',
     )
     for mod in (CR, BK, embed_lsi, make_replay):
         text = Path(mod.__file__).read_text(encoding="utf-8")

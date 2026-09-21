@@ -376,9 +376,9 @@ def _glitch_mc(t, fixes, imu, have_imu, n, idx, *, n_seeds=25, frac=0.05, mag=25
     Returns ``[(name, (mean_rmse, p95_rmse)), ...]``."""
     trackers = [
         ("dtfit Legendre robust (GPS-only)",
-         lambda fg: G.dtfit_track(t, fg, (1,), kind="lsi", robust=True)[0]),
+         lambda fg: G.dtfit_track(t, fg, (1,), kind="legendre", robust=True)[0]),
         ("dtfit Legendre plain (GPS-only)",
-         lambda fg: G.dtfit_track(t, fg, (1,), kind="lsi", robust=False)[0]),
+         lambda fg: G.dtfit_track(t, fg, (1,), kind="legendre", robust=False)[0]),
         ("Kalman-CA (GPS-only)",
          lambda fg: G.kalman_track(t, fg, (1,))[0]),
     ]
@@ -433,7 +433,7 @@ def report(path: str, h: int = 10, gap: int = 15) -> str:
 
     # (A) forecast RMSE: predict h ahead, score against the real future fix.
     # Every IMU row is judged against the matched S=0 control, pure GPS through
-    # the same imu_lsi_track engine, rather than the differently configured
+    # the same imu_track engine, rather than the differently configured
     # Legendre-cubic row. Otherwise a harness-config difference (cubic against the
     # engine's quadratic drift) could pass for an IMU gain. The motion-only
     # column is the honest discriminator, since a static rig rewards "stay put"
@@ -449,22 +449,22 @@ def report(path: str, h: int = 10, gap: int = 15) -> str:
     # instead of evaluating it directly, because a raw cubic diverges past the
     # window: 143 m at a 25-step gap against 104 m coasted. See dtfit_track.
     rows.append(("dtfit Legendre-cubic (GPS-only, CV-coast)",
-                 *_fwd(G.dtfit_track(t, fixes, (h,), kind="lsi", coast=True)[1][h])))
+                 *_fwd(G.dtfit_track(t, fixes, (h,), kind="legendre", coast=True)[1][h])))
     rows.append(("Kalman-CA (GPS-only)", *_fwd(G.kalman_track(t, fixes, (h,))[1][h])))
     ctrl_a = ctrl_m = gg_a = gg_m = float("nan")
     if have_imu:
-        ctrl_a, ctrl_m = _fwd(G.imu_lsi_track(t, fixes, gy3, ac3, R0, (h,), S=z3)[1][h])
+        ctrl_a, ctrl_m = _fwd(G.imu_track(t, fixes, gy3, ac3, R0, (h,), S=z3)[1][h])
         rows.append(("dtfit IMU-Legendre S=0 control (matched)", ctrl_a, ctrl_m))
         Sg, wg = gyro_gated_basis(t, fixes, imu)
-        gg_a, gg_m = _fwd(G.imu_lsi_track(t, fixes, gy3, ac3, R0, (h,), S=Sg)[1][h])
+        gg_a, gg_m = _fwd(G.imu_track(t, fixes, gy3, ac3, R0, (h,), S=Sg)[1][h])
         rows.append(("dtfit IMU-Legendre gyro-gated (GPS+gyro)", gg_a, gg_m))
         cm_a = cm_m = float("nan")
         if imu.get("mag_heading") is not None:
             Sgm, _ = gyro_gated_basis(t, fixes, imu, mag_heading=imu["mag_heading"])
-            cm_a, cm_m = _fwd(G.imu_lsi_track(t, fixes, gy3, ac3, R0, (h,), S=Sgm)[1][h])
+            cm_a, cm_m = _fwd(G.imu_track(t, fixes, gy3, ac3, R0, (h,), S=Sgm)[1][h])
             rows.append(("dtfit IMU-Legendre gyro+compass (GPS+gyro+mag)", cm_a, cm_m))
         rows.append(("dtfit IMU-Legendre+ZUPT accel-strapdown",
-                     *_fwd(G.imu_lsi_track(t, fixes, gy3, ac3, R0, (h,), S=S_rest)[1][h])))
+                     *_fwd(G.imu_track(t, fixes, gy3, ac3, R0, (h,), S=S_rest)[1][h])))
         rows.append(("CT-EKF (GPS+gyro)", *_fwd(G.ekf_track(t, fixes, imu["yaw"], (h,))[1][h])))
     lines.append(f"[A] {h}-step forecast RMSE vs the real future fix  [all / motion-only] (m):")
     for name, va, vm in rows:
@@ -484,14 +484,14 @@ def report(path: str, h: int = 10, gap: int = 15) -> str:
     fg[gm] = np.nan
     sc = []
     sc.append(("dtfit Legendre-cubic (GPS-only, CV-coast)",
-               G.dtfit_track(t, fg, (1,), kind="lsi", coast=True)[0]))
+               G.dtfit_track(t, fg, (1,), kind="legendre", coast=True)[0]))
     sc.append(("Kalman-CA (GPS-only)", G.kalman_track(t, fg, (1,))[0]))
     if have_imu:
         sc.append(("dtfit IMU-Legendre S=0 control (matched)",
-                   G.imu_lsi_track(t, fg, gy3, ac3, R0, (1,), S=z3)[0]))
+                   G.imu_track(t, fg, gy3, ac3, R0, (1,), S=z3)[0]))
         Sg_gap, _ = gyro_gated_basis(t, fg, imu)   # rebuilt on blanked fixes
         sc.append(("dtfit IMU-Legendre gyro-gated (GPS+gyro)",
-                   G.imu_lsi_track(t, fg, gy3, ac3, R0, (1,), S=Sg_gap)[0]))
+                   G.imu_track(t, fg, gy3, ac3, R0, (1,), S=Sg_gap)[0]))
         if imu.get("mag_heading") is not None:
             # mag_heading is the magnetometer's own; its constant frame offset
             # is fitted on the full run because that offset is a physical
@@ -499,9 +499,9 @@ def report(path: str, h: int = 10, gap: int = 15) -> str:
             # blanked gap, which is the anchor value being measured here.
             Sgm_gap, _ = gyro_gated_basis(t, fg, imu, mag_heading=imu["mag_heading"])
             sc.append(("dtfit IMU-Legendre gyro+compass (GPS+gyro+mag)",
-                       G.imu_lsi_track(t, fg, gy3, ac3, R0, (1,), S=Sgm_gap)[0]))
+                       G.imu_track(t, fg, gy3, ac3, R0, (1,), S=Sgm_gap)[0]))
         sc.append(("dtfit IMU-Legendre+ZUPT accel-strapdown",
-                   G.imu_lsi_track(t, fg, gy3, ac3, R0, (1,), S=S_rest)[0]))
+                   G.imu_track(t, fg, gy3, ac3, R0, (1,), S=S_rest)[0]))
         sc.append(("CT-EKF (GPS+gyro)", G.ekf_track(t, fg, imu["yaw"], (1,))[0]))
     lines.append("")
     lines.append(f"[B] dropout coasting RMSE vs held-out real fixes "
@@ -605,7 +605,7 @@ def sweep_rows(path: str, *, horizons=(2, 3, 5, 10), gaps=(5, 10, 15),
         return _fc_rmse(pred, fixes, motion=rest)
 
     def track(S):
-        return G.imu_lsi_track(t, fixes, gy3, ac3, R0, (h,), S=S,
+        return G.imu_track(t, fixes, gy3, ac3, R0, (h,), S=S,
                                adaptive_window=adaptive_window)
 
     rows = []
@@ -625,7 +625,7 @@ def sweep_rows(path: str, *, horizons=(2, 3, 5, 10), gaps=(5, 10, 15),
         fg[gm] = np.nan
 
         def rc(S):
-            sm = G.imu_lsi_track(t, fg, gy3, ac3, R0, (1,), S=S,
+            sm = G.imu_track(t, fg, gy3, ac3, R0, (1,), S=S,
                                  adaptive_window=adaptive_window)[0]
             return G.rmse3(sm[gm], fixes[gm]) if gm.any() else float("nan")
         ctrl = rc(z3)
@@ -796,7 +796,7 @@ def heading_rms(psi, course):
 def deadreckon_basis(t, fixes, psi, *, tau=4.0):
     """Position basis from a heading and GPS finite-difference speed, the speed
     held through gaps, washed out over ``tau``. This is the gyro-yaw
-    dead-reckoning fed to imu_lsi_track as the regressor ``S``. No
+    dead-reckoning fed to imu_track as the regressor ``S``. No
     accelerometer: its double integration is hopeless on a vibrating mount."""
     n = len(fixes); S = np.zeros((n, 3)); s = np.zeros(2); last = 0.0
     for i in range(n):
@@ -826,8 +826,8 @@ def maneuver_dropouts(log, fixes, *, gap=75, turn_deg=15):
     n = len(fixes); t = log["t"]; z3 = np.zeros((n, 3))
     psi_full = np.unwrap(complementary_heading(log, fixes)[0])
     gm = _gap_mask(n, gap=gap); fg = fixes.copy(); fg[gm] = np.nan
-    ctrl = G.imu_lsi_track(t, fg, z3, z3, np.eye(3), (1,), S=z3)[0]
-    fus = G.imu_lsi_track(t, fg, z3, z3, np.eye(3), (1,),
+    ctrl = G.imu_track(t, fg, z3, z3, np.eye(3), (1,), S=z3)[0]
+    fus = G.imu_track(t, fg, z3, z3, np.eye(3), (1,),
                           S=deadreckon_basis(t, fg, complementary_heading(log, fg)[0]))[0]
     runs = []; i = 0
     while i < n:
@@ -906,7 +906,7 @@ def comma_bench(segs, *, horizons=(5, 10), gaps=(15, 25), glitch_thr=8.0):
     dur = sum(float(s["t"][-1]) for s in segs)
     fc = {}
     for H in horizons:
-        d = [rms2(G.dtfit_track(s["t"], s["raw"], (H,), kind="lsi", coast=True)[1][H], s["truth"]) for s in segs]
+        d = [rms2(G.dtfit_track(s["t"], s["raw"], (H,), kind="legendre", coast=True)[1][H], s["truth"]) for s in segs]
         k = [rms2(G.kalman_track(s["t"], s["raw"], (H,))[1][H], s["truth"]) for s in segs]
         fc[H] = (wm(d), wm(k))
     co = {}
@@ -916,7 +916,7 @@ def comma_bench(segs, *, horizons=(5, 10), gaps=(15, 25), glitch_thr=8.0):
             gm = _gap_mask(s["n"], gap=gap); fg = s["raw"].copy(); fg[gm] = np.nan
             if not gm.any():
                 continue
-            d.append(rms2(G.dtfit_track(s["t"], fg, (1,), kind="lsi", coast=True)[0][gm], s["truth"][gm]))
+            d.append(rms2(G.dtfit_track(s["t"], fg, (1,), kind="legendre", coast=True)[0][gm], s["truth"][gm]))
             k.append(rms2(G.kalman_track(s["t"], fg, (1,))[0][gm], s["truth"][gm]))
         co[gap] = (float(np.mean(d)), float(np.mean(k)))
     return dict(n_seg=len(segs), n_fix=int(w.sum()), path_km=path / 1000.0,
@@ -977,7 +977,7 @@ def urbannav_e3(data, *, spike_thr=15.0):
         sp = err > spike_thr
         iso = int(sum(1 for k in np.where(sp)[0]
                       if 0 < k < len(err) - 1 and err[k - 1] < 8 and err[k + 1] < 8))
-        rob = G.dtfit_track(t, raw, (1,), kind="lsi", robust=True)[0]
+        rob = G.dtfit_track(t, raw, (1,), kind="legendre", robust=True)[0]
         kal = G.kalman_track(t, raw, (1,))[0]
         out[recv] = dict(n=d["n"], med=float(np.median(err)), p95=float(np.percentile(err, 95)),
                          mx=float(err.max()), n_spike=int(sp.sum()), n_iso=iso,

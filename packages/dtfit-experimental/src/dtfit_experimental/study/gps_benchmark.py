@@ -8,8 +8,9 @@ Two kinds of well-known trajectory:
    a figure-8 lemniscate. Since the truth is known at every step, the score is
    the true position RMSE rather than the held-out-fix proxy the no-RTK rig is
    limited to, Monte-Carlo averaged. Both are generated at the sim's native
-   scale (10 Hz, GPS sigma about 1.5 m, about 12 m/s), so every tracker runs in
-   the regime it is tuned for and the comparison is fair by construction.
+   scale (10 Hz, GPS sigma about 1.5 m, about 12 m/s on the coordinated turn),
+   so every tracker runs in the regime it is tuned for and the comparison is
+   fair by construction.
 
 2. Public real datasets with dm-level RTK/INS truth, wired through
    :func:`load_external` so a real log drops straight in; the EXTERNAL DATASETS
@@ -72,7 +73,8 @@ def ct_benchmark(seed=0, *, sigma=SIGMA, plan=None, n=N):
 def figure8_benchmark(seed=0, *, sigma=SIGMA, n=N, scale=150.0):
     """The figure-8 (Gerono lemniscate) at the native scale:
     ``x = scale*cos(phi)``, ``y = scale*sin(2*phi)/2`` over one period, a
-    smooth and continuously curving path peaking near 16 m/s. Exact ground
+    smooth and continuously curving path with speed 10.4 to 22.2 m/s, median
+    14.7 m/s. Exact ground
     truth."""
     rng = np.random.default_rng(seed)
     t = np.linspace(0.0, G.DURATION, n)
@@ -341,9 +343,9 @@ def run_methods(t, meas, *, sigma=SIGMA):
     the glitch column can compare a hardened dtfit (``robust=True``) against a
     symmetrically hardened pointwise filter instead of a soft target."""
     return {
-        "dtfit Legendre-cubic": G.dtfit_track(t, meas, (1,), kind="lsi", model="poly")[0],
-        "dtfit Legendre-turn": G.dtfit_track(t, meas, (1,), kind="lsi", model="turn")[0],
-        "dtfit block (area)": G.dtfit_track(t, meas, (1,), kind="eac", model="poly")[0],
+        "dtfit Legendre-cubic": G.dtfit_track(t, meas, (1,), kind="legendre", model="poly")[0],
+        "dtfit Legendre-turn": G.dtfit_track(t, meas, (1,), kind="legendre", model="turn")[0],
+        "dtfit block (area)": G.dtfit_track(t, meas, (1,), kind="block", model="poly")[0],
         "Kalman-CA": G.kalman_track(t, meas, (1,))[0],
         "Kalman-CA (Huber)": kalman_ca_track(t, meas, sigma=sigma, huber=3.0),
         "CT-EKF (pos-only)": ctekf_pos_track(t, meas, sigma=sigma),
@@ -455,7 +457,7 @@ def dropout_score(t, truth, meas, *, gap=20, sigma=SIGMA):
 def glitch_score(t, truth, meas, *, frac=0.06, mag=12.0, seed=0, sigma=SIGMA):
     """Inject multipath spikes, N(0, ``mag``) on a ``frac`` of the fixes, and
     score each tracker against true position at the spiked samples. Adds
-    dtfit's winsorized ``robust=True`` LSI, the integral method's robustness
+    dtfit's winsorized ``robust=True`` Legendre image filter, the integral method's robustness
     lever that the pointwise filters lack.
 
     Glitch placement uses a decorrelated child of ``seed``
@@ -470,7 +472,7 @@ def glitch_score(t, truth, meas, *, frac=0.06, mag=12.0, seed=0, sigma=SIGMA):
     mgl = meas.copy()
     mgl[gl, :2] += rng.normal(0.0, mag, (int(gl.sum()), 2))
     res = run_methods(t, mgl, sigma=sigma)
-    res["dtfit Legendre robust"] = G.dtfit_track(t, mgl, (1,), kind="lsi", model="poly",
+    res["dtfit Legendre robust"] = G.dtfit_track(t, mgl, (1,), kind="legendre", model="poly",
                                             robust=True)[0]
     return {nm: _pos_rmse(est, truth, gl) for nm, est in res.items()}
 

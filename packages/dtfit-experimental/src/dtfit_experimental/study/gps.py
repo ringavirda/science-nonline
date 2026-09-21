@@ -7,7 +7,7 @@ dropouts and multipath glitches.
   :func:`build_rig`, :func:`build_imu`;
 * the dtfit integral trackers: :func:`dtfit_track` (the streaming Legendre
   image and the block image of :class:`dtfit.streaming.ImageFilter`) and the
-  full-IMU strapdown :func:`imu_lsi_track` (external-regressor Legendre image
+  full-IMU strapdown :func:`imu_track` (external-regressor Legendre image
   fit), with the :class:`FusedCUSUM` maneuver detector;
 * the established baselines: :func:`kalman_track` (constant-accel Kalman) and
   :func:`ekf_track` (gyro-aided coordinated-turn EKF);
@@ -33,7 +33,7 @@ __all__ = [
     "MAG_SIGMA", "MAG_GAIN", "GYRO_BIAS",
     "trajectory", "random_plan", "rmse3", "build_rig", "build_imu", "build_mag",
     "controls", "dtfit_track", "kalman_track", "ekf_track",
-    "strapdown_basis", "imu_lsi_track", "FusedCUSUM", "roll_rmse", "match_onsets",
+    "strapdown_basis", "imu_track", "FusedCUSUM", "roll_rmse", "match_onsets",
     "exp_so3", "batch_trial", "run_batch",
 ]
 
@@ -217,7 +217,7 @@ MODELS = {
 }
 
 
-def _axis_filters(fixes, kind="lsi", model="poly", robust=False, off=None,
+def _axis_filters(fixes, kind="legendre", model="poly", robust=False, off=None,
                   adaptive_window=True):
     off = off or {}
     m = MODELS[model]
@@ -230,13 +230,15 @@ def _axis_filters(fixes, kind="lsi", model="poly", robust=False, off=None,
     # variance, staying responsive on clean fixes and damping automatically
     # on the noisy, anomaly-heavy harsh stream, with no per-regime
     # hand-tuning; this applies to both bases below.
-    if kind == "lsi":   # the Legendre spectrum, right for trajectories
+    if kind == "legendre":   # the Legendre spectrum, right for trajectories
         return [ImageFilter(m["expr"], "t", p0=p0(ax), window_size=15, order=m["order"],
                           q_diag=[1e-2] * nq, adaptive_window=adaptive_window,
                           robust=robust, drift_reset="inflate", **off, basis="legendre") for ax in range(3)]
-    return [ImageFilter(m["expr"], "t", p0=p0(ax), window_size=15,
-                      order=nq, q_diag=[1e-2] * nq, adaptive_window=adaptive_window,
-                      robust=robust, drift_reset="inflate", **off, basis="block") for ax in range(3)]
+    if kind == "block":
+        return [ImageFilter(m["expr"], "t", p0=p0(ax), window_size=15,
+                          order=nq, q_diag=[1e-2] * nq, adaptive_window=adaptive_window,
+                          robust=robust, drift_reset="inflate", **off, basis="block") for ax in range(3)]
+    raise ValueError(f'kind must be "legendre" or "block", got {kind!r}')
 
 
 class FusedCUSUM:
@@ -270,7 +272,7 @@ class FusedCUSUM:
         return False
 
 
-def dtfit_track(t, fixes, horizons=(10,), *, kind="lsi", model="poly", robust=False,
+def dtfit_track(t, fixes, horizons=(10,), *, kind="legendre", model="poly", robust=False,
                 fused=False, gyro=None, coast=False, coast_order=1,
                 adaptive_window=True):
     """Online per-axis tracking with rolling h-step forecasts. Missing fixes
@@ -288,7 +290,10 @@ def dtfit_track(t, fixes, horizons=(10,), *, kind="lsi", model="poly", robust=Fa
 
     ``adaptive_window`` is threaded straight into the underlying
     :class:`ImageFilter`: ``True`` (the default) sizes the window from the
-    data, ``False`` holds it fixed at ``window_size``."""
+    data, ``False`` holds it fixed at ``window_size``.
+
+    Raises:
+        ValueError: ``kind`` is neither ``"legendre"`` nor ``"block"``."""
     n = t.size
     sm = np.zeros((n, 3))
     pred = {h: np.full((n, 3), np.nan) for h in horizons}
@@ -411,7 +416,7 @@ def ekf_track(t, fixes, gyro, horizons=(10,), *, adaptive=False):
 
 
 # The full 9-DOF IMU (3-axis gyro plus 3-axis accelerometer), strapdown-fused
-# through the external-regressor LSI filter. This is the richer model the floor
+# through the external-regressor Legendre image filter. This is the richer model the floor
 # argument calls for: the accelerometer adds the acceleration actually sensed
 # (speed changes, centripetal and normal load) that a gyro-only constant-speed
 # model assumes away, and the 3-axis gyro gives the full 3-D attitude, banked
@@ -561,10 +566,10 @@ def strapdown_basis(t, gyro, accel, R0, *, tau=IMU_WASH_TAU,
     return S
 
 
-def imu_lsi_track(t, fixes, gyro, accel, R0, horizons=(10,), *, window=28,
+def imu_track(t, fixes, gyro, accel, R0, horizons=(10,), *, window=28,
                   drift="c2*tt**2", mag_heading=None, mag_gain=MAG_GAIN, S=None,
                   adaptive_window=True):
-    """Full-IMU GPS fusion, run per axis entirely through dtfit's LSI filter.
+    """Full-IMU GPS fusion, run per axis entirely through dtfit's Legendre image filter.
 
     The strapdown basis ``S`` (gyro attitude plus accelerometer, washed out) is
     fed to :class:`the Legendre filter` as an external regressor, making the per-axis
@@ -587,7 +592,7 @@ def imu_lsi_track(t, fixes, gyro, accel, R0, horizons=(10,), *, window=28,
     it, extrapolates explosively while coasting through a gap. The quadratic is
     both more accurate on clean smoothing and far more stable during dropouts.
     Paired with a slightly wider ``window`` of 28, which the order-6 projection
-    wants room for, the per-axis LSI leads the coordinated-turn EKF on
+    wants room for, the per-axis Legendre image filter leads the coordinated-turn EKF on
     smoothing, coasting and robustness alike.
 
     ``adaptive_window`` is threaded straight into the underlying
@@ -709,8 +714,8 @@ def batch_trial(arg):
     msk[:WARMUP] = False
     out = {
         "raw": rmse3(fixes[msk], truth[msk]),
-        "lsi": rmse3(dtfit_track(t, fixes, (1,), kind="lsi")[0][msk], truth[msk]),
-        "imu": rmse3(imu_lsi_track(t, fixes, gy3, ac3, R0, (1,),
+        "legendre": rmse3(dtfit_track(t, fixes, (1,), kind="legendre")[0][msk], truth[msk]),
+        "imu": rmse3(imu_track(t, fixes, gy3, ac3, R0, (1,),
                                    mag_heading=mg3)[0][msk], truth[msk]),
         "ekf": rmse3(ekf_track(t, fixes, gyro, (1,))[0][msk], truth[msk]),
         "kal": rmse3(kalman_track(t, fixes, (1,))[0][msk], truth[msk]),

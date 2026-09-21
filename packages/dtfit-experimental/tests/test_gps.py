@@ -29,6 +29,14 @@ def test_build_rig_carries_gps_sigma_and_turns_by_the_commanded_rate():
     assert rate == pytest.approx(0.5, abs=0.05)
 
 
+def test_dtfit_track_rejects_the_retired_lowercase_kind():
+    t, truth, fixes, gyro, rng = gps.build_rig(50, seed=1, gps_sigma=1.0)
+    # fails if _axis_filters still fell through to "block" for any
+    # kind other than "legendre" (the guard the retired name relies on)
+    with pytest.raises(ValueError, match="legendre.*block"):
+        gps.dtfit_track(t, fixes, (1,), kind="lsi")
+
+
 def test_dtfit_track_adaptive_window_keyword_reaches_the_filter():
     t, truth, fixes, gyro, rng = gps.build_rig(200, seed=1, gps_sigma=1.0)
     sm_adaptive, *_ = gps.dtfit_track(t, fixes, (1,), adaptive_window=True)

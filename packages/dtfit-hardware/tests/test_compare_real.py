@@ -77,7 +77,7 @@ def test_sweep_text_reproduces_sweep_rows_numbers(synthetic_log) -> None:
 
 
 def test_sweep_rows_threads_adaptive_window(synthetic_log) -> None:
-    # A dropped adaptive_window keyword on the way into imu_lsi_track would
+    # A dropped adaptive_window keyword on the way into imu_track would
     # make the fixed-window sweep a silent copy of the adaptive one.
     adaptive = C.sweep_rows(synthetic_log, horizons=(2,), gaps=(),
                             adaptive_window=True)
