@@ -32,6 +32,18 @@ Legendre filter (robust image) (static tuning),anomaly,0.05,0.679624
 Legendre filter (robust image) (static tuning),anomaly,0.1,1.18128
 Legendre filter (robust image) (static tuning),anomaly,0.2,1.76004
 EKF (params-as-state),anomaly,0,1.07433
+EKF (static setting),anomaly,0,0.58218
+EKF (3-sigma gate),anomaly,0,1.07433
+"EKF (static setting, 3-sigma gate)",anomaly,0,0.58218
 EKF (params-as-state),anomaly,0.05,352.034
+EKF (static setting),anomaly,0.05,304.366
+EKF (3-sigma gate),anomaly,0.05,134.97
+"EKF (static setting, 3-sigma gate)",anomaly,0.05,144.869
 EKF (params-as-state),anomaly,0.1,458.934
+EKF (static setting),anomaly,0.1,425.283
+EKF (3-sigma gate),anomaly,0.1,228.711
+"EKF (static setting, 3-sigma gate)",anomaly,0.1,233.668
 EKF (params-as-state),anomaly,0.2,886.434
+EKF (static setting),anomaly,0.2,900.745
+EKF (3-sigma gate),anomaly,0.2,376.027
+"EKF (static setting, 3-sigma gate)",anomaly,0.2,359.618

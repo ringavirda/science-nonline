@@ -24,5 +24,8 @@ Legendre filter (robust image) (static tuning),dropout,0.05,0.599624
 Legendre filter (robust image) (static tuning),dropout,0.1,0.538114
 Legendre filter (robust image) (static tuning),dropout,0.2,0.658272
 EKF (params-as-state),dropout,0.05,1.12827
+EKF (static setting),dropout,0.05,0.641313
 EKF (params-as-state),dropout,0.1,1.01153
+EKF (static setting),dropout,0.1,0.555375
 EKF (params-as-state),dropout,0.2,1.07677
+EKF (static setting),dropout,0.2,0.657177

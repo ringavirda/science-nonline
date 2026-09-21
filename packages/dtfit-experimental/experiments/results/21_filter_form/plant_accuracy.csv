@@ -6,6 +6,9 @@ damped_osc,Legendre filter (static tuning),perr_pct,0.599086,0.521291,0.339877,0
 damped_osc,EKF (params-as-state),perr_pct,1.07433,0.607462,0.772207,0
 damped_osc,RLS (AR predictor),perr_pct,,,,0
 damped_osc,sliding-window curve_fit,perr_pct,44.1572,12.9514,44.8507,0
+damped_osc,EKF (static setting),perr_pct,0.58218,0.196218,0.620323,0
+damped_osc,image of the whole record,perr_pct,0.206759,0.0976746,0.167194,0
+damped_osc,whole-record NLLS,perr_pct,0.206755,0.0976825,0.167159,0
 ac_sine,block filter (inherited tuning),perr_pct,1.49653,0.712903,1.37017,0
 ac_sine,block filter (static tuning),perr_pct,0.391023,0.166833,0.37318,0
 ac_sine,Legendre filter (inherited tuning),perr_pct,1.19698,0.886146,0.944179,0
@@ -13,6 +16,9 @@ ac_sine,Legendre filter (static tuning),perr_pct,0.384119,0.174976,0.381197,0
 ac_sine,EKF (params-as-state),perr_pct,0.331663,0.15161,0.349112,0
 ac_sine,RLS (AR predictor),perr_pct,,,,0
 ac_sine,sliding-window curve_fit,perr_pct,1.68745,1.12134,1.2265,0
+ac_sine,EKF (static setting),perr_pct,0.250546,0.150134,0.21747,0
+ac_sine,image of the whole record,perr_pct,0.248992,0.150632,0.220883,0
+ac_sine,whole-record NLLS,perr_pct,0.24899,0.150633,0.220882,0
 first_order,block filter (inherited tuning),perr_pct,17.1595,9.53328,16.8848,0
 first_order,block filter (static tuning),perr_pct,0.643849,0.7654,0.258308,0
 first_order,Legendre filter (inherited tuning),perr_pct,17.252,8.87796,17.9063,0
@@ -20,6 +26,9 @@ first_order,Legendre filter (static tuning),perr_pct,0.546175,0.77037,0.207975,0
 first_order,EKF (params-as-state),perr_pct,0.704655,0.184015,0.751193,0
 first_order,RLS (AR predictor),perr_pct,,,,0
 first_order,sliding-window curve_fit,perr_pct,37.0423,16.2773,46.6222,0
+first_order,EKF (static setting),perr_pct,1.30395,0.209698,1.3329,0
+first_order,image of the whole record,perr_pct,0.156037,0.0884599,0.144071,0
+first_order,whole-record NLLS,perr_pct,0.156037,0.0884599,0.144071,0
 ca_traj,block filter (inherited tuning),perr_pct,24.624,12.3045,25.5482,0
 ca_traj,block filter (static tuning),perr_pct,3.15889,1.99061,2.60853,0
 ca_traj,Legendre filter (inherited tuning),perr_pct,22.0955,10.7284,20.3222,0
@@ -27,6 +36,9 @@ ca_traj,Legendre filter (static tuning),perr_pct,3.15773,1.99747,2.60797,0
 ca_traj,EKF (params-as-state),perr_pct,4.68099,3.66899,3.18202,0
 ca_traj,RLS (AR predictor),perr_pct,,,,0
 ca_traj,sliding-window curve_fit,perr_pct,410.526,51.3245,409.858,0
+ca_traj,EKF (static setting),perr_pct,2.25922,1.70895,1.58951,0
+ca_traj,image of the whole record,perr_pct,2.26903,1.73248,1.52704,0
+ca_traj,whole-record NLLS,perr_pct,2.26903,1.73248,1.52704,0
 damped_osc (matched model),EKF,rmse_vs_clean,0.00704318,0.000682141,0.00696532,0
 damped_osc (as first_order),EKF,rmse_vs_clean,0.201649,0.00263695,0.200967,4
 first_order (matched model),EKF,rmse_vs_clean,0.0278618,0.00160263,0.02786,0

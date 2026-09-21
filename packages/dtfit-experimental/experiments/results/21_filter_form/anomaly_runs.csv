@@ -1,0 +1,21 @@
+estimator,level,mean,median,under_5pct
+Legendre filter (robust image) (static tuning),0,0.597456,0.350509,8
+Legendre filter (robust image) (static tuning),0.05,0.679624,0.326372,8
+Legendre filter (robust image) (static tuning),0.1,1.18128,0.506438,8
+Legendre filter (robust image) (static tuning),0.2,1.76004,0.271134,7
+EKF (params-as-state),0,1.07433,0.772207,8
+EKF (params-as-state),0.05,352.034,321.659,0
+EKF (params-as-state),0.1,458.934,377.786,0
+EKF (params-as-state),0.2,886.434,628.713,0
+EKF (static setting),0,0.58218,0.620323,8
+EKF (static setting),0.05,304.366,301.263,1
+EKF (static setting),0.1,425.283,353.676,0
+EKF (static setting),0.2,900.745,628.665,0
+EKF (3-sigma gate),0,1.07433,0.772207,8
+EKF (3-sigma gate),0.05,134.97,8.16528,3
+EKF (3-sigma gate),0.1,228.711,322.369,2
+EKF (3-sigma gate),0.2,376.027,362.48,1
+"EKF (static setting, 3-sigma gate)",0,0.58218,0.620323,8
+"EKF (static setting, 3-sigma gate)",0.05,144.869,1.44879,5
+"EKF (static setting, 3-sigma gate)",0.1,233.668,334.621,3
+"EKF (static setting, 3-sigma gate)",0.2,359.618,297.671,1

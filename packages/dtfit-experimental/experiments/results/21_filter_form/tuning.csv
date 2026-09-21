@@ -9,3 +9,4 @@ legendre order 7  W 120  q 1e-6  fixed,0.640691,0.617924
 legendre order 9  W 200  q 1e-8  fixed (retuned),0.353859,0.266813
 block order 6  W 120  q 1e-6  fixed,0.598404,0.598588
 EKF (params-as-state),1.07433,0.607462
+EKF (static setting),0.58218,0.196218

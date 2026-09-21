@@ -16,6 +16,10 @@ Legendre filter (static tuning),0.05,0.599086
 Legendre filter (static tuning),0.1,1.09511
 Legendre filter (static tuning),0.2,1.82442
 EKF (params-as-state),0.02,0.874382
+EKF (static setting),0.02,0.520845
 EKF (params-as-state),0.05,1.07433
+EKF (static setting),0.05,0.58218
 EKF (params-as-state),0.1,1.62052
+EKF (static setting),0.1,0.726853
 EKF (params-as-state),0.2,3.17022
+EKF (static setting),0.2,1.56949
