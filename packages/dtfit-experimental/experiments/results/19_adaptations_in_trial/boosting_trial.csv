@@ -1,0 +1,10 @@
+method,median_nrmse_pct,ci_lo,ci_hi,series
+boosted,31.1125,29.1648,33.61,synthetic trend+cycle
+auto_forecast,19.8994,18.4728,21.9078,synthetic trend+cycle
+random_walk,58.3508,55.5303,63.3037,synthetic trend+cycle
+boosted,18.9198,,,CO2 (trend+season)
+boosted,31.715,,,sunspots (~11y cycle)
+auto_forecast,18.8145,,,CO2 (trend+season)
+auto_forecast,33.1396,,,sunspots (~11y cycle)
+random_walk,42.9879,,,CO2 (trend+season)
+random_walk,29.9252,,,sunspots (~11y cycle)

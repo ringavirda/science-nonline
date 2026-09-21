@@ -1,0 +1,5 @@
+construction,joint_median,pooled_median,mean_of_errors_median,joint_ci_lo,joint_ci_hi,pooled_ci_lo,pooled_ci_hi
+"C4, 4 channels x 30 pts (well identified)",7.09639,6.44397,16.4149,,,,
+"weak, 4 channels x 10 pts, span < tau",51.6356,49.9756,,,,,
+"weak, 8 channels x 8 pts",35.3738,81.9135,,,,,
+weak combined (4x10 and 8x8),46.11,58.2129,,36.0047,55.8192,46.3812,86.5399

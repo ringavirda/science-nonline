@@ -1,0 +1,9 @@
+method,median_err_pct,ci_lo,ci_hi,signal
+fit_lsi_basis,0.673013,0.527657,0.86885,sine
+FourierBasis,0.679444,0.532645,0.872193,sine
+legendre_osc,0.680777,0.547229,0.771497,sine
+nlls,0.680758,0.547212,0.771498,sine
+fit_lsi_basis,197.133,63.3588,197.895,decay
+LaguerreBasis,1.36802,1.04597,1.6967,decay
+legendre,1.36878,1.04433,1.69514,decay
+nlls,1.36802,1.04597,1.6967,decay
