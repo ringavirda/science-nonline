@@ -1,9 +1,9 @@
-# dtfit-hardware — the real-silicon rig (hardware twin of the GPS simulation)
+# dtfit-hardware -- the real-silicon rig (hardware twin of the GPS simulation)
 
 The [GPS simulation notebook](../dtfit-experimental/experiments/realdata/33_gps_simulation.ipynb)
 (in `dtfit-experimental`) validates the streaming trackers on a
 **simulated** 9-DOF GPS/inertial rig. This package runs the same story on **real
-hardware** — an Arduino Nano 33 BLE Sense + NEO-M8N GPS — and scores the on-MCU
+hardware** -- an Arduino Nano 33 BLE Sense + NEO-M8N GPS -- and scores the on-MCU
 filter against captured real-data logs and public RTK/INS datasets. It is the
 engineering counterpart of the planned embedded paper.
 
@@ -12,39 +12,42 @@ It encapsulates everything device-specific: the Arduino **firmware**, the host
 (`compare_real.py`), and a phone-side **BLE monitor app** (`mobile/`).
 
 Depends on `dtfit-experimental` (to score against the baselines of `dtfit_experimental.study.gps`)
-→ `dtfit`. The dependency is one-directional: `dtfit-hardware` → `dtfit-experimental` → `dtfit`.
+-> `dtfit`. The dependency is one-directional: `dtfit-hardware` -> `dtfit-experimental` -> `dtfit`.
 
-- **Report:** [`src/dtfit_hardware/realtime_gps_hw.ipynb`](src/dtfit_hardware/realtime_gps_hw.ipynb) — reproduces the sim's **E1/E2/E3/E5 on real-data logs** (forecast, dropout-coasting, glitch robustness, on-MCU cost + float32 bit-faithfulness), with rig status and BOM. A living report, expanded as more runs land.
-- **Parts + wiring:** [`papers/embedded_hardware_bom.md`](../../papers/embedded_hardware_bom.md)
-- **Beginner build guide:** [`papers/embedded_nano_build_guide.md`](../../papers/embedded_nano_build_guide.md)
-- **Phone monitor:** [`mobile/dtfit-monitor/`](mobile/dtfit-monitor/) — its own README covers the React Native build.
+- **Report:** [`experiments/rig.ipynb`](experiments/rig.ipynb) -- three recorded logs scored against Kalman-CA and a CT-EKF (forecast, dropout coasting, the adaptive against the fixed window, the clock origin), and the on-chip float32 filter: cost, memory, agreement with a float64 replay. It reruns without the rig from the tracked captures under `experiments/captures/`; the recorded drives are private and their cells skip when absent.
+- **Bring-up notebook:** [`src/dtfit_hardware/realtime_gps_hw.ipynb`](src/dtfit_hardware/realtime_gps_hw.ipynb) -- rig status and BOM.
+- **Phone monitor:** [`mobile/dtfit-monitor/`](mobile/dtfit-monitor/) -- its own README covers the React Native build.
 
 ## Layout
 
 ```
 dtfit-hardware/
-├── pyproject.toml
-├── mobile/dtfit-monitor/       # phone-side live BLE view (React Native / Expo) -- see its README
-└── src/dtfit_hardware/
-    ├── realtime_gps_hw.ipynb   # THE REPORT: real-data E1/E2/E3/E5 + rig status (figures/tables)
-    ├── backend.py              # host control + telemetry (find/flash/capture/log, USB + BLE)
-    ├── compare_real.py         # real-log comparison: dtfit trackers vs Kalman/CT-EKF, matched
-    │                           #   S=0 control, gyro-gated IMU fusion, glitch + float32 checks
-    ├── firmware/               # Arduino sketches flashed to the board
-    │   ├── nano_diagnostic/        # LED + IMU + I2C scan, no wiring
-    │   ├── nano_lsi_log/           # THE rig firmware: on-MCU LSI + 9-DOF IMU + mag -> SD & BLE
-    │   ├── nano_sd_dump/           # stream riglog.csv off the SD card over USB (no card reader)
-    │   └── ...                     # gps_passthrough, lsi_onboard, rig_check, ble_telemetry
-    ├── tools/                  # host tools (embed_lsi.py -> C tables, test_lsi.cpp)
-    └── data/                   # captured telemetry logs (CSV; git-ignored, local-only)
+|-- pyproject.toml
+|-- mobile/dtfit-monitor/       # phone-side live BLE view (React Native / Expo) -- see its README
+|-- experiments/
+|   |-- rig.ipynb               # THE REPORT: recorded drives + the on-chip filter
+|   |-- captures/               # serial captures and compile logs of the on-chip runs (tracked)
+|   `-- results/rig/            # the tables the notebook exports (tracked)
+`-- src/dtfit_hardware/
+    |-- realtime_gps_hw.ipynb   # bring-up notebook: rig status and BOM
+    |-- backend.py              # host control + telemetry (find/flash/capture/log, USB + BLE)
+    |-- compare_real.py         # real-log comparison: dtfit trackers vs Kalman/CT-EKF, matched
+    |                           #   S=0 control, gyro-gated IMU fusion, glitch + float32 checks
+    |-- firmware/               # Arduino sketches flashed to the board
+    |   |-- nano_diagnostic/        # LED + IMU + I2C scan, no wiring
+    |   |-- nano_lsi_log/           # THE rig firmware: on-MCU LSI + 9-DOF IMU + mag -> SD & BLE
+    |   |-- nano_sd_dump/           # stream riglog.csv off the SD card over USB (no card reader)
+    |   `-- ...                     # gps_passthrough, lsi_onboard, rig_check, ble_telemetry
+    |-- tools/                  # host tools (embed_lsi.py -> C tables, make_replay.py, test_lsi.cpp)
+    `-- data/                   # captured telemetry logs (CSV; git-ignored, local-only)
 ```
 
 The same `dtfit-gps` GATT service is consumed three ways: `backend.py` (PC, via
-`bleak`) and [`mobile/dtfit-monitor/`](mobile/dtfit-monitor/) — a small React
+`bleak`) and [`mobile/dtfit-monitor/`](mobile/dtfit-monitor/) -- a small React
 Native app that shows GPS fix / sats / speed / IMU / on-MCU LSI live on an Android
 phone, so you can tell the rig is working untethered in the field.
 
-`backend.py` wraps the Arduino CLI (bundled with the Arduino IDE — no separate
+`backend.py` wraps the Arduino CLI (bundled with the Arduino IDE -- no separate
 install) and `pyserial`, so the notebook/tests can locate the board, flash a
 sketch and capture its serial stream. There is **no NumPy simulation here**: this
 package's "compute" is driving real silicon and logging what it returns.
@@ -95,15 +98,18 @@ for line in rig.capture(seconds=10):   # raw NMEA once the GPS is wired
 | Stage | Firmware | Proves | Wiring |
 |---|---|---|---|
 | 0 | `nano_diagnostic` | upload path, USB serial, onboard IMU, I2C bus | none |
-| 2 | `nano_gps_passthrough` | NEO-M8N UART link (raw NMEA) | GPS↔Nano UART + 5 V |
+| 2 | `nano_gps_passthrough` | NEO-M8N UART link (raw NMEA) | GPS<->Nano UART + 5 V |
 | 5 | `nano_ble_telemetry` | untethered GPS+IMU logging over BLE | battery + boost |
 
-> **Stage 4 (INA226 energy-per-estimate) is dropped.** Both INA226 modules are dead — the
+> **Stage 4 (INA226 energy-per-estimate) is dropped.** Both INA226 modules are dead -- the
 > chip never ACKs even on an I2C bus proven good by the GPS magnetometer at `0x0E`, with VCC
-> at 3.2 V and SDA↔A4 / SCL↔A5 continuity verified. With no working power meter, the
-> energy-per-estimate experiment is cut; the on-MCU **cost story rests on µs/update + RAM**
-> instead (measured on the M4F via `nano_lsi_onboard`: ~267 µs/update, sub-kB state).
+> at 3.2 V and SDA<->A4 / SCL<->A5 continuity verified. With no working power meter, the
+> energy-per-estimate experiment is cut; the on-MCU **cost story rests on us/update + RAM**
+> instead (measured on the M4F: 104 us per update and 152 bytes of state for one axis via
+> `nano_lsi_onboard`, 182 us and 304 bytes for two via the replay sketch;
+> `experiments/results/rig/onchip_cost.csv`).
 
-Each hardware stage reproduces a cell (E1–E7) of the GPS simulation on
-real silicon; the notebook compares the captured logs to the simulated baselines
-(constant-accel Kalman, CT-EKF) and to public RTK/INS ground truth.
+The rig notebook scores the captured logs against the baselines of the GPS
+simulation (constant-accel Kalman, CT-EKF); no surveyed truth exists for the
+recorded logs, so the scores are forecast against the later fix and coast
+against held-out fixes.
