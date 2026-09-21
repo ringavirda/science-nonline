@@ -21,9 +21,6 @@ on two or more domains is promoted into stable ``dtfit``, where it then lives
 physically rather than being re-imported from here.
 
     from dtfit_experimental import (
-        fit_lsi_basis,        # #2 pluggable orthogonal basis (Fourier/...)
-        fit_joint,            # #4 joint shared-parameter multi-channel fit
-        boosted_fit,          # #5 stage-wise residual boosting
         InformationFilter,    # inverse-covariance (info-form) fusion primitive
         FourierBasis,         # image-interface basis, fit(basis=...)
         ChebyshevBasis,       # image-interface basis, fit(basis=...)
@@ -38,26 +35,17 @@ physically rather than being re-imported from here.
     )
 
 ``FourierBasis``, ``ChebyshevBasis`` and ``LaguerreBasis`` are the
-image-projection form, reached through ``dtfit.fit(basis=...)``;
-``fit_lsi_basis`` is the older spectral-criterion form. Both are
-experimental and coexist (see ``bases.py``).
+image-projection form, reached through ``dtfit.fit(basis=...)``.
 
-These signatures may change until promotion. Each of the four is here for its
-own reason. ``fit_lsi_basis`` buys vocabulary, not accuracy: a Fourier or
-Laguerre basis makes periodic and decay models expressible, yet recovery did
-not improve and the LTSF benchmark went against it. the Legendre fit still
-hard-codes Legendre for that reason. ``boosted_fit`` is a genuine win, but on
-one domain only (additive trend plus season, CO2 and the like); a confirming
-second domain would clear the promotion gate. ``fit_joint`` is the substantial
-new solver, still under evaluation. ``InformationFilter``, the
+These signatures may change until promotion. ``InformationFilter``, the
 inverse-covariance primitive whose fusion is a plain addition, is coherent and
 tested but no domain study exercises it and the covariance-form the block filter
 / the Legendre filter do not use it; it waits here for a sensor-fusion or embedded
-domain. Measured verdicts live in ``experiments/cases/analysis``.
+domain. Measured verdicts live in
+``experiments/results/19_adaptations_in_trial``.
 """
 
 from dtfit._core._backend import available_backends, resolve_backend, Backend
-from .basis_lsi import fit_lsi_basis
 from .bases import ChebyshevBasis, FourierBasis, LaguerreBasis
 from .blocks import (
     AlignedFit,
@@ -76,19 +64,12 @@ from .weak_ode import (
     seed_nlls,
     weak_operators,
 )
-from .joint import fit_joint, JointResult
-from .boosting import boosted_fit, BoostedModel
 from .information import InformationFilter
 
 __all__ = [
-    "fit_lsi_basis",
     "available_backends",
     "resolve_backend",
     "Backend",
-    "fit_joint",
-    "JointResult",
-    "boosted_fit",
-    "BoostedModel",
     "InformationFilter",
     "FourierBasis",
     "ChebyshevBasis",

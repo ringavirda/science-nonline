@@ -6,7 +6,7 @@ carries the Gram of the family on the sample grid, and the projected NLLS
 runs on it unchanged. They are adaptations, not core; core knows only
 Legendre and block. Each earns its place by a coefficient count and a Gram
 conditioning on its matching signal class, not by beating Legendre on
-accuracy (measured 2026-09-08, 30 seeds):
+accuracy, over 30 seeds:
 
 * Fourier on a 4-cycle sine: K=5 (11 coef) matches Legendre order 24
   (25 coef). A couple of harmonics carry a cycle many polynomial orders
@@ -16,10 +16,6 @@ accuracy (measured 2026-09-08, 30 seeds):
   a conditioning tool at high order, not an accuracy gain.
 * Laguerre on a decaying exponential: order 8 (9 coef) matches Legendre
   order 24 (25 coef). The basis functions themselves decay.
-
-The older spectral-criterion adaptation :func:`fit_lsi_basis` still exists
-for its own reason (a diagonal-weighted spectral match with a period and a
-pre-smoother); these are the image-projection form.
 
 An image built in one of these bases does not round-trip through
 ``dtfit.image`` serialization, whose ``from_dict`` resolves the name

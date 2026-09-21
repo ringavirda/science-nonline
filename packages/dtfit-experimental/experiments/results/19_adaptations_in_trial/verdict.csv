@@ -1,6 +1,6 @@
-adaptation,signal_class,plain_route,metric,adapt_value,plain_value,ratio,ci_lo,ci_hi,verdict
-basis_lsi,sine + decay spectral matching,shipped FourierBasis / LaguerreBasis,"median relative parameter error, percent",197.133,0.679444,144.101,0.527657,197.895,remove
-boosting,real + synthetic trend-plus-cycle series,dtfit.auto_forecast,"held-out nRMSE, percent",31.1125,19.8994,1.56349,29.1648,33.61,remove
-joint,weakly-identifiable shared-parameter channels,pooled per-channel estimate,"median relative parameter error, percent",46.11,58.2129,0.792092,36.0047,55.8192,remove
-information,linear-Gaussian two-partition fusion,"Image.merge + one fit (nearest substitute, no plain route exists)",max relative disagreement,8.03622e-09,0,8.03622e-09,8.03622e-09,8.03622e-09,keep
-bases,cycle + decay reconstruction at a fixed accuracy,Legendre at a matched coefficient count,coefficient-count ratio to Legendre,0.818182,1,0.818182,0.333333,0.818182,keep
+adaptation,signal_class,plain_route,metric,adapt_value,plain_value,ratio,ci_lo,ci_hi,plain_ci_lo,plain_ci_hi,decided_by,verdict
+basis_lsi,sine + decay spectral matching,shipped FourierBasis / LaguerreBasis,"median relative parameter error, percent",197.133,0.679444,144.101,0.527657,197.895,0.532645,1.6967,the rule,remove
+boosting,real + synthetic trend-plus-cycle series,dtfit.auto_forecast,"held-out nRMSE, percent",31.1125,19.8994,1.56349,29.1648,33.61,18.4728,21.9078,the rule,remove
+joint,weakly-identifiable shared-parameter channels,pooled per-channel estimate,"median relative parameter error, percent",46.11,58.2129,0.792092,36.0047,55.8192,46.3812,86.5399,the rule,remove
+information,linear-Gaussian two-partition fusion,"Image.merge + one fit (nearest substitute, no plain route exists)",max relative disagreement,8.03622e-09,0,8.03622e-09,,,,,the parity clause,keep
+bases,cycle + decay reconstruction at a fixed accuracy,Legendre at a matched coefficient count,"coefficient-count ratio to Legendre, worst of the two classes",0.9,1,0.9,,,,,the owner's ruling,keep

@@ -10,11 +10,9 @@ for exactly this job, and against an sklearn MLP, which fits the curve well but
 recovers no physical parameters at all. That contrast is the point of the
 comparison.
 
-Two further benches exercise the adaptations rather than the base estimators.
+A further bench exercises an adaptation rather than the base estimators:
 :func:`regime_change` runs an :class:`the block filter` across a mid-run damping jump
-to see whether the online filter re-adapts and flags the break;
-:func:`mimo_joint` identifies a three-output plant whose channels share one
-natural frequency, jointly and then per channel for contrast.
+to see whether the online filter re-adapts and flags the break.
 
 The SciPy and sklearn baselines are imported lazily in
 :mod:`dtfit_experimental.study.baselines`, and the ``with_scipy`` / ``with_mlp`` flags let the
@@ -26,7 +24,6 @@ from __future__ import annotations
 import numpy as np
 
 import dtfit as dt
-from dtfit_experimental import fit_joint
 from dtfit.streaming import ImageFilter
 
 from dtfit_experimental.study.metrics import metrics, timed
@@ -35,7 +32,7 @@ from dtfit_experimental.study import baselines as bl
 __all__ = [
     "DAMP_EXPR", "FO_EXPR",
     "scenario_damped", "scenario_first_order", "param_err",
-    "damped_table", "first_order_table", "regime_change", "mimo_joint",
+    "damped_table", "first_order_table", "regime_change",
 ]
 
 # Underdamped free response; dtfit sorts the params, giving order A, w, z.
@@ -163,26 +160,3 @@ def regime_change(rng, n=900):
         track.append(float(flt.predict(np.array([t[i]]))[0]) if len(flt._t) else np.nan)
         z_hist.append(flt.params_["z"])
     return t, y, clean, np.array(track), np.array(z_hist), drift_idx, half
-
-
-def mimo_joint(rng, n=200):
-    """3-output plant sharing a natural frequency w; identify jointly.
-
-    Returns ``(w_true, amps, j, indep_w, chans, t)``: the true shared
-    frequency, the per-channel amplitudes, the :func:`fit_joint` result ``j``,
-    the per-channel independent-EAC frequency estimates, the channels, and the
-    time grid.
-    """
-    t = np.linspace(0, 6, n)
-    w_true, z_true = 3.0, 0.12
-    amps = [1.0, 2.0, 3.0]
-    chans = [(t, _damped(t, A, w_true, z_true) + rng.normal(0, 0.04, n))
-             for A in amps]
-    j = fit_joint(chans, DAMP_EXPR, "t", shared=["w"], n_windows=6,
-                  p0_shared=[2.5], p0_private=[1.0, 0.1])
-    # independent per-channel EAC for contrast
-    indep_w = []
-    for (tx, yx) in chans:
-        r = dt.fit(DAMP_EXPR, dt.Original(tx, yx), "t", basis="block", p0=[1.0, 2.5, 0.1], bounds=([0.1, 1, 0.01], [5, 6, 0.9]))
-        indep_w.append(dict(zip(["A", "w", "z"], r.coeffs))["w"])
-    return w_true, amps, j, indep_w, chans, t

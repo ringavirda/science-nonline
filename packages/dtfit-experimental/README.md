@@ -8,15 +8,14 @@ prototyped and evaluated here.
 
 ## What lives here
 
-- **`dtfit_experimental`** -- the experimental adaptations that remain in trial
-  (`fit_lsi_basis`, `fit_joint`, `boosted_fit`). These build directly on `dtfit`'s
-  internals (`dtfit._core._spectral`, `dtfit._core._backend`, `dtfit._symbolic`, `dtfit._stats`). (The
-  overlapping-window ensemble has been retired in favour of the robust image
-  `dtfit`.) `FourierBasis`, `ChebyshevBasis` and `LaguerreBasis` sit beside
+- **`dtfit_experimental`** -- the experimental adaptations that remain in trial:
+  `InformationFilter`, the inverse-covariance fusion primitive, and the image
+  bases `FourierBasis`, `ChebyshevBasis`, `LaguerreBasis` (reached through
+  `dtfit.fit(basis=...)`). These build directly on `dtfit`'s internals
+  (`dtfit._core._spectral`, `dtfit._core._backend`, `dtfit._symbolic`, `dtfit._stats`).
+  Notebook 19 (`experiments/method/19_adaptations_in_trial.ipynb`) measures each
+  against the plain route and carries its verdict.
 - `weak_ode` -- weak-form ODE identification: rate laws linearized by clearing denominators or eliminating hidden states, fit by least squares with no ODE solve and no p0 (`weak_operators`, `fit_logistic`, `fit_michaelis_menten`, `fit_lotka_volterra_prey`), plus `seed_nlls`, which solves the ODE and refines the weak estimate by nonlinear least squares to full accuracy.
-  `fit_lsi_basis`: the image-projection form of an alternate basis, reached
-  through `dtfit.fit(basis=...)`, rather than the older spectral-criterion
-  match.
 - **`dtfit_experimental.experiments`** -- the experiment suite: `cases/` (each
   adaptation in isolation), `domains/` (per-application-domain validation against
   the established baselines), shared `study/` framework, and `data/`.

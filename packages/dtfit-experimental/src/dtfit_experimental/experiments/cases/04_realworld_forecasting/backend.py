@@ -25,7 +25,6 @@ from __future__ import annotations
 import numpy as np
 
 import dtfit as dt
-from dtfit_experimental import fit_lsi_basis, boosted_fit
 
 from dtfit_experimental.study.metrics import metrics
 from dtfit_experimental.study import baselines as bl
@@ -33,7 +32,7 @@ from dtfit_experimental.study.paths import data_dir
 
 __all__ = [
     "load_covid", "load_uah", "load_sunspots", "load_co2",
-    "dtfit_exp", "dtfit_sunspots", "dtfit_co2",
+    "dtfit_exp",
     "DATASETS", "run_one",
 ]
 
@@ -74,31 +73,9 @@ def dtfit_exp(t_tr, y_tr, t_all):
     return np.asarray(r.model(t_all)) * y0, "LSI exp"
 
 
-def dtfit_sunspots(t_tr, y_tr, t_all):
-    # Adaptation #2: the Fourier basis expresses the periodic form directly.
-    expr = "c + A*sin(w*x + p)"
-    r = fit_lsi_basis(t_tr, y_tr, expr, "x", basis="fourier", order=8,
-                      bounds=[(10, 120), (0, 200), (0.1, 1.5), (-np.pi, np.pi)])
-    return np.asarray(r.model(t_all)), "Fourier-LSI (#2)"
-
-
-def dtfit_co2(t_tr, y_tr, t_all):
-    # Adaptation #5: stage-wise boosting fits the trend, then the seasonal
-    # term on what the trend left behind.
-    bm = boosted_fit(t_tr, y_tr, [
-        dict(expr="a0 + a1*x + a2*x**2", var="x", method="lsi",
-             p0=[y_tr[0], 1.0, 0.0]),
-        dict(expr="A*sin(w*x + p)", var="x", method="lsi",
-             bounds=[(0.1, 20), (0.1, 60), (-np.pi, np.pi)]),
-    ])
-    return bm.predict(t_all), "boosted LSI (#5)"
-
-
 DATASETS = {
     "COVID-19 UA (exp growth)": (load_covid, dtfit_exp, dict(order=(2, 2, 2))),
     "USD/UAH (exp depreciation)": (load_uah, dtfit_exp, dict(order=(2, 1, 2))),
-    "Sunspots (~11y cycle)": (load_sunspots, dtfit_sunspots, dict(order=(3, 0, 3))),
-    "Mauna Loa CO2 (trend+season)": (load_co2, dtfit_co2, dict(order=(2, 1, 2))),
 }
 
 

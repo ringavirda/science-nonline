@@ -9,9 +9,8 @@ standard, where a black-box learner recovers none. What it provides:
   parameters across mechanics, electronics, spectroscopy, kinetics, biology,
   reliability and signal processing, with their per-family closure functions;
 * the data generator :func:`gen`, driving the noise, outlier and sparse sweeps;
-* the dtfit estimators :func:`est_lsi`, :func:`est_eac`, 
-  :func:`est_robust` and :func:`est_merged`, plus the joint multi-channel fit
-  through :func:`dtfit_experimental.fit_joint`, each returning a
+* the dtfit estimators :func:`est_lsi`, :func:`est_eac`,
+  :func:`est_robust` and :func:`est_merged`, each returning a
   ``{name: value}`` dict;
 * the established baselines :func:`est_nlls` (SciPy ``curve_fit``) and
   :func:`est_robust_nlls` (soft-L1 ``least_squares``), and the no-parameter
@@ -20,8 +19,7 @@ standard, where a black-box learner recovers none. What it provides:
 * the scoring and sweep helpers :func:`param_err`, :func:`safe` and a
   re-exported :func:`metrics`, the sweep drivers :func:`noise_sweep`,
   :func:`outlier_sweep` and :func:`learner_curve_fit`, the special-regime
-  helpers :func:`regime_rows` and :func:`joint_channels`, and the real-data
-  loader :func:`load_data`.
+  helper :func:`regime_rows`, and the real-data loader :func:`load_data`.
 
 LSI coefficients come back in sympy's name-sorted order, so the estimators zip
 them against ``sorted(names)``; the baselines keep the declared ``names``
@@ -34,7 +32,6 @@ from __future__ import annotations
 import numpy as np
 
 import dtfit as dt
-from dtfit_experimental import fit_joint
 
 from dtfit_experimental.study.metrics import metrics
 from dtfit_experimental.study import baselines as bl
@@ -53,7 +50,7 @@ __all__ = [
     "A_METHODS", "DT_LABELS", "DT_DIAGNOSTIC_LABELS", "applicability_verdict",
     "family_recovery_row",
     "noise_sweep", "outlier_sweep", "learner_curve_fit",
-    "regime_rows", "joint_channels", "subspace_rate_recovery", "load_data",
+    "regime_rows", "subspace_rate_recovery", "load_data",
     "load_puromycin", "real_puromycin", "exp_model_mismatch",
     "f_expgrow",
 ]
@@ -481,32 +478,6 @@ def regime_rows(rng):
                  "NLLS": safe(est_nlls, gm, t, y),
                  "note": "all comparable -- few points, no clear edge"})
     return rows
-
-
-def joint_channels(rng):
-    """C4, the multi-channel shared parameter that the joint fit (#4) exists
-    for: one decay rate shared across short, noisy channels, none of which
-    constrains tau well alone. Returns
-    ``{"joint_err", "indep_err", "indep_scatter"}``, the errors in percent."""
-    tau_true, ks = 1.2, [3.0, 2.0, 4.0, 2.5]
-    tt = np.linspace(0, 6, 30)
-    chans = [(tt, K * (1 - np.exp(-tt / tau_true)) + rng.normal(0, 0.18 * K, tt.size))
-             for K in ks]
-    j = fit_joint(chans, "K*(1-exp(-t/tau))", "t", shared=["tau"], n_windows=5,
-                  p0_shared=[1.0], p0_private=[1.0])
-    joint_err = abs(j.shared["tau"] - tau_true) / tau_true * 100
-    indep = []
-    for (tx, yx) in chans:
-        try:
-            r = dt.fit("K*(1-exp(-t/tau))", dt.Original(tx, yx), "t", basis="block", p0=[1.0, 1.0], bounds=[(0.1, 10), (0.05, 5)])
-            indep.append(float(r.coeffs[1]))     # sorted names [K, tau] -> tau
-        except Exception:
-            pass
-    indep_err = float(np.mean([abs(v - tau_true) / tau_true * 100 for v in indep])) \
-        if indep else float("nan")
-    indep_scatter = float(np.std(indep)) if indep else float("nan")
-    return {"joint_err": float(joint_err), "indep_err": indep_err,
-            "indep_scatter": indep_scatter}
 
 
 # Part C2: the head-to-head against the Western signal-parameter lineage,
