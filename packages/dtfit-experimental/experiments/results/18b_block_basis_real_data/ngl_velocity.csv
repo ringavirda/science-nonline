@@ -1,0 +1,17 @@
+span,threshold,self_scale,estimator,stations,d_midas_med,d_midas_p90,d_ref_med,d_ref_p90
+8,5,False,aligned,120,0.148027,0.724397,0.185548,1.3709
+8,5,False,"pointwise, database epochs",120,0.0884474,0.918012,0,0
+8,5,False,"pointwise, detected epochs",120,0.146347,0.760621,0.174544,1.3341
+8,5,False,"pointwise, no steps",120,0.180005,1.50387,0.152744,1.37825
+8,5,True,aligned,120,0.141521,0.588079,0.141294,1.14194
+8,5,True,"pointwise, database epochs",120,0.0884474,0.918012,0,0
+8,5,True,"pointwise, detected epochs",120,0.147438,0.645822,0.140572,1.194
+8,5,True,"pointwise, no steps",120,0.180005,1.50387,0.152744,1.37825
+26,4,False,aligned,120,0.289994,1.65812,0.402776,3.00999
+26,4,False,"pointwise, database epochs",120,0.0884474,0.918012,0,0
+26,4,False,"pointwise, detected epochs",120,0.285416,1.63192,0.416712,2.9913
+26,4,False,"pointwise, no steps",120,0.180005,1.50387,0.152744,1.37825
+26,4,True,aligned,120,0.0997283,0.555258,0.115993,0.768013
+26,4,True,"pointwise, database epochs",120,0.0884474,0.918012,0,0
+26,4,True,"pointwise, detected epochs",120,0.0994173,0.555243,0.113098,0.771566
+26,4,True,"pointwise, no steps",120,0.180005,1.50387,0.152744,1.37825

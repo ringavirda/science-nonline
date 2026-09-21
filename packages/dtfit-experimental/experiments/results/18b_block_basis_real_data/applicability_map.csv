@@ -1,0 +1,17 @@
+verdict,place,number,source,section
+ahead,"a window edge on each known epoch, jump columns at K = 32",0.988891,18a_block_basis_synthetic/epochs_vs_uniform.csv,18a section 2
+ahead,the segment basis on two exponential regimes at K = 8,0.95871,18a_block_basis_synthetic/segment_basis.csv,18a section 3
+ahead,"worst-parameter efficiency of 32 windows on a 10-cycle model, 64 stored numbers on an irregular gapped grid",0.723127,18a_block_basis_synthetic/storage_budget.csv,18a section 7
+ahead,the same budget on a two-jump model,0.827519,18a_block_basis_synthetic/storage_budget.csv,18a section 7
+ahead,"window edges on the database epochs of real GPS series, distance from the pointwise shifts in standard errors at K = 8 per year",0.0323433,18b_block_basis_real_data/ngl_known_epochs.csv,18b section 1
+needed,the Legendre Gram on a 20 percent duty burst grid at K = 32,1.20852e+13,18a_block_basis_synthetic/gapped_gram.csv,18a section 4
+needed,"the Legendre image at the same K on real GPS series, K = 8 per year, distance from the pointwise shifts in standard errors",0.392845,18b_block_basis_real_data/ngl_known_epochs.csv,18b section 1
+needed,"data known only as window totals: the midpoint reading's bias on a peak amplitude, percent",-6.08467,18a_block_basis_synthetic/aggregated_synthetic.csv,18a section 6
+needed,"hourly temperature as 6 h means: the diurnal amplitude the midpoint reading returns, as a ratio of the hourly fit's",0.905761,18b_block_basis_real_data/isd_aggregated.csv,18b section 3
+parity,equal K on a record with no gap: the block image on a jump column at K = 32,0.932255,18a_block_basis_synthetic/uniform_vs_legendre.csv,18a section 1
+parity,"leaving a flagged window out against keeping it, step rmse at 4 sigma",0.0969453,18a_block_basis_synthetic/flagged_window_rule.csv,18a section 5
+parity,"the area fit of 3 h means on the diurnal amplitude, as a ratio of the hourly fit's",1.00011,18b_block_basis_real_data/isd_aggregated.csv,18b section 3
+parity,"the aligned fit's east velocity against MIDAS, span 8 and threshold 5, self-scaled, mm/yr",0.141521,18b_block_basis_real_data/ngl_velocity.csv,18b section 2
+behind,the smooth cycle term at equal K = 32 on a record with no gap,0.711867,18a_block_basis_synthetic/uniform_vs_legendre.csv,18a section 1
+behind,the segment basis's Gram on the burst grids,2.35977e+19,18a_block_basis_synthetic/gapped_gram.csv,18a section 4
+behind,unknown epochs on real GPS: the fraction of the large database steps found at the best self-scaled setting,0.315217,18b_block_basis_real_data/ngl_detection.csv,18b section 2

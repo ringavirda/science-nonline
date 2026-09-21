@@ -1,0 +1,5 @@
+span,threshold,self_scale,stations,large_steps,large_found,database_steps,all_found,det_per_station,at_database_epoch,flagged_windows,clipped_samples
+8,5,True,120,92,0.184783,278,0.0647482,1.49167,0.156425,179,4166
+8,5,False,120,92,0.423913,278,0.18705,9.19167,0.0652765,1103,4166
+26,4,True,120,92,0.315217,278,0.104317,1.425,0.269006,171,4166
+26,4,False,120,92,0.706522,278,0.460432,47.9583,0.0319722,5755,4166
