@@ -108,3 +108,16 @@ def test_plain_warnings_shows_the_category_and_message_only(capsys):
         plain_warnings()
         warnings.warn("the solve restarted", UserWarning, stacklevel=1)
     assert capsys.readouterr().err == "UserWarning: the solve restarted\n"
+
+
+def test_plain_warnings_shows_a_repeated_message_once(capsys):
+    """Fails if ``plain_warnings`` stops remembering what it has shown."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("always")
+        plain_warnings()
+        for _ in range(3):
+            warnings.warn("overflow in exp", RuntimeWarning, stacklevel=1)
+        warnings.warn("overflow in exp", UserWarning, stacklevel=1)
+    assert capsys.readouterr().err == (
+        "RuntimeWarning: overflow in exp\nUserWarning: overflow in exp\n"
+    )

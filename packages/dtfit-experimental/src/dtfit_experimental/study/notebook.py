@@ -132,15 +132,17 @@ def optional_import(name: str) -> ModuleType | None:
 
 
 def plain_warnings() -> None:
-    """Show every warning as one line, ``Category: message``, on stderr.
+    """Show a warning as one line, ``Category: message``, on stderr, and
+    each distinct line once.
 
     Replaces ``warnings.showwarning`` for the rest of the process, so the
     source file, line number and source line of the default display are
     gone and a notebook's saved output does not carry the path the
-    packages are installed under. Filters are left alone: a warning that
-    was hidden stays hidden, and a repeated one is still shown once per
-    location.
+    packages are installed under. A warning whose category and message
+    were already shown is dropped, wherever it is raised from. Filters are
+    left alone: a warning that was hidden stays hidden.
     """
+    shown: set[tuple[str, str]] = set()
 
     def show(
         message: Warning | str,
@@ -150,9 +152,12 @@ def plain_warnings() -> None:
         file: TextIO | None = None,
         line: str | None = None,
     ) -> None:
+        key = (category.__name__, str(message))
+        if key in shown:
+            return
+        shown.add(key)
         print(
-            f"{category.__name__}: {message}",
-            file=sys.stderr if file is None else file,
+            f"{key[0]}: {key[1]}", file=sys.stderr if file is None else file
         )
 
     warnings.showwarning = show
