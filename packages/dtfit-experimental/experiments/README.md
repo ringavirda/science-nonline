@@ -60,6 +60,10 @@ beyond what `python -m dtfit_experimental.study.download_data` fetches.
    provenance line from `study.notebook.provenance(started)`.
 7. Plain ASCII in every markdown cell and printed label; the two bases are
    called Legendre and block, never a retired name.
+8. A saved output carries no path of the machine it ran on. A notebook whose
+   fits or baselines warn calls `study.notebook.plain_warnings()` in its
+   setup cell, which shows each warning as `Category: message` without the
+   source file and line.
 
 Only reusable or heavy machinery moves to `study/`: baselines, simulators,
 loaders, metrics, plot helpers, the Monte-Carlo scaffolding

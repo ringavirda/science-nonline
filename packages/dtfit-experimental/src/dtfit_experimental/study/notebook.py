@@ -6,12 +6,14 @@ from __future__ import annotations
 
 import importlib
 import subprocess
+import sys
 import time
+import warnings
 from datetime import datetime, timezone
 from importlib import metadata
 from pathlib import Path
 from types import ModuleType
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TextIO
 
 from . import paths
 
@@ -127,6 +129,33 @@ def optional_import(name: str) -> ModuleType | None:
     except ImportError:
         print(f"{name} not installed, skipping")
         return None
+
+
+def plain_warnings() -> None:
+    """Show every warning as one line, ``Category: message``, on stderr.
+
+    Replaces ``warnings.showwarning`` for the rest of the process, so the
+    source file, line number and source line of the default display are
+    gone and a notebook's saved output does not carry the path the
+    packages are installed under. Filters are left alone: a warning that
+    was hidden stays hidden, and a repeated one is still shown once per
+    location.
+    """
+
+    def show(
+        message: Warning | str,
+        category: type[Warning],
+        filename: str,
+        lineno: int,
+        file: TextIO | None = None,
+        line: str | None = None,
+    ) -> None:
+        print(
+            f"{category.__name__}: {message}",
+            file=sys.stderr if file is None else file,
+        )
+
+    warnings.showwarning = show
 
 
 def provenance(started: float) -> str:

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import re
 import time
+import warnings
 
 import pandas as pd
 import pytest
@@ -14,6 +15,7 @@ import pytest
 from dtfit_experimental.study.notebook import (
     data_file,
     optional_import,
+    plain_warnings,
     provenance,
     results_dir,
     save_table,
@@ -97,3 +99,12 @@ def test_provenance_carries_a_commit_and_wall_time():
     # fails if elapsed were computed from the wrong end of the interval
     # (started - now instead of now - started, a negative reading)
     assert float(match.group(1)) >= 0.05
+
+
+def test_plain_warnings_shows_the_category_and_message_only(capsys):
+    """Fails if ``plain_warnings`` leaves the default display in place."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("always")
+        plain_warnings()
+        warnings.warn("the solve restarted", UserWarning, stacklevel=1)
+    assert capsys.readouterr().err == "UserWarning: the solve restarted\n"
