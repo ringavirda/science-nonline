@@ -1,0 +1,5 @@
+topic,limit
+NGL compression,"fixed span-and-density order policy, not tuned per station"
+gated station-years,one calendar year of ISD (2024) and the NGL archive as reduced now
+GPU leg,"one GPU, one CUDA build, one host link"
+Pi numbers,"one Raspberry Pi 5 on one occasion, no repeat spread"
