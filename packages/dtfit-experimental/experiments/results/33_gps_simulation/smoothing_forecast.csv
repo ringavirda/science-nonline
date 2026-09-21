@@ -1,7 +1,8 @@
 method,smoothing RMSE (m),10-step forecast RMSE (m)
 raw GPS,2.59589,
-dtfit Legendre (GPS-only),1.62152,8.91075
-dtfit block (GPS-only),1.65706,9.05672
+dtfit Legendre (GPS-only),1.62152,8.40033
+"dtfit Legendre (GPS-only), model extrapolated",1.62152,8.91075
+dtfit block (GPS-only),1.65706,8.49167
 full-IMU strapdown Legendre,1.03329,4.11692
 CT-EKF,1.17948,3.0205
 Kalman-CA,1.68654,8.59249

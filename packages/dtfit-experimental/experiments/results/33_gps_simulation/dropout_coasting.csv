@@ -1,4 +1,4 @@
-gap (samples),full-IMU strapdown Legendre,dtfit Legendre (GPS-only),CT-EKF,Kalman-CA,hold-last
-5,1.29029,3.26593,1.57004,3.38977,4.82708
-15,1.96121,8.08694,2.48723,8.40378,12.2057
-30,3.16578,18.669,4.89906,18.325,22.0413
+gap (samples),full-IMU strapdown Legendre,dtfit Legendre (GPS-only),"dtfit Legendre (GPS-only), model extrapolated",CT-EKF,Kalman-CA,hold-last
+5,1.29029,3.20257,3.26593,1.57004,3.38977,4.82708
+15,1.96121,7.61301,8.08694,2.48723,8.40378,12.2057
+30,3.16578,15.4412,18.669,4.89906,18.325,22.0413
