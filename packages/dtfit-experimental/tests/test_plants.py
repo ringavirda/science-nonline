@@ -10,6 +10,7 @@ from dtfit_experimental.study.plants import (
     MISMATCH_PAIRS, mismatch_scores,
     make_multi, MergedTracker, run_tracker, kalman_multi,
 )
+from dtfit_experimental.study.baselines import EKFParam
 from dtfit_experimental.study.cost import MCUS, footprint_rows
 
 
@@ -37,6 +38,33 @@ def test_block_adapter_forwards_adaptive_window():
     ad = EAAd(plant, adaptive_window=False)
     assert ad.f.adaptive_window is False
     assert ad.f.W == plant["window"]
+
+
+def test_ekf_gate_holds_the_parameters_on_a_gross_innovation():
+    """A sample far outside the gate gets the time update only: the parameter
+    stays and ``P`` grows by ``q``; a sample inside the gate still moves the
+    parameter. The first half fails if the gate check is dropped from
+    ``update``, the second if the gate rejects every sample (the comparison
+    turned round)."""
+    f = EKFParam("a*t", "t", [1.0], q=1e-3, r=0.01, p_init=0.01, gate=3.0)
+    f.update(1.0, 50.0)
+    assert f.p[0] == 1.0
+    assert f.P[0, 0] == pytest.approx(0.011)
+    f.update(1.0, 1.05)
+    assert f.p[0] > 1.0
+
+
+def test_ekf_adapter_forwards_its_settings():
+    """The adapter hands ``q``, ``r``, ``p_init`` and ``gate`` to the filter;
+    fails if any of them is hard-coded back to the tracking default."""
+    ad = EKFAd(PLANTS[0], q=1e-8, r=0.1, p_init=2.0, gate=3.0)
+    assert ad.f.Q[0, 0] == 1e-8
+    assert ad.f.R == 0.1
+    assert ad.f.P[0, 0] == 2.0
+    assert ad.f.gate == 3.0
+    default = EKFAd(PLANTS[0])
+    assert (default.f.Q[0, 0], default.f.R, default.f.P[0, 0], default.f.gate) == (
+        1e-4, 0.5, 5.0, None)
 
 
 def test_drive_scores_past_warmup_only():

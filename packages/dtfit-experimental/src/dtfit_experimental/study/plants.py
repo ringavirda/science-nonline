@@ -233,17 +233,26 @@ class EKFAd(_Ad):
     baseline dtfit's window-image filters are scored against.
 
     Args:
-        plant: An entry of :data:`PLANTS`. The process and measurement
-            noise (``q=1e-4``, ``r=0.5``) and the initial covariance
-            (``p_init=5.0``) are fixed for every plant, not tuned per
-            plant like ``q_diag`` in :data:`PLANTS`.
+        plant: An entry of :data:`PLANTS`.
+        q: Process-noise variance per received sample. The default ``1e-4``
+            is a tracking setting; a plant whose parameters do not move is
+            matched by a value near zero.
+        r: Measurement-noise variance, in the squared unit of the signal.
+            The default ``0.5`` is far above the noise of every plant here
+            and acts as a damping on the first linearizations.
+        p_init: Initial diagonal of the parameter covariance.
+        gate: Innovation gate in predicted standard deviations, ``None``
+            (default) for none; see :class:`EKFParam`.
+
+    The defaults are the same for every plant, not tuned per plant like
+    ``q_diag`` in :data:`PLANTS`.
     """
 
     name = "EKF (params-as-state)"
 
-    def __init__(self, plant):
-        self.f = EKFParam(plant["expr"], "t", list(plant["p0"]), q=1e-4, r=0.5,
-                          p_init=5.0)
+    def __init__(self, plant, *, q=1e-4, r=0.5, p_init=5.0, gate=None):
+        self.f = EKFParam(plant["expr"], "t", list(plant["p0"]), q=q, r=r,
+                          p_init=p_init, gate=gate)
 
     def step(self, t, y):
         self.f.update(t, y)

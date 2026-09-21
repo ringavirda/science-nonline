@@ -713,9 +713,22 @@ class EKFParam:
     for dtfit's streaming equal-areas and Legendre filters, since both track
     the model parameters online; what differs is the measurement, a pointwise
     value here against an integrated area or spectrum for dtfit.
+
+    Args:
+        expr: The model, a SymPy-parsable string in ``var`` and its parameters.
+        var: Name of the independent variable in ``expr``.
+        p0: Initial parameter values, in the sorted order of the parameter names.
+        q: Process-noise variance added to every diagonal entry of ``P`` once
+            per received sample; 0 makes the parameters constants.
+        r: Measurement-noise variance, in the squared unit of ``y``.
+        p_init: Initial diagonal of ``P``.
+        gate: Innovation gate in standard deviations of the predicted
+            innovation, or ``None`` (default) for no gate. A sample whose
+            innovation exceeds ``gate * sqrt(H P H' + r)`` in magnitude gets the
+            time update only: ``P`` grows by ``q`` and the parameters stay.
     """
 
-    def __init__(self, expr, var, p0, *, q=1e-4, r=1.0, p_init=1.0):
+    def __init__(self, expr, var, p0, *, q=1e-4, r=1.0, p_init=1.0, gate=None):
         import sympy as sp
         t = sp.Symbol(var)
         model = sp.sympify(expr)
@@ -728,6 +741,7 @@ class EKFParam:
         self.P = np.eye(n) * float(p_init)
         self.Q = np.eye(n) * float(q)
         self.R = float(r)
+        self.gate = None if gate is None else float(gate)
         self.last_residual_ = float("nan")
 
     def update(self, t, y):
@@ -741,8 +755,10 @@ class EKFParam:
         S = float(H @ self.P @ H + self.R)
         if S <= 0:
             return self
-        K = self.P @ H / S
         innov = float(y) - yhat
+        if self.gate is not None and abs(innov) > self.gate * np.sqrt(S):
+            return self
+        K = self.P @ H / S
         self.p = self.p + K * innov
         self.P = (np.eye(n) - np.outer(K, H)) @ self.P
         self.last_residual_ = innov
