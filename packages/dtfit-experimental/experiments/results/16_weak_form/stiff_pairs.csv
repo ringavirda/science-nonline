@@ -1,0 +1,6 @@
+pair,n,median_err_weak_pct,median_err_good_pct,failures_good
+oscillatory,600,0.509251,0.165593,0
+roots -1 and -10,600,88.3151,1.31254,0
+roots -1 and -10,6000,58.0322,0.295205,0
+roots -1 and -100,600,95.9474,8.92869,0
+roots -1 and -100,20000,95.5476,1.48495,0
