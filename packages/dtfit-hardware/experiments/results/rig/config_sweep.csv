@@ -1,0 +1,517 @@
+method,config,h,rmse,drive
+tracker,order 3 window 8 q 0.01,2,1.46795,5 Hz drive
+tracker,order 3 window 8 q 0.01,3,1.8516,5 Hz drive
+tracker,order 3 window 8 q 0.01,5,2.75269,5 Hz drive
+tracker,order 3 window 8 q 0.01,10,5.47916,5 Hz drive
+tracker,order 3 window 8 q 0.1,2,1.29034,5 Hz drive
+tracker,order 3 window 8 q 0.1,3,1.70343,5 Hz drive
+tracker,order 3 window 8 q 0.1,5,2.63146,5 Hz drive
+tracker,order 3 window 8 q 0.1,10,5.36103,5 Hz drive
+tracker,order 3 window 8 q 1,2,1.33835,5 Hz drive
+tracker,order 3 window 8 q 1,3,1.82604,5 Hz drive
+tracker,order 3 window 8 q 1,5,2.88017,5 Hz drive
+tracker,order 3 window 8 q 1,10,5.83391,5 Hz drive
+tracker,order 3 window 8 q 10,2,1.31868,5 Hz drive
+tracker,order 3 window 8 q 10,3,1.81127,5 Hz drive
+tracker,order 3 window 8 q 10,5,2.87191,5 Hz drive
+tracker,order 3 window 8 q 10,10,5.82986,5 Hz drive
+tracker,order 3 window 12 q 0.01,2,1.61524,5 Hz drive
+tracker,order 3 window 12 q 0.01,3,1.98407,5 Hz drive
+tracker,order 3 window 12 q 0.01,5,2.86991,5 Hz drive
+tracker,order 3 window 12 q 0.01,10,5.58536,5 Hz drive
+tracker,order 3 window 12 q 0.1,2,1.41311,5 Hz drive
+tracker,order 3 window 12 q 0.1,3,1.81927,5 Hz drive
+tracker,order 3 window 12 q 0.1,5,2.75203,5 Hz drive
+tracker,order 3 window 12 q 0.1,10,5.55628,5 Hz drive
+tracker,order 3 window 12 q 1,2,1.37986,5 Hz drive
+tracker,order 3 window 12 q 1,3,1.8221,5 Hz drive
+tracker,order 3 window 12 q 1,5,2.81071,5 Hz drive
+tracker,order 3 window 12 q 1,10,5.69989,5 Hz drive
+tracker,order 3 window 12 q 10,2,1.30373,5 Hz drive
+tracker,order 3 window 12 q 10,3,1.71454,5 Hz drive
+tracker,order 3 window 12 q 10,5,2.64267,5 Hz drive
+tracker,order 3 window 12 q 10,10,5.40547,5 Hz drive
+tracker,order 3 window 28 q 0.01,2,1.78326,5 Hz drive
+tracker,order 3 window 28 q 0.01,3,2.13444,5 Hz drive
+tracker,order 3 window 28 q 0.01,5,3.00204,5 Hz drive
+tracker,order 3 window 28 q 0.01,10,5.66919,5 Hz drive
+tracker,order 3 window 28 q 0.1,2,1.52245,5 Hz drive
+tracker,order 3 window 28 q 0.1,3,1.88694,5 Hz drive
+tracker,order 3 window 28 q 0.1,5,2.76105,5 Hz drive
+tracker,order 3 window 28 q 0.1,10,5.39665,5 Hz drive
+tracker,order 3 window 28 q 1,2,1.55751,5 Hz drive
+tracker,order 3 window 28 q 1,3,1.95435,5 Hz drive
+tracker,order 3 window 28 q 1,5,2.8851,5 Hz drive
+tracker,order 3 window 28 q 1,10,5.67055,5 Hz drive
+tracker,order 3 window 28 q 10,2,1.51878,5 Hz drive
+tracker,order 3 window 28 q 10,3,1.90275,5 Hz drive
+tracker,order 3 window 28 q 10,5,2.81252,5 Hz drive
+tracker,order 3 window 28 q 10,10,5.53511,5 Hz drive
+tracker,order 6 window 8 q 0.01,2,1.5558,5 Hz drive
+tracker,order 6 window 8 q 0.01,3,1.94414,5 Hz drive
+tracker,order 6 window 8 q 0.01,5,2.85955,5 Hz drive
+tracker,order 6 window 8 q 0.01,10,5.61751,5 Hz drive
+tracker,order 6 window 8 q 0.1,2,1.3733,5 Hz drive
+tracker,order 6 window 8 q 0.1,3,1.81591,5 Hz drive
+tracker,order 6 window 8 q 0.1,5,2.80103,5 Hz drive
+tracker,order 6 window 8 q 0.1,10,5.65237,5 Hz drive
+tracker,order 6 window 8 q 1,2,1.29881,5 Hz drive
+tracker,order 6 window 8 q 1,3,1.76956,5 Hz drive
+tracker,order 6 window 8 q 1,5,2.79004,5 Hz drive
+tracker,order 6 window 8 q 1,10,5.66841,5 Hz drive
+tracker,order 6 window 8 q 10,2,1.29264,5 Hz drive
+tracker,order 6 window 8 q 10,3,1.77436,5 Hz drive
+tracker,order 6 window 8 q 10,5,2.81256,5 Hz drive
+tracker,order 6 window 8 q 10,10,5.71864,5 Hz drive
+tracker,order 6 window 12 q 0.01,2,1.57594,5 Hz drive
+tracker,order 6 window 12 q 0.01,3,1.91959,5 Hz drive
+tracker,order 6 window 12 q 0.01,5,2.75892,5 Hz drive
+tracker,order 6 window 12 q 0.01,10,5.37204,5 Hz drive
+tracker,order 6 window 12 q 0.1,2,1.39213,5 Hz drive
+tracker,order 6 window 12 q 0.1,3,1.77516,5 Hz drive
+tracker,order 6 window 12 q 0.1,5,2.6701,5 Hz drive
+tracker,order 6 window 12 q 0.1,10,5.39459,5 Hz drive
+tracker,order 6 window 12 q 1,2,1.31096,5 Hz drive
+tracker,order 6 window 12 q 1,3,1.71134,5 Hz drive
+tracker,order 6 window 12 q 1,5,2.62659,5 Hz drive
+tracker,order 6 window 12 q 1,10,5.36988,5 Hz drive
+tracker,order 6 window 12 q 10,2,1.31116,5 Hz drive
+tracker,order 6 window 12 q 10,3,1.72333,5 Hz drive
+tracker,order 6 window 12 q 10,5,2.65988,5 Hz drive
+tracker,order 6 window 12 q 10,10,5.43119,5 Hz drive
+tracker,order 6 window 28 q 0.01,2,1.73002,5 Hz drive
+tracker,order 6 window 28 q 0.01,3,2.05185,5 Hz drive
+tracker,order 6 window 28 q 0.01,5,2.86281,5 Hz drive
+tracker,order 6 window 28 q 0.01,10,5.4287,5 Hz drive
+tracker,order 6 window 28 q 0.1,2,1.53528,5 Hz drive
+tracker,order 6 window 28 q 0.1,3,1.90744,5 Hz drive
+tracker,order 6 window 28 q 0.1,5,2.79966,5 Hz drive
+tracker,order 6 window 28 q 0.1,10,5.49574,5 Hz drive
+tracker,order 6 window 28 q 1,2,1.61938,5 Hz drive
+tracker,order 6 window 28 q 1,3,2.0303,5 Hz drive
+tracker,order 6 window 28 q 1,5,2.99147,5 Hz drive
+tracker,order 6 window 28 q 1,10,5.84621,5 Hz drive
+tracker,order 6 window 28 q 10,2,1.45831,5 Hz drive
+tracker,order 6 window 28 q 10,3,1.83371,5 Hz drive
+tracker,order 6 window 28 q 10,5,2.72872,5 Hz drive
+tracker,order 6 window 28 q 10,10,5.4298,5 Hz drive
+kalman,q 0.005,2,1.55355,5 Hz drive
+kalman,q 0.005,3,2.08357,5 Hz drive
+kalman,q 0.005,5,3.30533,5 Hz drive
+kalman,q 0.005,10,7.31517,5 Hz drive
+kalman,q 0.015,2,1.47907,5 Hz drive
+kalman,q 0.015,3,2.03854,5 Hz drive
+kalman,q 0.015,5,3.36043,5 Hz drive
+kalman,q 0.015,10,7.93961,5 Hz drive
+kalman,q 0.05,2,1.42688,5 Hz drive
+kalman,q 0.05,3,2.02224,5 Hz drive
+kalman,q 0.05,5,3.45419,5 Hz drive
+kalman,q 0.05,10,8.62279,5 Hz drive
+kalman,q 0.15,2,1.43359,5 Hz drive
+kalman,q 0.15,3,2.0904,5 Hz drive
+kalman,q 0.15,5,3.6965,5 Hz drive
+kalman,q 0.15,10,9.59578,5 Hz drive
+kalman,q 0.5,2,1.48959,5 Hz drive
+kalman,q 0.5,3,2.25058,5 Hz drive
+kalman,q 0.5,5,4.16421,5 Hz drive
+kalman,q 0.5,10,11.3307,5 Hz drive
+kalman,q 1.5,2,1.57735,5 Hz drive
+kalman,q 1.5,3,2.46367,5 Hz drive
+kalman,q 1.5,5,4.75696,5 Hz drive
+kalman,q 1.5,10,13.5839,5 Hz drive
+kalman,q 5,2,1.73284,5 Hz drive
+kalman,q 5,3,2.80765,5 Hz drive
+kalman,q 5,5,5.67056,5 Hz drive
+kalman,q 5,10,17.0284,5 Hz drive
+ct_ekf,q_acc 0.3 q_w 0.08,2,1.56547,5 Hz drive
+ct_ekf,q_acc 0.3 q_w 0.08,3,2.02795,5 Hz drive
+ct_ekf,q_acc 0.3 q_w 0.08,5,3.07938,5 Hz drive
+ct_ekf,q_acc 0.3 q_w 0.08,10,6.49119,5 Hz drive
+ct_ekf,q_acc 0.3 q_w 0.8,2,1.56549,5 Hz drive
+ct_ekf,q_acc 0.3 q_w 0.8,3,2.02795,5 Hz drive
+ct_ekf,q_acc 0.3 q_w 0.8,5,3.07939,5 Hz drive
+ct_ekf,q_acc 0.3 q_w 0.8,10,6.49192,5 Hz drive
+ct_ekf,q_acc 0.3 q_w 8,2,1.5655,5 Hz drive
+ct_ekf,q_acc 0.3 q_w 8,3,2.02795,5 Hz drive
+ct_ekf,q_acc 0.3 q_w 8,5,3.07939,5 Hz drive
+ct_ekf,q_acc 0.3 q_w 8,10,6.492,5 Hz drive
+ct_ekf,q_acc 1 q_w 0.08,2,1.39741,5 Hz drive
+ct_ekf,q_acc 1 q_w 0.08,3,1.85558,5 Hz drive
+ct_ekf,q_acc 1 q_w 0.08,5,2.8941,5 Hz drive
+ct_ekf,q_acc 1 q_w 0.08,10,6.27942,5 Hz drive
+ct_ekf,q_acc 1 q_w 0.8,2,1.39742,5 Hz drive
+ct_ekf,q_acc 1 q_w 0.8,3,1.85558,5 Hz drive
+ct_ekf,q_acc 1 q_w 0.8,5,2.89414,5 Hz drive
+ct_ekf,q_acc 1 q_w 0.8,10,6.28028,5 Hz drive
+ct_ekf,q_acc 1 q_w 8,2,1.39742,5 Hz drive
+ct_ekf,q_acc 1 q_w 8,3,1.85558,5 Hz drive
+ct_ekf,q_acc 1 q_w 8,5,2.89415,5 Hz drive
+ct_ekf,q_acc 1 q_w 8,10,6.28037,5 Hz drive
+ct_ekf,q_acc 3 q_w 0.08,2,1.31866,5 Hz drive
+ct_ekf,q_acc 3 q_w 0.08,3,1.77882,5 Hz drive
+ct_ekf,q_acc 3 q_w 0.08,5,2.81352,5 Hz drive
+ct_ekf,q_acc 3 q_w 0.08,10,6.18393,5 Hz drive
+ct_ekf,q_acc 3 q_w 0.8,2,1.31866,5 Hz drive
+ct_ekf,q_acc 3 q_w 0.8,3,1.77882,5 Hz drive
+ct_ekf,q_acc 3 q_w 0.8,5,2.81358,5 Hz drive
+ct_ekf,q_acc 3 q_w 0.8,10,6.18489,5 Hz drive
+ct_ekf,q_acc 3 q_w 8,2,1.31866,5 Hz drive
+ct_ekf,q_acc 3 q_w 8,3,1.77882,5 Hz drive
+ct_ekf,q_acc 3 q_w 8,5,2.81359,5 Hz drive
+ct_ekf,q_acc 3 q_w 8,10,6.18499,5 Hz drive
+ct_ekf,q_acc 10 q_w 0.08,2,1.2923,5 Hz drive
+ct_ekf,q_acc 10 q_w 0.08,3,1.76746,5 Hz drive
+ct_ekf,q_acc 10 q_w 0.08,5,2.82261,5 Hz drive
+ct_ekf,q_acc 10 q_w 0.08,10,6.20292,5 Hz drive
+ct_ekf,q_acc 10 q_w 0.8,2,1.2923,5 Hz drive
+ct_ekf,q_acc 10 q_w 0.8,3,1.76747,5 Hz drive
+ct_ekf,q_acc 10 q_w 0.8,5,2.8227,5 Hz drive
+ct_ekf,q_acc 10 q_w 0.8,10,6.20397,5 Hz drive
+ct_ekf,q_acc 10 q_w 8,2,1.2923,5 Hz drive
+ct_ekf,q_acc 10 q_w 8,3,1.76747,5 Hz drive
+ct_ekf,q_acc 10 q_w 8,5,2.82271,5 Hz drive
+ct_ekf,q_acc 10 q_w 8,10,6.20408,5 Hz drive
+tracker,order 3 window 8 q 0.01,2,5.33504,walk
+tracker,order 3 window 8 q 0.01,3,6.46191,walk
+tracker,order 3 window 8 q 0.01,5,9.12327,walk
+tracker,order 3 window 8 q 0.01,10,16.7254,walk
+tracker,order 3 window 8 q 0.1,2,4.60241,walk
+tracker,order 3 window 8 q 0.1,3,5.73432,walk
+tracker,order 3 window 8 q 0.1,5,8.36744,walk
+tracker,order 3 window 8 q 0.1,10,15.6811,walk
+tracker,order 3 window 8 q 1,2,5.47279,walk
+tracker,order 3 window 8 q 1,3,7.4214,walk
+tracker,order 3 window 8 q 1,5,11.5415,walk
+tracker,order 3 window 8 q 1,10,22.147,walk
+tracker,order 3 window 8 q 10,2,5.74265,walk
+tracker,order 3 window 8 q 10,3,7.88941,walk
+tracker,order 3 window 8 q 10,5,12.3703,walk
+tracker,order 3 window 8 q 10,10,23.8094,walk
+tracker,order 3 window 12 q 0.01,2,6.33527,walk
+tracker,order 3 window 12 q 0.01,3,7.71574,walk
+tracker,order 3 window 12 q 0.01,5,10.9214,walk
+tracker,order 3 window 12 q 0.01,10,19.948,walk
+tracker,order 3 window 12 q 0.1,2,4.58121,walk
+tracker,order 3 window 12 q 0.1,3,5.69462,walk
+tracker,order 3 window 12 q 0.1,5,8.29597,walk
+tracker,order 3 window 12 q 0.1,10,15.5573,walk
+tracker,order 3 window 12 q 1,2,4.6026,walk
+tracker,order 3 window 12 q 1,3,6.04651,walk
+tracker,order 3 window 12 q 1,5,9.22443,walk
+tracker,order 3 window 12 q 1,10,17.675,walk
+tracker,order 3 window 12 q 10,2,4.71284,walk
+tracker,order 3 window 12 q 10,3,6.2529,walk
+tracker,order 3 window 12 q 10,5,9.60089,walk
+tracker,order 3 window 12 q 10,10,18.4244,walk
+tracker,order 3 window 28 q 0.01,2,6.70862,walk
+tracker,order 3 window 28 q 0.01,3,8.32219,walk
+tracker,order 3 window 28 q 0.01,5,11.9514,walk
+tracker,order 3 window 28 q 0.01,10,21.9082,walk
+tracker,order 3 window 28 q 0.1,2,5.33297,walk
+tracker,order 3 window 28 q 0.1,3,6.42654,walk
+tracker,order 3 window 28 q 0.1,5,9.05881,walk
+tracker,order 3 window 28 q 0.1,10,16.504,walk
+tracker,order 3 window 28 q 1,2,5.10901,walk
+tracker,order 3 window 28 q 1,3,6.43604,walk
+tracker,order 3 window 28 q 1,5,9.44592,walk
+tracker,order 3 window 28 q 1,10,17.7059,walk
+tracker,order 3 window 28 q 10,2,6.27381,walk
+tracker,order 3 window 28 q 10,3,8.25083,walk
+tracker,order 3 window 28 q 10,5,12.5284,walk
+tracker,order 3 window 28 q 10,10,23.7132,walk
+tracker,order 6 window 8 q 0.01,2,6.52071,walk
+tracker,order 6 window 8 q 0.01,3,8.05562,walk
+tracker,order 6 window 8 q 0.01,5,11.5386,walk
+tracker,order 6 window 8 q 0.01,10,21.1593,walk
+tracker,order 6 window 8 q 0.1,2,6.60569,walk
+tracker,order 6 window 8 q 0.1,3,8.55322,walk
+tracker,order 6 window 8 q 0.1,5,12.7602,walk
+tracker,order 6 window 8 q 0.1,10,23.9175,walk
+tracker,order 6 window 8 q 1,2,6.23094,walk
+tracker,order 6 window 8 q 1,3,8.32558,walk
+tracker,order 6 window 8 q 1,5,12.7349,walk
+tracker,order 6 window 8 q 1,10,24.197,walk
+tracker,order 6 window 8 q 10,2,6.16733,walk
+tracker,order 6 window 8 q 10,3,8.31971,walk
+tracker,order 6 window 8 q 10,5,12.8251,walk
+tracker,order 6 window 8 q 10,10,24.4564,walk
+tracker,order 6 window 12 q 0.01,2,5.51213,walk
+tracker,order 6 window 12 q 0.01,3,6.36179,walk
+tracker,order 6 window 12 q 0.01,5,8.51134,walk
+tracker,order 6 window 12 q 0.01,10,15.0336,walk
+tracker,order 6 window 12 q 0.1,2,5.45051,walk
+tracker,order 6 window 12 q 0.1,3,6.9027,walk
+tracker,order 6 window 12 q 0.1,5,10.1653,walk
+tracker,order 6 window 12 q 0.1,10,19.0635,walk
+tracker,order 6 window 12 q 1,2,5.74152,walk
+tracker,order 6 window 12 q 1,3,7.55864,walk
+tracker,order 6 window 12 q 1,5,11.48,walk
+tracker,order 6 window 12 q 1,10,21.8265,walk
+tracker,order 6 window 12 q 10,2,5.67185,walk
+tracker,order 6 window 12 q 10,3,7.50148,walk
+tracker,order 6 window 12 q 10,5,11.4383,walk
+tracker,order 6 window 12 q 10,10,21.7972,walk
+tracker,order 6 window 28 q 0.01,2,6.77656,walk
+tracker,order 6 window 28 q 0.01,3,7.96313,walk
+tracker,order 6 window 28 q 0.01,5,10.8319,walk
+tracker,order 6 window 28 q 0.01,10,19.2125,walk
+tracker,order 6 window 28 q 0.1,2,5.19651,walk
+tracker,order 6 window 28 q 0.1,3,6.27107,walk
+tracker,order 6 window 28 q 0.1,5,8.85074,walk
+tracker,order 6 window 28 q 0.1,10,16.2209,walk
+tracker,order 6 window 28 q 1,2,5.08952,walk
+tracker,order 6 window 28 q 1,3,6.30599,walk
+tracker,order 6 window 28 q 1,5,9.10991,walk
+tracker,order 6 window 28 q 1,10,16.9407,walk
+tracker,order 6 window 28 q 10,2,5.26469,walk
+tracker,order 6 window 28 q 10,3,6.64103,walk
+tracker,order 6 window 28 q 10,5,9.78008,walk
+tracker,order 6 window 28 q 10,10,18.3412,walk
+kalman,q 0.005,2,5.95052,walk
+kalman,q 0.005,3,8.60604,walk
+kalman,q 0.005,5,15.005,walk
+kalman,q 0.005,10,37.6967,walk
+kalman,q 0.015,2,6.11224,walk
+kalman,q 0.015,3,9.12988,walk
+kalman,q 0.015,5,16.6083,walk
+kalman,q 0.015,10,44.0505,walk
+kalman,q 0.05,2,6.45048,walk
+kalman,q 0.05,3,9.99254,walk
+kalman,q 0.05,5,19.0505,walk
+kalman,q 0.05,10,53.4694,walk
+kalman,q 0.15,2,6.95243,walk
+kalman,q 0.15,3,11.1386,walk
+kalman,q 0.15,5,22.1421,walk
+kalman,q 0.15,10,65.2502,walk
+kalman,q 0.5,2,7.80885,walk
+kalman,q 0.5,3,12.9839,walk
+kalman,q 0.5,5,26.9683,walk
+kalman,q 0.5,10,83.4038,walk
+kalman,q 1.5,2,8.98341,walk
+kalman,q 1.5,3,15.4444,walk
+kalman,q 1.5,5,33.317,walk
+kalman,q 1.5,10,107.078,walk
+kalman,q 5,2,10.8967,walk
+kalman,q 5,3,19.3928,walk
+kalman,q 5,5,43.4341,walk
+kalman,q 5,10,144.694,walk
+ct_ekf,q_acc 0.3 q_w 0.08,2,5.42938,walk
+ct_ekf,q_acc 0.3 q_w 0.08,3,7.74101,walk
+ct_ekf,q_acc 0.3 q_w 0.08,5,13.1009,walk
+ct_ekf,q_acc 0.3 q_w 0.08,10,31.1953,walk
+ct_ekf,q_acc 0.3 q_w 0.8,2,5.43008,walk
+ct_ekf,q_acc 0.3 q_w 0.8,3,7.74183,walk
+ct_ekf,q_acc 0.3 q_w 0.8,5,13.1008,walk
+ct_ekf,q_acc 0.3 q_w 0.8,10,31.1975,walk
+ct_ekf,q_acc 0.3 q_w 8,2,5.43015,walk
+ct_ekf,q_acc 0.3 q_w 8,3,7.74191,walk
+ct_ekf,q_acc 0.3 q_w 8,5,13.1008,walk
+ct_ekf,q_acc 0.3 q_w 8,10,31.1977,walk
+ct_ekf,q_acc 1 q_w 0.08,2,5.44254,walk
+ct_ekf,q_acc 1 q_w 0.08,3,7.81736,walk
+ct_ekf,q_acc 1 q_w 0.08,5,13.2152,walk
+ct_ekf,q_acc 1 q_w 0.08,10,31.2955,walk
+ct_ekf,q_acc 1 q_w 0.8,2,5.44311,walk
+ct_ekf,q_acc 1 q_w 0.8,3,7.81774,walk
+ct_ekf,q_acc 1 q_w 0.8,5,13.2134,walk
+ct_ekf,q_acc 1 q_w 0.8,10,31.3015,walk
+ct_ekf,q_acc 1 q_w 8,2,5.44317,walk
+ct_ekf,q_acc 1 q_w 8,3,7.81777,walk
+ct_ekf,q_acc 1 q_w 8,5,13.2132,walk
+ct_ekf,q_acc 1 q_w 8,10,31.3021,walk
+ct_ekf,q_acc 3 q_w 0.08,2,5.52958,walk
+ct_ekf,q_acc 3 q_w 0.08,3,7.95092,walk
+ct_ekf,q_acc 3 q_w 0.08,5,13.2938,walk
+ct_ekf,q_acc 3 q_w 0.08,10,31.17,walk
+ct_ekf,q_acc 3 q_w 0.8,2,5.52975,walk
+ct_ekf,q_acc 3 q_w 0.8,3,7.94995,walk
+ct_ekf,q_acc 3 q_w 0.8,5,13.2879,walk
+ct_ekf,q_acc 3 q_w 0.8,10,31.1797,walk
+ct_ekf,q_acc 3 q_w 8,2,5.52977,walk
+ct_ekf,q_acc 3 q_w 8,3,7.94985,walk
+ct_ekf,q_acc 3 q_w 8,5,13.2873,walk
+ct_ekf,q_acc 3 q_w 8,10,31.1807,walk
+ct_ekf,q_acc 10 q_w 0.08,2,5.73965,walk
+ct_ekf,q_acc 10 q_w 0.08,3,8.20804,walk
+ct_ekf,q_acc 10 q_w 0.08,5,13.3743,walk
+ct_ekf,q_acc 10 q_w 0.08,10,30.7602,walk
+ct_ekf,q_acc 10 q_w 0.8,2,5.73901,walk
+ct_ekf,q_acc 10 q_w 0.8,3,8.2041,walk
+ct_ekf,q_acc 10 q_w 0.8,5,13.3593,walk
+ct_ekf,q_acc 10 q_w 0.8,10,30.7732,walk
+ct_ekf,q_acc 10 q_w 8,2,5.73895,walk
+ct_ekf,q_acc 10 q_w 8,3,8.2037,walk
+ct_ekf,q_acc 10 q_w 8,5,13.3578,walk
+ct_ekf,q_acc 10 q_w 8,10,30.7746,walk
+tracker,order 3 window 8 q 0.01,2,8.92312,1 Hz drive
+tracker,order 3 window 8 q 0.01,3,11.1521,1 Hz drive
+tracker,order 3 window 8 q 0.01,5,16.8117,1 Hz drive
+tracker,order 3 window 8 q 0.01,10,36.3287,1 Hz drive
+tracker,order 3 window 8 q 0.1,2,5.84738,1 Hz drive
+tracker,order 3 window 8 q 0.1,3,8.08949,1 Hz drive
+tracker,order 3 window 8 q 0.1,5,13.6029,1 Hz drive
+tracker,order 3 window 8 q 0.1,10,32.2009,1 Hz drive
+tracker,order 3 window 8 q 1,2,4.66712,1 Hz drive
+tracker,order 3 window 8 q 1,3,6.671,1 Hz drive
+tracker,order 3 window 8 q 1,5,11.6991,1 Hz drive
+tracker,order 3 window 8 q 1,10,29.6292,1 Hz drive
+tracker,order 3 window 8 q 10,2,4.45987,1 Hz drive
+tracker,order 3 window 8 q 10,3,6.44662,1 Hz drive
+tracker,order 3 window 8 q 10,5,11.4809,1 Hz drive
+tracker,order 3 window 8 q 10,10,29.0983,1 Hz drive
+tracker,order 3 window 12 q 0.01,2,11.0421,1 Hz drive
+tracker,order 3 window 12 q 0.01,3,13.4293,1 Hz drive
+tracker,order 3 window 12 q 0.01,5,19.5738,1 Hz drive
+tracker,order 3 window 12 q 0.01,10,40.336,1 Hz drive
+tracker,order 3 window 12 q 0.1,2,6.68012,1 Hz drive
+tracker,order 3 window 12 q 0.1,3,8.81979,1 Hz drive
+tracker,order 3 window 12 q 0.1,5,14.2675,1 Hz drive
+tracker,order 3 window 12 q 0.1,10,33.0178,1 Hz drive
+tracker,order 3 window 12 q 1,2,5.16923,1 Hz drive
+tracker,order 3 window 12 q 1,3,7.10725,1 Hz drive
+tracker,order 3 window 12 q 1,5,12.0952,1 Hz drive
+tracker,order 3 window 12 q 1,10,30.0189,1 Hz drive
+tracker,order 3 window 12 q 10,2,5.02184,1 Hz drive
+tracker,order 3 window 12 q 10,3,6.99278,1 Hz drive
+tracker,order 3 window 12 q 10,5,12.0378,1 Hz drive
+tracker,order 3 window 12 q 10,10,29.9719,1 Hz drive
+tracker,order 3 window 28 q 0.01,2,11.1774,1 Hz drive
+tracker,order 3 window 28 q 0.01,3,13.7852,1 Hz drive
+tracker,order 3 window 28 q 0.01,5,20.123,1 Hz drive
+tracker,order 3 window 28 q 0.01,10,41.0876,1 Hz drive
+tracker,order 3 window 28 q 0.1,2,9.52407,1 Hz drive
+tracker,order 3 window 28 q 0.1,3,11.7235,1 Hz drive
+tracker,order 3 window 28 q 0.1,5,17.4693,1 Hz drive
+tracker,order 3 window 28 q 0.1,10,37.2255,1 Hz drive
+tracker,order 3 window 28 q 1,2,6.48302,1 Hz drive
+tracker,order 3 window 28 q 1,3,8.65577,1 Hz drive
+tracker,order 3 window 28 q 1,5,14.1006,1 Hz drive
+tracker,order 3 window 28 q 1,10,32.9073,1 Hz drive
+tracker,order 3 window 28 q 10,2,6.02819,1 Hz drive
+tracker,order 3 window 28 q 10,3,8.04667,1 Hz drive
+tracker,order 3 window 28 q 10,5,13.2543,1 Hz drive
+tracker,order 3 window 28 q 10,10,31.5916,1 Hz drive
+tracker,order 6 window 8 q 0.01,2,12.0263,1 Hz drive
+tracker,order 6 window 8 q 0.01,3,14.123,1 Hz drive
+tracker,order 6 window 8 q 0.01,5,19.7646,1 Hz drive
+tracker,order 6 window 8 q 0.01,10,39.6589,1 Hz drive
+tracker,order 6 window 8 q 0.1,2,5.85343,1 Hz drive
+tracker,order 6 window 8 q 0.1,3,7.84694,1 Hz drive
+tracker,order 6 window 8 q 0.1,5,13.0358,1 Hz drive
+tracker,order 6 window 8 q 0.1,10,31.3331,1 Hz drive
+tracker,order 6 window 8 q 1,2,4.41892,1 Hz drive
+tracker,order 6 window 8 q 1,3,6.33464,1 Hz drive
+tracker,order 6 window 8 q 1,5,11.2672,1 Hz drive
+tracker,order 6 window 8 q 1,10,28.9622,1 Hz drive
+tracker,order 6 window 8 q 10,2,4.27851,1 Hz drive
+tracker,order 6 window 8 q 10,3,6.18635,1 Hz drive
+tracker,order 6 window 8 q 10,5,11.0922,1 Hz drive
+tracker,order 6 window 8 q 10,10,28.7151,1 Hz drive
+tracker,order 6 window 12 q 0.01,2,14.1235,1 Hz drive
+tracker,order 6 window 12 q 0.01,3,16.2645,1 Hz drive
+tracker,order 6 window 12 q 0.01,5,22.0592,1 Hz drive
+tracker,order 6 window 12 q 0.01,10,42.4434,1 Hz drive
+tracker,order 6 window 12 q 0.1,2,6.503,1 Hz drive
+tracker,order 6 window 12 q 0.1,3,8.55531,1 Hz drive
+tracker,order 6 window 12 q 0.1,5,13.8764,1 Hz drive
+tracker,order 6 window 12 q 0.1,10,32.4156,1 Hz drive
+tracker,order 6 window 12 q 1,2,5.16354,1 Hz drive
+tracker,order 6 window 12 q 1,3,7.08463,1 Hz drive
+tracker,order 6 window 12 q 1,5,12.0768,1 Hz drive
+tracker,order 6 window 12 q 1,10,29.9986,1 Hz drive
+tracker,order 6 window 12 q 10,2,4.96718,1 Hz drive
+tracker,order 6 window 12 q 10,3,6.85324,1 Hz drive
+tracker,order 6 window 12 q 10,5,11.8015,1 Hz drive
+tracker,order 6 window 12 q 10,10,29.634,1 Hz drive
+tracker,order 6 window 28 q 0.01,2,12.3254,1 Hz drive
+tracker,order 6 window 28 q 0.01,3,15.1986,1 Hz drive
+tracker,order 6 window 28 q 0.01,5,22.2799,1 Hz drive
+tracker,order 6 window 28 q 0.01,10,44.9003,1 Hz drive
+tracker,order 6 window 28 q 0.1,2,7.8259,1 Hz drive
+tracker,order 6 window 28 q 0.1,3,9.96438,1 Hz drive
+tracker,order 6 window 28 q 0.1,5,15.5217,1 Hz drive
+tracker,order 6 window 28 q 0.1,10,34.6094,1 Hz drive
+tracker,order 6 window 28 q 1,2,6.80765,1 Hz drive
+tracker,order 6 window 28 q 1,3,8.74883,1 Hz drive
+tracker,order 6 window 28 q 1,5,13.8436,1 Hz drive
+tracker,order 6 window 28 q 1,10,32.2664,1 Hz drive
+tracker,order 6 window 28 q 10,2,6.6025,1 Hz drive
+tracker,order 6 window 28 q 10,3,8.5254,1 Hz drive
+tracker,order 6 window 28 q 10,5,13.627,1 Hz drive
+tracker,order 6 window 28 q 10,10,31.9469,1 Hz drive
+kalman,q 0.005,2,4.21637,1 Hz drive
+kalman,q 0.005,3,6.49462,1 Hz drive
+kalman,q 0.005,5,12.4545,1 Hz drive
+kalman,q 0.005,10,36.6074,1 Hz drive
+kalman,q 0.015,2,3.82755,1 Hz drive
+kalman,q 0.015,3,6.06067,1 Hz drive
+kalman,q 0.015,5,11.986,1 Hz drive
+kalman,q 0.015,10,36.1975,1 Hz drive
+kalman,q 0.05,2,3.6413,1 Hz drive
+kalman,q 0.05,3,5.93041,1 Hz drive
+kalman,q 0.05,5,12.1284,1 Hz drive
+kalman,q 0.05,10,37.4561,1 Hz drive
+kalman,q 0.15,2,3.64548,1 Hz drive
+kalman,q 0.15,3,6.08153,1 Hz drive
+kalman,q 0.15,5,12.7872,1 Hz drive
+kalman,q 0.15,10,40.3377,1 Hz drive
+kalman,q 0.5,2,3.84579,1 Hz drive
+kalman,q 0.5,3,6.5901,1 Hz drive
+kalman,q 0.5,5,14.2286,1 Hz drive
+kalman,q 0.5,10,45.9383,1 Hz drive
+kalman,q 1.5,2,4.22576,1 Hz drive
+kalman,q 1.5,3,7.42923,1 Hz drive
+kalman,q 1.5,5,16.4336,1 Hz drive
+kalman,q 1.5,10,54.1525,1 Hz drive
+kalman,q 5,2,4.9094,1 Hz drive
+kalman,q 5,3,8.87707,1 Hz drive
+kalman,q 5,5,20.1707,1 Hz drive
+kalman,q 5,10,68.0114,1 Hz drive
+ct_ekf,q_acc 0.3 q_w 0.08,2,4.0021,1 Hz drive
+ct_ekf,q_acc 0.3 q_w 0.08,3,6.00168,1 Hz drive
+ct_ekf,q_acc 0.3 q_w 0.08,5,11.0071,1 Hz drive
+ct_ekf,q_acc 0.3 q_w 0.08,10,29.6765,1 Hz drive
+ct_ekf,q_acc 0.3 q_w 0.8,2,4.00212,1 Hz drive
+ct_ekf,q_acc 0.3 q_w 0.8,3,6.00152,1 Hz drive
+ct_ekf,q_acc 0.3 q_w 0.8,5,11.0067,1 Hz drive
+ct_ekf,q_acc 0.3 q_w 0.8,10,29.6788,1 Hz drive
+ct_ekf,q_acc 0.3 q_w 8,2,4.00212,1 Hz drive
+ct_ekf,q_acc 0.3 q_w 8,3,6.00151,1 Hz drive
+ct_ekf,q_acc 0.3 q_w 8,5,11.0067,1 Hz drive
+ct_ekf,q_acc 0.3 q_w 8,10,29.679,1 Hz drive
+ct_ekf,q_acc 1 q_w 0.08,2,3.45427,1 Hz drive
+ct_ekf,q_acc 1 q_w 0.08,3,5.34788,1 Hz drive
+ct_ekf,q_acc 1 q_w 0.08,5,10.181,1 Hz drive
+ct_ekf,q_acc 1 q_w 0.08,10,28.5882,1 Hz drive
+ct_ekf,q_acc 1 q_w 0.8,2,3.45432,1 Hz drive
+ct_ekf,q_acc 1 q_w 0.8,3,5.34778,1 Hz drive
+ct_ekf,q_acc 1 q_w 0.8,5,10.1808,1 Hz drive
+ct_ekf,q_acc 1 q_w 0.8,10,28.5908,1 Hz drive
+ct_ekf,q_acc 1 q_w 8,2,3.45432,1 Hz drive
+ct_ekf,q_acc 1 q_w 8,3,5.34777,1 Hz drive
+ct_ekf,q_acc 1 q_w 8,5,10.1808,1 Hz drive
+ct_ekf,q_acc 1 q_w 8,10,28.5911,1 Hz drive
+ct_ekf,q_acc 3 q_w 0.08,2,3.18898,1 Hz drive
+ct_ekf,q_acc 3 q_w 0.08,3,5.01414,1 Hz drive
+ct_ekf,q_acc 3 q_w 0.08,5,9.72724,1 Hz drive
+ct_ekf,q_acc 3 q_w 0.08,10,27.9376,1 Hz drive
+ct_ekf,q_acc 3 q_w 0.8,2,3.18901,1 Hz drive
+ct_ekf,q_acc 3 q_w 0.8,3,5.01403,1 Hz drive
+ct_ekf,q_acc 3 q_w 0.8,5,9.72707,1 Hz drive
+ct_ekf,q_acc 3 q_w 0.8,10,27.9405,1 Hz drive
+ct_ekf,q_acc 3 q_w 8,2,3.18901,1 Hz drive
+ct_ekf,q_acc 3 q_w 8,3,5.01401,1 Hz drive
+ct_ekf,q_acc 3 q_w 8,5,9.72705,1 Hz drive
+ct_ekf,q_acc 3 q_w 8,10,27.9408,1 Hz drive
+ct_ekf,q_acc 10 q_w 0.08,2,3.09947,1 Hz drive
+ct_ekf,q_acc 10 q_w 0.08,3,4.89134,1 Hz drive
+ct_ekf,q_acc 10 q_w 0.08,5,9.52703,1 Hz drive
+ct_ekf,q_acc 10 q_w 0.08,10,27.6021,1 Hz drive
+ct_ekf,q_acc 10 q_w 0.8,2,3.09948,1 Hz drive
+ct_ekf,q_acc 10 q_w 0.8,3,4.89121,1 Hz drive
+ct_ekf,q_acc 10 q_w 0.8,5,9.52693,1 Hz drive
+ct_ekf,q_acc 10 q_w 0.8,10,27.6056,1 Hz drive
+ct_ekf,q_acc 10 q_w 8,2,3.09948,1 Hz drive
+ct_ekf,q_acc 10 q_w 8,3,4.8912,1 Hz drive
+ct_ekf,q_acc 10 q_w 8,5,9.52693,1 Hz drive
+ct_ekf,q_acc 10 q_w 8,10,27.6059,1 Hz drive

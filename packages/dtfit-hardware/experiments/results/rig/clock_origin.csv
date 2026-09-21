@@ -1,0 +1,121 @@
+method,config,h,rmse,drive,shift_s
+tracker,order 6 window 28 q 0.01,2,1.73002,5 Hz drive,0
+tracker,order 6 window 28 q 0.01,3,2.05185,5 Hz drive,0
+tracker,order 6 window 28 q 0.01,5,2.86281,5 Hz drive,0
+tracker,order 6 window 28 q 0.01,10,5.4287,5 Hz drive,0
+tracker,order 3 window 12 q 1,2,1.37986,5 Hz drive,0
+tracker,order 3 window 12 q 1,3,1.8221,5 Hz drive,0
+tracker,order 3 window 12 q 1,5,2.81071,5 Hz drive,0
+tracker,order 3 window 12 q 1,10,5.69989,5 Hz drive,0
+tracker,order 6 window 28 q 0.01,2,1.70379,5 Hz drive,1000
+tracker,order 6 window 28 q 0.01,3,2.0404,5 Hz drive,1000
+tracker,order 6 window 28 q 0.01,5,2.87176,5 Hz drive,1000
+tracker,order 6 window 28 q 0.01,10,5.48958,5 Hz drive,1000
+tracker,order 3 window 12 q 1,2,1.3789,5 Hz drive,1000
+tracker,order 3 window 12 q 1,3,1.81948,5 Hz drive,1000
+tracker,order 3 window 12 q 1,5,2.8031,5 Hz drive,1000
+tracker,order 3 window 12 q 1,10,5.68958,5 Hz drive,1000
+tracker,order 6 window 28 q 0.01,2,1.79227,5 Hz drive,3000
+tracker,order 6 window 28 q 0.01,3,2.15571,5 Hz drive,3000
+tracker,order 6 window 28 q 0.01,5,3.03945,5 Hz drive,3000
+tracker,order 6 window 28 q 0.01,10,5.7648,5 Hz drive,3000
+tracker,order 3 window 12 q 1,2,1.3549,5 Hz drive,3000
+tracker,order 3 window 12 q 1,3,1.77648,5 Hz drive,3000
+tracker,order 3 window 12 q 1,5,2.72804,5 Hz drive,3000
+tracker,order 3 window 12 q 1,10,5.54928,5 Hz drive,3000
+tracker,order 6 window 28 q 0.01,2,1.81623,5 Hz drive,5000
+tracker,order 6 window 28 q 0.01,3,2.16951,5 Hz drive,5000
+tracker,order 6 window 28 q 0.01,5,3.0442,5 Hz drive,5000
+tracker,order 6 window 28 q 0.01,10,5.73772,5 Hz drive,5000
+tracker,order 3 window 12 q 1,2,2.93057,5 Hz drive,5000
+tracker,order 3 window 12 q 1,3,3.55346,5 Hz drive,5000
+tracker,order 3 window 12 q 1,5,5.00336,5 Hz drive,5000
+tracker,order 3 window 12 q 1,10,9.19338,5 Hz drive,5000
+tracker,order 6 window 28 q 0.01,2,8.90631,5 Hz drive,10000
+tracker,order 6 window 28 q 0.01,3,10.4457,5 Hz drive,10000
+tracker,order 6 window 28 q 0.01,5,14.1035,5 Hz drive,10000
+tracker,order 6 window 28 q 0.01,10,24.5147,5 Hz drive,10000
+tracker,order 3 window 12 q 1,2,1.4961,5 Hz drive,10000
+tracker,order 3 window 12 q 1,3,1.9171,5 Hz drive,10000
+tracker,order 3 window 12 q 1,5,2.88257,5 Hz drive,10000
+tracker,order 3 window 12 q 1,10,5.761,5 Hz drive,10000
+tracker,order 6 window 28 q 0.01,2,6.77656,walk,0
+tracker,order 6 window 28 q 0.01,3,7.96313,walk,0
+tracker,order 6 window 28 q 0.01,5,10.8319,walk,0
+tracker,order 6 window 28 q 0.01,10,19.2125,walk,0
+tracker,order 6 window 8 q 10,2,6.16733,walk,0
+tracker,order 6 window 8 q 10,3,8.31971,walk,0
+tracker,order 6 window 8 q 10,5,12.8251,walk,0
+tracker,order 6 window 8 q 10,10,24.4564,walk,0
+tracker,order 6 window 28 q 0.01,2,6.67159,walk,1000
+tracker,order 6 window 28 q 0.01,3,7.7252,walk,1000
+tracker,order 6 window 28 q 0.01,5,10.3284,walk,1000
+tracker,order 6 window 28 q 0.01,10,18.0978,walk,1000
+tracker,order 6 window 8 q 10,2,6.2934,walk,1000
+tracker,order 6 window 8 q 10,3,8.47421,walk,1000
+tracker,order 6 window 8 q 10,5,13.0357,walk,1000
+tracker,order 6 window 8 q 10,10,24.8259,walk,1000
+tracker,order 6 window 28 q 0.01,2,6.64413,walk,3000
+tracker,order 6 window 28 q 0.01,3,7.68852,walk,3000
+tracker,order 6 window 28 q 0.01,5,10.2744,walk,3000
+tracker,order 6 window 28 q 0.01,10,17.9971,walk,3000
+tracker,order 6 window 8 q 10,2,6.28875,walk,3000
+tracker,order 6 window 8 q 10,3,8.4672,walk,3000
+tracker,order 6 window 8 q 10,5,13.0241,walk,3000
+tracker,order 6 window 8 q 10,10,24.8032,walk,3000
+tracker,order 6 window 28 q 0.01,2,6.65901,walk,5000
+tracker,order 6 window 28 q 0.01,3,7.70706,walk,5000
+tracker,order 6 window 28 q 0.01,5,10.3029,walk,5000
+tracker,order 6 window 28 q 0.01,10,18.0537,walk,5000
+tracker,order 6 window 8 q 10,2,6.28734,walk,5000
+tracker,order 6 window 8 q 10,3,8.46512,walk,5000
+tracker,order 6 window 8 q 10,5,13.0206,walk,5000
+tracker,order 6 window 8 q 10,10,24.7964,walk,5000
+tracker,order 6 window 28 q 0.01,2,6.65279,walk,10000
+tracker,order 6 window 28 q 0.01,3,7.70073,walk,10000
+tracker,order 6 window 28 q 0.01,5,10.2944,walk,10000
+tracker,order 6 window 28 q 0.01,10,18.0453,walk,10000
+tracker,order 6 window 8 q 10,2,6.2851,walk,10000
+tracker,order 6 window 8 q 10,3,8.46183,walk,10000
+tracker,order 6 window 8 q 10,5,13.0152,walk,10000
+tracker,order 6 window 8 q 10,10,24.7857,walk,10000
+tracker,order 6 window 28 q 0.01,2,12.3254,1 Hz drive,0
+tracker,order 6 window 28 q 0.01,3,15.1986,1 Hz drive,0
+tracker,order 6 window 28 q 0.01,5,22.2799,1 Hz drive,0
+tracker,order 6 window 28 q 0.01,10,44.9003,1 Hz drive,0
+tracker,order 3 window 8 q 0.1,2,5.84738,1 Hz drive,0
+tracker,order 3 window 8 q 0.1,3,8.08949,1 Hz drive,0
+tracker,order 3 window 8 q 0.1,5,13.6029,1 Hz drive,0
+tracker,order 3 window 8 q 0.1,10,32.2009,1 Hz drive,0
+tracker,order 6 window 28 q 0.01,2,17.4396,1 Hz drive,1000
+tracker,order 6 window 28 q 0.01,3,19.2269,1 Hz drive,1000
+tracker,order 6 window 28 q 0.01,5,24.3682,1 Hz drive,1000
+tracker,order 6 window 28 q 0.01,10,43.6435,1 Hz drive,1000
+tracker,order 3 window 8 q 0.1,2,5.71654,1 Hz drive,1000
+tracker,order 3 window 8 q 0.1,3,7.80482,1 Hz drive,1000
+tracker,order 3 window 8 q 0.1,5,13.0892,1 Hz drive,1000
+tracker,order 3 window 8 q 0.1,10,31.4705,1 Hz drive,1000
+tracker,order 6 window 28 q 0.01,2,12.8312,1 Hz drive,3000
+tracker,order 6 window 28 q 0.01,3,15.6659,1 Hz drive,3000
+tracker,order 6 window 28 q 0.01,5,22.7111,1 Hz drive,3000
+tracker,order 6 window 28 q 0.01,10,45.4237,1 Hz drive,3000
+tracker,order 3 window 8 q 0.1,2,5.81418,1 Hz drive,3000
+tracker,order 3 window 8 q 0.1,3,7.95646,1 Hz drive,3000
+tracker,order 3 window 8 q 0.1,5,13.3265,1 Hz drive,3000
+tracker,order 3 window 8 q 0.1,10,31.8231,1 Hz drive,3000
+tracker,order 6 window 28 q 0.01,2,13.1096,1 Hz drive,5000
+tracker,order 6 window 28 q 0.01,3,15.9182,1 Hz drive,5000
+tracker,order 6 window 28 q 0.01,5,22.9246,1 Hz drive,5000
+tracker,order 6 window 28 q 0.01,10,45.5738,1 Hz drive,5000
+tracker,order 3 window 8 q 0.1,2,6.21612,1 Hz drive,5000
+tracker,order 3 window 8 q 0.1,3,8.45389,1 Hz drive,5000
+tracker,order 3 window 8 q 0.1,5,13.9888,1 Hz drive,5000
+tracker,order 3 window 8 q 0.1,10,32.8266,1 Hz drive,5000
+tracker,order 6 window 28 q 0.01,2,23.9023,1 Hz drive,10000
+tracker,order 6 window 28 q 0.01,3,26.5092,1 Hz drive,10000
+tracker,order 6 window 28 q 0.01,5,33.0896,1 Hz drive,10000
+tracker,order 6 window 28 q 0.01,10,57.4238,1 Hz drive,10000
+tracker,order 3 window 8 q 0.1,2,5.90898,1 Hz drive,10000
+tracker,order 3 window 8 q 0.1,3,8.09654,1 Hz drive,10000
+tracker,order 3 window 8 q 0.1,5,13.545,1 Hz drive,10000
+tracker,order 3 window 8 q 0.1,10,32.18,1 Hz drive,10000
