@@ -1,0 +1,31 @@
+estimator,burst,rmse_ratio
+NLLS,1,16.4163
+soft_l1 (pointwise),1,1.96202
+Legendre,1,16.5988
+Legendre robust,1,1.18002
+block,1,16.9833
+block robust,1,1.20138
+NLLS,5,17.2561
+soft_l1 (pointwise),5,1.9018
+Legendre,5,17.0349
+Legendre robust,5,1.19479
+block,5,16.7957
+block robust,5,1.55826
+NLLS,10,15.064
+soft_l1 (pointwise),10,1.67933
+Legendre,10,15.0311
+Legendre robust,10,1.18017
+block,10,14.4145
+block robust,10,2.14004
+NLLS,20,17.2823
+soft_l1 (pointwise),20,2.63799
+Legendre,20,17.5443
+Legendre robust,20,1.34529
+block,20,17.4673
+block robust,20,3.92891
+NLLS,40,8.65258
+soft_l1 (pointwise),40,1.53024
+Legendre,40,8.77758
+Legendre robust,40,1.32146
+block,40,8.25299
+block robust,40,3.49774

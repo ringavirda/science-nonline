@@ -13,7 +13,6 @@ notebook in Jupyter and re-run it, or execute it headless with
 |---|---|---|
 | 1 | Control-systems system identification | [01_control_systems.ipynb](01_control_systems/01_control_systems.ipynb) |
 | 2 | Big data / streaming (scaling law) | [02_big_data_streaming.ipynb](02_big_data_streaming/02_big_data_streaming.ipynb) |
-| 3 | Noise & robustness sweep | [03_noise_robustness.ipynb](03_noise_robustness/03_noise_robustness.ipynb) |
 | 4 | Real-world forecasting (train/holdout) | [04_realworld_forecasting.ipynb](04_realworld_forecasting/04_realworld_forecasting.ipynb) |
 | 5 | GPS positioning & trajectory forecast | [05_gps_trajectory.ipynb](05_gps_trajectory/05_gps_trajectory.ipynb) |
 | 6 | LTSF benchmark vs published R&D results | [06_benchmark_ltsf.ipynb](06_benchmark_ltsf/06_benchmark_ltsf.ipynb) |

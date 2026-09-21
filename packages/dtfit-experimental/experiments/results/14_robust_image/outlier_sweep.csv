@@ -1,0 +1,25 @@
+estimator,fraction,param_error_pct
+NLLS,0,0.401931
+soft_l1 (pointwise),0,0.394094
+Legendre,0,0.397937
+Legendre robust,0,0.402886
+block,0,0.43768
+block robust,0,0.359
+NLLS,0.05,4.87699
+soft_l1 (pointwise),0.05,0.486309
+Legendre,0.05,4.86516
+Legendre robust,0.05,0.410608
+block,0.05,5.09298
+block robust,0.05,0.398747
+NLLS,0.1,5.29651
+soft_l1 (pointwise),0.1,0.646817
+Legendre,0.1,5.1147
+Legendre robust,0.1,0.437249
+block,0.1,4.7697
+block robust,0.1,0.454079
+NLLS,0.2,8.79939
+soft_l1 (pointwise),0.2,0.895886
+Legendre,0.2,8.81113
+Legendre robust,0.2,0.408051
+block,0.2,8.33864
+block robust,0.2,0.652694

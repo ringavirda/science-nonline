@@ -1,0 +1,6 @@
+seed_block,Legendre cost,Legendre draws above one,block cost,block draws above one
+0,1.01538,32,1.0322,37
+60,1.02903,30,1.03772,34
+120,1.0066,35,0.99935,30
+180,1.0138,28,1.02141,32
+240,1.0399,35,1.06149,35
