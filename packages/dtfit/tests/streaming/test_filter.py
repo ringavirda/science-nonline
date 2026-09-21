@@ -555,6 +555,53 @@ def test_inflate_scales_covariance_for_both_filters():
         assert np.allclose(flt.P, p0 * 7.0 * 50.0)
 
 
+def _grown_line_filter(drift_reset):
+    rng = np.random.default_rng(0)
+    t = np.linspace(0, 20, 400)
+    y = 2.0 + 0.5 * t + rng.normal(0, 0.05, t.size)
+    flt = LSI("c0 + c1*t", "t", p0=[2.0, 0.5], window_size=40, order=3,
+              q_diag=[1e-3, 1e-3], drift_inflation=50.0,
+              drift_reset=drift_reset)
+    for i in range(300):
+        flt.partial_fit(t[i], y[i])
+    return flt, t, y
+
+
+def test_rearm_inflates_collapses_and_keeps_the_samples():
+    """Under ``drift_reset="inflate"`` ``rearm`` does what the filter's own
+    detection does, without recording a detection. Fails if ``rearm``
+    leaves ``P`` alone, leaves the adaptive window at its grown length,
+    drops the samples, keeps the detector's baselines, or raises the drift
+    flag or count."""
+    flt, _t, _y = _grown_line_filter("inflate")
+    assert flt._W_eff > flt.min_window and flt.detector.n_tests_ > 0
+    p_before, held = flt.P.copy(), len(flt._t)
+    flt.rearm()
+    assert np.allclose(flt.P, p_before * 50.0)
+    assert flt._W_eff == flt.min_window
+    assert len(flt._t) == held
+    assert flt.detector.n_tests_ == 0
+    assert not flt.drift_flag_ and flt.n_drifts_ == 0
+
+
+def test_rearm_full_clears_the_window_and_measures_again():
+    """Under ``drift_reset="full"`` ``rearm`` resets ``P`` and empties the
+    window, and the filter measures again once ``min_window`` samples have
+    arrived. Fails if the samples survive the re-arm, if ``P`` is inflated
+    rather than reset, or if the filter measures on fewer than
+    ``min_window`` samples afterwards."""
+    flt, t, y = _grown_line_filter("full")
+    p_init = flt._p_init.copy()
+    flt.rearm()
+    assert len(flt._t) == 0 and np.allclose(flt.P, p_init)
+    held = flt.p.copy()
+    for i in range(300, 300 + flt.min_window - 1):
+        flt.partial_fit(t[i], y[i])
+    assert np.array_equal(flt.p, held)
+    flt.partial_fit(t[300 + flt.min_window - 1], y[300 + flt.min_window - 1])
+    assert not np.array_equal(flt.p, held)
+
+
 # Robust mode: in-window residual winsorization rejects gross outliers.
 def _outlier_sine(seed, frac):
     rng = np.random.default_rng(seed)

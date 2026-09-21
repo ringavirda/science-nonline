@@ -57,6 +57,11 @@ carry breaking changes, and each one is listed explicitly under **Changed**.
   the ranking its samples would.
 - `dtfit.models` exports the shared input seam: `resolve_model`, `ModelSpec`,
   `result_kwargs`, `normalize_p0`, `normalize_bounds`.
+- `ImageFilter.rearm()`: the filter's own re-arm (its `drift_reset` applied
+  to `P` and the window, the adaptive window collapsed, the detector's
+  baselines and stride restarted) as a hook for an external change detector
+  that tests more often than once per window; `inflate()` still touches `P`
+  alone.
 
 ### Changed
 

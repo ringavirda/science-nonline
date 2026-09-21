@@ -72,6 +72,13 @@ multiplies `P` by `drift_inflation` and keeps the window; `"full"` resets
 window collapses to `min_window` and the detector's own baselines
 restart.
 
+The test runs once per window, so its reaction time depends on where in
+that stride a change lands, and under the adaptive window a change can be
+absorbed before the next test. A caller that needs a bounded reaction time
+tests `nis_` on every sample against a chi-square threshold with `n_coef`
+degrees of freedom and calls `rearm()` on a crossing, which applies the
+same re-arm; `inflate()` re-arms `P` alone and keeps the window.
+
 ## The adaptive window
 
 `adaptive_window=True` (the default) sizes the window from the data: it

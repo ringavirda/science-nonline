@@ -93,7 +93,14 @@ only pass overrides:
   `P`, growing with the gap length. Raises for a callable model or a
   regressor model.
 - `inflate(factor=None) -> None` -- multiply `P` by `factor` (default
-  `drift_inflation`); the hook for an external change detector.
+  `drift_inflation`); the hook for an external change detector that keeps
+  the window.
+- `rearm() -> None` -- re-arm as after a detection by the filter's own
+  detector: apply `drift_reset` to `P` and the window, collapse the
+  adaptive window to `min_window`, restart the detector's baselines and
+  stride. `drift_flag_`, `n_drifts_` and `last_drift_direction_` are left
+  untouched. The hook for an external change detector that tests more often
+  than once per window.
 
 **Attributes**
 

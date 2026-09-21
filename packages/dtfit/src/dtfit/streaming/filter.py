@@ -509,9 +509,9 @@ class ImageFilter:
 
     update = partial_fit
 
-    def _on_drift(self, up: bool) -> None:
-        """Re-arm after a detection: inflate or reset ``P``, collapse the
-        adaptive window and its sizing state, restart the stride."""
+    def _rearm(self) -> None:
+        """Inflate or reset ``P``, collapse the adaptive window and its
+        sizing state, restart the stride."""
         if self.drift_reset == "inflate":
             self.P = self.P * self.drift_inflation
         else:
@@ -520,16 +520,39 @@ class ImageFilter:
         self._W_eff = self.min_window
         self._resid_corr = 0.0
         self._n_full = 0
+
+    def _on_drift(self, up: bool) -> None:
+        """Re-arm after a detection by the filter's own detector and
+        record it."""
+        self._rearm()
         self.n_drifts_ = self.detector.n_drifts_
         self.drift_flag_ = True
         self.last_drift_direction_ = 1 if up else -1
 
     def inflate(self, factor: float | None = None) -> None:
         """Multiply ``P`` by ``factor`` (default ``drift_inflation``) so new
-        data dominates: the hook for an external change detector."""
+        data dominates: the hook for an external change detector that
+        keeps the window. :meth:`rearm` also drops what the window holds
+        from before the change."""
         self.P = self.P * (
             self.drift_inflation if factor is None else float(factor)
         )
+
+    def rearm(self) -> None:
+        """Re-arm as after a detection by the filter's own detector: the
+        hook for an external change detector that tests more often than
+        once per window.
+
+        ``drift_reset="inflate"`` multiplies ``P`` by ``drift_inflation``
+        and keeps the samples; ``"full"`` resets ``P`` to its initial value
+        and clears the window, so the filter measures again once
+        ``min_window`` new samples have arrived. Either way the adaptive
+        window collapses to ``min_window`` and the filter's own detector
+        forgets its baselines and restarts its stride. ``drift_flag_``,
+        ``n_drifts_`` and ``last_drift_direction_`` are left untouched.
+        """
+        self._rearm()
+        self.detector.reset()
 
     @property
     def _anchor(self) -> float | None:
