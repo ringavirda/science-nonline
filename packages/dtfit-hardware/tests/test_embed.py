@@ -118,6 +118,7 @@ def test_embed_names_no_retired_symbol() -> None:
     # removed-surface names may reappear in the host glue.
     import dtfit_hardware.compare_real as CR
     import dtfit_hardware.backend as BK
+    from dtfit_hardware.tools import make_replay
     from pathlib import Path
 
     retired = (
@@ -127,7 +128,7 @@ def test_embed_names_no_retired_symbol() -> None:
         "active_ratio", "f_scale", "adapt_r", "adapt_noise",
         "param_cov_", "stderr_",
     )
-    for mod in (CR, BK, embed_lsi):
+    for mod in (CR, BK, embed_lsi, make_replay):
         text = Path(mod.__file__).read_text(encoding="utf-8")
         hits = [s for s in retired if s in text]
         assert not hits, f"{mod.__name__} names retired symbols: {hits}"

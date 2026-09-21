@@ -337,7 +337,7 @@ def _gap_mask(n, gap=15, period=80):
 
 def _cv_replay(t, fixes_en, rest=None):
     """Float64 replay of the on-MCU model for the precision diff: per-axis
-    degree-1 LSI (``c0 + c1*t``) over a 15-sample window, roughly what
+    degree-1 Legendre (``c0 + c1*t``) over a 15-sample window, roughly what
     ``nano_lsi_log`` computes on-chip. It is not the cubic GPS-only tracker.
 
     Window and degree match the chip. The Legendre spectral ``order`` here is 4
@@ -375,9 +375,9 @@ def _glitch_mc(t, fixes, imu, have_imu, n, idx, *, n_seeds=25, frac=0.05, mag=25
     tracker's smoothed estimate at the spiked samples against the clean fix.
     Returns ``[(name, (mean_rmse, p95_rmse)), ...]``."""
     trackers = [
-        ("dtfit LSI robust (GPS-only)",
+        ("dtfit Legendre robust (GPS-only)",
          lambda fg: G.dtfit_track(t, fg, (1,), kind="lsi", robust=True)[0]),
-        ("dtfit LSI plain (GPS-only)",
+        ("dtfit Legendre plain (GPS-only)",
          lambda fg: G.dtfit_track(t, fg, (1,), kind="lsi", robust=False)[0]),
         ("Kalman-CA (GPS-only)",
          lambda fg: G.kalman_track(t, fg, (1,))[0]),
@@ -434,7 +434,7 @@ def report(path: str, h: int = 10, gap: int = 15) -> str:
     # (A) forecast RMSE: predict h ahead, score against the real future fix.
     # Every IMU row is judged against the matched S=0 control, pure GPS through
     # the same imu_lsi_track engine, rather than the differently configured
-    # LSI-cubic row. Otherwise a harness-config difference (cubic against the
+    # Legendre-cubic row. Otherwise a harness-config difference (cubic against the
     # engine's quadratic drift) could pass for an IMU gain. The motion-only
     # column is the honest discriminator, since a static rig rewards "stay put"
     # whatever the IMU did.
@@ -448,22 +448,22 @@ def report(path: str, h: int = 10, gap: int = 15) -> str:
     # coast=True dead-reckons the cubic at constant velocity off its window
     # instead of evaluating it directly, because a raw cubic diverges past the
     # window: 143 m at a 25-step gap against 104 m coasted. See dtfit_track.
-    rows.append(("dtfit LSI-cubic (GPS-only, CV-coast)",
+    rows.append(("dtfit Legendre-cubic (GPS-only, CV-coast)",
                  *_fwd(G.dtfit_track(t, fixes, (h,), kind="lsi", coast=True)[1][h])))
     rows.append(("Kalman-CA (GPS-only)", *_fwd(G.kalman_track(t, fixes, (h,))[1][h])))
     ctrl_a = ctrl_m = gg_a = gg_m = float("nan")
     if have_imu:
         ctrl_a, ctrl_m = _fwd(G.imu_lsi_track(t, fixes, gy3, ac3, R0, (h,), S=z3)[1][h])
-        rows.append(("dtfit IMU-LSI S=0 control (matched)", ctrl_a, ctrl_m))
+        rows.append(("dtfit IMU-Legendre S=0 control (matched)", ctrl_a, ctrl_m))
         Sg, wg = gyro_gated_basis(t, fixes, imu)
         gg_a, gg_m = _fwd(G.imu_lsi_track(t, fixes, gy3, ac3, R0, (h,), S=Sg)[1][h])
-        rows.append(("dtfit IMU-LSI gyro-gated (GPS+gyro)", gg_a, gg_m))
+        rows.append(("dtfit IMU-Legendre gyro-gated (GPS+gyro)", gg_a, gg_m))
         cm_a = cm_m = float("nan")
         if imu.get("mag_heading") is not None:
             Sgm, _ = gyro_gated_basis(t, fixes, imu, mag_heading=imu["mag_heading"])
             cm_a, cm_m = _fwd(G.imu_lsi_track(t, fixes, gy3, ac3, R0, (h,), S=Sgm)[1][h])
-            rows.append(("dtfit IMU-LSI gyro+compass (GPS+gyro+mag)", cm_a, cm_m))
-        rows.append(("dtfit IMU-LSI+ZUPT accel-strapdown",
+            rows.append(("dtfit IMU-Legendre gyro+compass (GPS+gyro+mag)", cm_a, cm_m))
+        rows.append(("dtfit IMU-Legendre+ZUPT accel-strapdown",
                      *_fwd(G.imu_lsi_track(t, fixes, gy3, ac3, R0, (h,), S=S_rest)[1][h])))
         rows.append(("CT-EKF (GPS+gyro)", *_fwd(G.ekf_track(t, fixes, imu["yaw"], (h,))[1][h])))
     lines.append(f"[A] {h}-step forecast RMSE vs the real future fix  [all / motion-only] (m):")
@@ -483,14 +483,14 @@ def report(path: str, h: int = 10, gap: int = 15) -> str:
     fg = fixes.copy()
     fg[gm] = np.nan
     sc = []
-    sc.append(("dtfit LSI-cubic (GPS-only, CV-coast)",
+    sc.append(("dtfit Legendre-cubic (GPS-only, CV-coast)",
                G.dtfit_track(t, fg, (1,), kind="lsi", coast=True)[0]))
     sc.append(("Kalman-CA (GPS-only)", G.kalman_track(t, fg, (1,))[0]))
     if have_imu:
-        sc.append(("dtfit IMU-LSI S=0 control (matched)",
+        sc.append(("dtfit IMU-Legendre S=0 control (matched)",
                    G.imu_lsi_track(t, fg, gy3, ac3, R0, (1,), S=z3)[0]))
         Sg_gap, _ = gyro_gated_basis(t, fg, imu)   # rebuilt on blanked fixes
-        sc.append(("dtfit IMU-LSI gyro-gated (GPS+gyro)",
+        sc.append(("dtfit IMU-Legendre gyro-gated (GPS+gyro)",
                    G.imu_lsi_track(t, fg, gy3, ac3, R0, (1,), S=Sg_gap)[0]))
         if imu.get("mag_heading") is not None:
             # mag_heading is the magnetometer's own; its constant frame offset
@@ -498,9 +498,9 @@ def report(path: str, h: int = 10, gap: int = 15) -> str:
             # constant. The compass therefore still holds heading through the
             # blanked gap, which is the anchor value being measured here.
             Sgm_gap, _ = gyro_gated_basis(t, fg, imu, mag_heading=imu["mag_heading"])
-            sc.append(("dtfit IMU-LSI gyro+compass (GPS+gyro+mag)",
+            sc.append(("dtfit IMU-Legendre gyro+compass (GPS+gyro+mag)",
                        G.imu_lsi_track(t, fg, gy3, ac3, R0, (1,), S=Sgm_gap)[0]))
-        sc.append(("dtfit IMU-LSI+ZUPT accel-strapdown",
+        sc.append(("dtfit IMU-Legendre+ZUPT accel-strapdown",
                    G.imu_lsi_track(t, fg, gy3, ac3, R0, (1,), S=S_rest)[0]))
         sc.append(("CT-EKF (GPS+gyro)", G.ekf_track(t, fg, imu["yaw"], (1,))[0]))
     lines.append("")
@@ -549,7 +549,7 @@ def report(path: str, h: int = 10, gap: int = 15) -> str:
     if have_imu:
         lines.append("")
         lines.append("note: the honest baseline is the S=0 *matched control* (pure GPS through the "
-                     "same LSI engine), not the LSI-cubic row -- judged against it,")
+                     "same Legendre engine), not the Legendre-cubic row -- judged against it,")
         lines.append(f"      no IMU method beats GPS-only on this {rest_pct:.0f}%-static run (a parked "
                      "rig can't beat 'stay put'; the IMU contribution above is ~0/positive).")
         lines.append("      The gyro-gated row is the fusion to prove on a MOVING run: it dead-reckons "
@@ -565,8 +565,85 @@ def report(path: str, h: int = 10, gap: int = 15) -> str:
     return "\n".join(lines)
 
 
-def sweep(path: str, horizons=(2, 3, 5, 10), gaps=(5, 10, 15)) -> str:
-    """Compact horizon/gap sweep of the key fusion rows.
+def sweep_rows(path: str, *, horizons=(2, 3, 5, 10), gaps=(5, 10, 15),
+              adaptive_window: bool = True) -> list[dict]:
+    """The arithmetic behind :func:`sweep`'s table: per-horizon forecast RMSE
+    then per-gap dropout-coasting RMSE, motion-only throughout.
+
+    Args:
+        path: rig CSV log with IMU columns (``load_log``).
+        horizons: forecast steps ahead to score, in samples.
+        gaps: dropout lengths to score, in samples.
+        adaptive_window: the image filter's window, adaptive (library
+            default) when ``True``, fixed at its configured cap when
+            ``False``.
+
+    Returns:
+        One ``dict`` per horizon (``kind="forecast"``, key ``h``) then per gap
+        (``kind="coast"``, key ``gap``), each carrying every column's RMSE in
+        metres (``kalman`` is NaN on a coast row, ``gyro_compass`` is NaN with
+        no compass) and ``compass_resid_deg`` (``None`` with no compass).
+        Empty with no IMU columns in the log.
+    """
+    log = load_log(path)
+    fixes, _ = to_enu(log["lat"], log["lon"], log["alt_m"])
+    t, n = log["t"], log["n"]
+    imu = _imu(log)
+    if imu is None:
+        return []
+    gy3, ac3, R0 = imu["gyro"], imu["accel"], imu["R0"]
+    z3 = np.zeros((n, 3))
+    mh, minfo = _mag_heading_enu(log, fixes)
+    imu["mag_heading"] = mh
+    compass_resid = minfo["resid_deg"] if minfo is not None else None
+    rest = imu["rest"]
+    Sg_full, _ = gyro_gated_basis(t, fixes, imu)
+    Sgm_full = (gyro_gated_basis(t, fixes, imu, mag_heading=mh)[0]
+                if mh is not None else None)
+
+    def fc(pred):
+        return _fc_rmse(pred, fixes, motion=rest)
+
+    def track(S):
+        return G.imu_lsi_track(t, fixes, gy3, ac3, R0, (h,), S=S,
+                               adaptive_window=adaptive_window)
+
+    rows = []
+    for h in horizons:
+        ctrl = fc(track(z3)[1][h])
+        gg = fc(track(Sg_full)[1][h])
+        cm = fc(track(Sgm_full)[1][h]) if Sgm_full is not None else float("nan")
+        ek = fc(G.ekf_track(t, fixes, imu["yaw"], (h,))[1][h])
+        ka = fc(G.kalman_track(t, fixes, (h,))[1][h])
+        rows.append(dict(kind="forecast", h=h, gap=None, gps_ctrl=ctrl,
+                         gyro_gated=gg, gyro_compass=cm, ct_ekf=ek, kalman=ka,
+                         compass_resid_deg=compass_resid))
+
+    for gap in gaps:
+        gm = _gap_mask(n, gap=gap)
+        fg = fixes.copy()
+        fg[gm] = np.nan
+
+        def rc(S):
+            sm = G.imu_lsi_track(t, fg, gy3, ac3, R0, (1,), S=S,
+                                 adaptive_window=adaptive_window)[0]
+            return G.rmse3(sm[gm], fixes[gm]) if gm.any() else float("nan")
+        ctrl = rc(z3)
+        gg = rc(gyro_gated_basis(t, fg, imu)[0])
+        cm = (rc(gyro_gated_basis(t, fg, imu, mag_heading=mh)[0])
+              if mh is not None else float("nan"))
+        ek = G.ekf_track(t, fg, imu["yaw"], (1,))[0]
+        eks = G.rmse3(ek[gm], fixes[gm]) if gm.any() else float("nan")
+        rows.append(dict(kind="coast", h=None, gap=gap, gps_ctrl=ctrl,
+                         gyro_gated=gg, gyro_compass=cm, ct_ekf=eks,
+                         kalman=float("nan"), compass_resid_deg=compass_resid))
+    return rows
+
+
+def sweep(path: str, horizons=(2, 3, 5, 10), gaps=(5, 10, 15), *,
+         adaptive_window: bool = True) -> str:
+    """Compact horizon/gap sweep of the key fusion rows, formatted from
+    :func:`sweep_rows` (see its docstring for the arithmetic).
 
     It answers two questions the fixed ``report`` (h=10, gap=15) cannot. First,
     whether the gyro or compass contribution shows up at a shorter forecast
@@ -576,55 +653,28 @@ def sweep(path: str, horizons=(2, 3, 5, 10), gaps=(5, 10, 15)) -> str:
     and its matched S=0 control, leaving no room for a config difference to
     masquerade as an IMU gain.
     """
-    log = load_log(path)
-    fixes, _ = to_enu(log["lat"], log["lon"], log["alt_m"])
-    t, n = log["t"], log["n"]
-    imu = _imu(log)
-    if imu is None:
+    rows = sweep_rows(path, horizons=horizons, gaps=gaps,
+                      adaptive_window=adaptive_window)
+    if not rows:
         return "sweep: no IMU columns"
-    gy3, ac3, R0 = imu["gyro"], imu["accel"], imu["R0"]
-    z3 = np.zeros((n, 3))
-    mh, minfo = _mag_heading_enu(log, fixes)
-    imu["mag_heading"] = mh
-    rest = imu["rest"]
-    Sg_full, _ = gyro_gated_basis(t, fixes, imu)
-    Sgm_full = (gyro_gated_basis(t, fixes, imu, mag_heading=mh)[0]
-                if mh is not None else None)
+    fc_rows = [r for r in rows if r["kind"] == "forecast"]
+    co_rows = [r for r in rows if r["kind"] == "coast"]
+    resid = fc_rows[0]["compass_resid_deg"] if fc_rows else None
     L = [f"sweep: {path}",
-         (f"  compass tracks course to {minfo['resid_deg']:.0f} deg RMS"
-          if mh is not None else "  no compass"),
+         (f"  compass tracks course to {resid:.0f} deg RMS"
+          if resid is not None else "  no compass"),
          "",
          "[A] forecast RMSE, motion-only (m), by horizon h (samples ~= s):",
          "   h  GPS-ctrl  gyro-gated  gyro+compass   CT-EKF   Kalman"]
-
-    def fc(pred):
-        return _fc_rmse(pred, fixes, motion=rest)
-    for h in horizons:
-        ctrl = fc(G.imu_lsi_track(t, fixes, gy3, ac3, R0, (h,), S=z3)[1][h])
-        gg = fc(G.imu_lsi_track(t, fixes, gy3, ac3, R0, (h,), S=Sg_full)[1][h])
-        cm = (fc(G.imu_lsi_track(t, fixes, gy3, ac3, R0, (h,), S=Sgm_full)[1][h])
-              if Sgm_full is not None else float("nan"))
-        ek = fc(G.ekf_track(t, fixes, imu["yaw"], (h,))[1][h])
-        ka = fc(G.kalman_track(t, fixes, (h,))[1][h])
-        L.append(f"  {h:2d}  {ctrl:7.2f}  {gg:9.2f}  {cm:11.2f}  {ek:7.2f}  {ka:6.2f}")
+    for r in fc_rows:
+        L.append(f"  {r['h']:2d}  {r['gps_ctrl']:7.2f}  {r['gyro_gated']:9.2f}  "
+                 f"{r['gyro_compass']:11.2f}  {r['ct_ekf']:7.2f}  {r['kalman']:6.2f}")
 
     L += ["", "[B] dropout coasting RMSE (m) vs held-out fixes, by gap length (samples):",
           "   gap  GPS-ctrl  gyro-gated  gyro+compass   CT-EKF"]
-    for gap in gaps:
-        gm = _gap_mask(n, gap=gap)
-        fg = fixes.copy()
-        fg[gm] = np.nan
-
-        def rc(S):
-            sm = G.imu_lsi_track(t, fg, gy3, ac3, R0, (1,), S=S)[0]
-            return G.rmse3(sm[gm], fixes[gm]) if gm.any() else float("nan")
-        ctrl = rc(z3)
-        gg = rc(gyro_gated_basis(t, fg, imu)[0])
-        cm = (rc(gyro_gated_basis(t, fg, imu, mag_heading=mh)[0])
-              if mh is not None else float("nan"))
-        ek = G.ekf_track(t, fg, imu["yaw"], (1,))[0]
-        eks = G.rmse3(ek[gm], fixes[gm]) if gm.any() else float("nan")
-        L.append(f"  {gap:3d}  {ctrl:7.2f}  {gg:9.2f}  {cm:11.2f}  {eks:7.2f}")
+    for r in co_rows:
+        L.append(f"  {r['gap']:3d}  {r['gps_ctrl']:7.2f}  {r['gyro_gated']:9.2f}  "
+                 f"{r['gyro_compass']:11.2f}  {r['ct_ekf']:7.2f}")
     return "\n".join(L)
 
 
@@ -833,11 +883,11 @@ def load_comma_enu(path):
 
 
 def comma_bench(segs, *, horizons=(5, 10), gaps=(15, 25), glitch_thr=8.0):
-    """dtfit LSI-cubic (CV-coast) against Kalman-CA on the comma2k19 segments,
-    scored on absolute decimetre truth. This is the real E1 forecast and E2
-    coast that the rig can only proxy without RTK. Metrics are fix-weighted
-    over segments, and the run also scans for organic multipath as raw-vs-truth
-    deviation, with nothing injected.
+    """dtfit Legendre-cubic (GPS-only, CV-coast) against Kalman-CA on the
+    comma2k19 segments, scored on absolute decimetre truth. This is the real
+    E1 forecast and E2 coast that the rig can only proxy without RTK. Metrics
+    are fix-weighted over segments, and the run also scans for organic
+    multipath as raw-vs-truth deviation, with nothing injected.
 
     Returns:
         Dataset stats plus ``forecast[H]=(dtfit, kalman)``,

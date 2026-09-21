@@ -60,7 +60,7 @@ FIRMWARE = HERE.parent / "firmware"
 # sketch-local copy of each header, so the generator writes lsi_tables.h into
 # all of them in one pass. Regenerating just one would silently leave the
 # other's tables stale, and mismatched firmware would ship.
-FIRMWARE_TARGETS = ("nano_lsi_onboard", "nano_lsi_log")
+FIRMWARE_TARGETS = ("nano_lsi_onboard", "nano_lsi_log", "nano_lsi_replay")
 
 
 def tables() -> dict:

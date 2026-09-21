@@ -31,6 +31,7 @@ packages/dtfit/site/
 # (kept in the private thesis repo)
 **/experiments/data/
 packages/dtfit-hardware/src/dtfit_hardware/data
+packages/dtfit-hardware/src/dtfit_hardware/firmware/nano_lsi_replay/replay_vec.h
 
 # Editor config
 .vscode/
