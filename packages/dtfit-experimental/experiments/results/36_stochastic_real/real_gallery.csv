@@ -1,0 +1,8 @@
+key,title,domain,n,literature,detected,components
+nile,Nile annual volume (1871-1970),hydrology,100,long memory / trend,trend,"trend, long-memory, mean-reversion, vol-clustering"
+sunspots,Sunspot number (1700-2008),solar physics,309,cyclical,cyclical,"cycle, mean-reversion"
+co2,Mauna Loa CO2 (weekly),climate,2284,trend+cycle,trend+seasonal,"trend, seasonal, mean-reversion, vol-clustering"
+gdp,US real GDP (quarterly),macroeconomics,203,random walk + drift,random walk + drift,"unit-root, drift"
+tbill,US 3-month T-bill rate (quarterly),macroeconomics,203,random walk / mean-revert,random walk,"unit-root, vol-clustering"
+usd_uah,"USD/UAH (2014-15, daily)",FX,730,random walk,random walk,unit-root
+fx_ltsf,LTSF exchange rate (daily),FX,7588,random walk,random walk,"unit-root, vol-clustering"
