@@ -1,0 +1,4 @@
+rearm,seeds,rmse_after_fault_mean,rmse_after_fault_max
+inflate P by 4,8,0.0905531,0.0941421
+"rearm, inflate reset",8,0.0529885,0.0635765
+"rearm, full reset",8,0.0762343,0.0786624

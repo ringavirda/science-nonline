@@ -1,0 +1,9 @@
+fault,approach,seeds,caught,latency_mean_steps,latency_max_steps,false_alarms
+1,fused chi-square (bank),8,8,0.25,1,0
+1,"three per-axis tests, every sample",8,8,0.125,1,0
+0.5,fused chi-square (bank),8,8,0.5,1,0
+0.5,"three per-axis tests, every sample",8,8,0.125,1,0
+0.25,fused chi-square (bank),8,8,0.875,2,0
+0.25,"three per-axis tests, every sample",8,8,0.75,2,0
+0.1,fused chi-square (bank),8,8,3.125,7,0
+0.1,"three per-axis tests, every sample",8,8,2.875,8,0

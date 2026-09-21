@@ -1,4 +1,5 @@
 approach,caught,false_alarms,latency_steps
 fused chi-square (bank),True,0,1
+"three per-axis tests, every sample",True,0,1
 three independent filters,True,1,19
 Kalman bank (own NIS test),False,0,
