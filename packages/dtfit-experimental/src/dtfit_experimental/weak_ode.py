@@ -18,19 +18,18 @@ and ``I2`` project ``g``, ``g'`` and ``g''`` onto the same test-function family.
 The construction is the modulating-function method of system identification
 (Shinbrot 1957; Preisig and Rippin 1993), the same one weak SINDy uses for
 noisy data (Messenger and Bortz 2021); this module adopts it into the image
-scheme rather than proposes it. Measured against nonlinear least squares on
-the integrated law started near the truth (60 seeds, 2 to 10 percent noise),
-the weak form is 1.3 to 5 times less accurate and 30 to 180 times faster,
-and needs no start. Its instrumental-variable and generalized-least-squares
-variants (:func:`solve_weak`) do not close that gap: the instruments change
-nothing and the whitening helps one law and hurts another, so the loss is
-the truncated test-function family, not the solver. Used as the start of
+scheme rather than proposes it. Measured in
+``experiments/method/16_weak_form.ipynb`` against nonlinear least squares on
+the integrated law, started near the truth and handed the true initial state
+(60 seeds, 2 to 10 percent noise), the weak form is 1.7 to 4.4 times less
+accurate and 30 to 200 times faster, and needs no start. Used as the start of
 that nonlinear least squares instead, the weak estimate gives the full
 least-squares accuracy on every law at 2 to 10 percent noise and removes
-the basin failures of a poor start (Michaelis-Menten: 28 percent of poorly
-started fits fail, 1 percent of seeded ones), so its place is the
-start-free seeder of an ODE fit, not its replacement. ``beta`` in the
-prey-only Lotka-Volterra is structurally unidentifiable and is not returned.
+the basin failures of a poor start (Michaelis-Menten: 97 to 100 percent of
+fits started at 3 times the truth fail, none of the seeded ones), so its
+place is the start-free seeder of an ODE fit, not its replacement. ``beta``
+in the prey-only Lotka-Volterra is structurally unidentifiable and is not
+returned.
 """
 
 from __future__ import annotations
