@@ -42,7 +42,10 @@ fraction, widest at 5 percent (2.02 against 2.82 m). On the real urban-canyon
 trip the reweighted fit and the Huber Kalman are the only routes that recover
 the track, an order of magnitude ahead of their plain versions (20 and 43
 times), and the reweighted fit stays within 7 percent of the Huber Kalman at
-the shortest window.
+the shortest window. The whole margin comes from two fixes of 1494, 10.3 and
+5.3 km off: without them the raw fix is at 5.70 m, below every route, so on
+this trip reweighting buys the rejection of gross errors and not accuracy
+between them.
 
 **Maneuver detection.** The fused detector needs the gyro-rate channel to
 lead: with it, it wins on catch rate and latency and raises more false alarms
