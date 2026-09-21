@@ -1,0 +1,6 @@
+MCU,SRAM_KB,clock_MHz,FPU,MFLOPs,fits,tracker_B,share_W15_pct,share_W60_pct
+AVR ATmega328 (Uno),2,16,no (soft),0.05,yes,636,31.1,83.8
+ARM Cortex-M0+ (SAMD21),32,48,no (soft),0.3,yes,636,1.9,5.2
+ARM Cortex-M4F (STM32F4),192,168,yes,30,yes,636,0.3,0.9
+ESP32 (LX6 FPU),520,240,yes,40,yes,636,0.1,0.3
+nRF52840,256,64,yes,10,yes,636,0.2,0.7

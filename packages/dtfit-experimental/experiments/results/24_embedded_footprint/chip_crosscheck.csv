@@ -1,0 +1,5 @@
+item,bytes
+"flashed struct (tbuf+ybuf, count+ready, p, P)",152
+"model (cost.embedded_footprint(2, 15))",184
+difference: scratch buffer (model's scratch(n) term),8
+difference: unused bookkeeping words (6 of 8),24

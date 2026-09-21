@@ -1,0 +1,6 @@
+MCU,MFLOPs,epoch_ms,under_budget,epoch_ms_scaled,scaled_under_budget
+AVR ATmega328 (Uno),0.05,31.62,True,110.691,False
+ARM Cortex-M0+ (SAMD21),0.3,5.27,True,18.4485,True
+ARM Cortex-M4F (STM32F4),30,0.0527,True,0.184485,True
+ESP32 (LX6 FPU),40,0.039525,True,0.138364,True
+nRF52840,10,0.1581,True,0.553456,True

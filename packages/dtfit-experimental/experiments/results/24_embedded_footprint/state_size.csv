@@ -1,0 +1,4 @@
+config,n_params,window,sram_words,sram_bytes_f32,sram_bytes_f64,flops_per_update
+CA quadratic (GPS axis),3,15,53,212,424,527
+damped sine (control ID),3,50,123,492,984,1647
+linear (range smoother),2,20,56,224,448,388
