@@ -1,0 +1,11 @@
+scenario,filter,rmse_amp,delay,false_alarm_seeds,step_us
+drift,image_block,0.0921844,,1,77.0197
+drift,image_legendre,0.075741,,2,77.8569
+drift,image_legendre_adaptive,0.0757332,,2,79.9987
+drift,recursive_area,0.172744,,10,141.499
+drift,recursive_spectrum,0.105626,,2,38.7536
+jump,image_block,0.0516087,5.8,1,77.1821
+jump,image_legendre,0.019092,5.8,1,77.6478
+jump,image_legendre_adaptive,0.0190923,0.5,0,82.5847
+jump,recursive_area,1.07932,5.8,0,136.352
+jump,recursive_spectrum,0.0163317,,0,39.1417

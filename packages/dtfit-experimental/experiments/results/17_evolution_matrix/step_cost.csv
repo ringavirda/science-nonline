@@ -1,0 +1,10 @@
+filter,window_size,us_per_step,spread_us
+recursive_area,15,85.9989,1.36315
+recursive_subareas,15,428.899,8.60863
+recursive_spectrum,15,34.6791,0.779011
+recursive_area,30,141.576,1.71604
+recursive_subareas,30,365.381,7.34699
+recursive_spectrum,30,36.3204,0.604652
+recursive_area,60,133.068,6.75428
+recursive_subareas,60,247.295,14.0227
+recursive_spectrum,60,38.0544,0.380917

@@ -1,0 +1,10 @@
+filter,start_factor,step,first_measurement,min_window
+recursive_area,1.25,43,29,30
+recursive_area,1.5,,29,30
+recursive_area,2,,29,30
+recursive_subareas,1.25,30,29,30
+recursive_subareas,1.5,39,29,30
+recursive_subareas,2,81,29,30
+recursive_spectrum,1.25,8,6,7
+recursive_spectrum,1.5,10,6,7
+recursive_spectrum,2,18,6,7
