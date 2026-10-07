@@ -237,6 +237,9 @@ def _one_blas_thread(x):
 def test_pool_map_keeps_order_and_caps_blas_threads(monkeypatch):
     # raised above 1 so the cap under test, not the inherited environment,
     # is what can bring a worker's thread count back down to 1
+    np.dot(np.eye(8), np.eye(8))
+    if not [i for i in threadpoolctl.threadpool_info() if i["user_api"] == "blas"]:
+        pytest.skip("no BLAS that threadpoolctl can cap (Accelerate on macOS)")
     monkeypatch.setenv("OPENBLAS_NUM_THREADS", "4")
     monkeypatch.setenv("OMP_NUM_THREADS", "4")
     items = list(range(8))
