@@ -11,7 +11,7 @@ authors:
   - given-names: Oleksandr
     family-names: Tuhanskykh
     email: ringanaro@gmail.com
-version: 0.4.0
+version: 0.5.0
 license: MIT
 repository-code: "https://github.com/ringavirda/science-nonline"
 url: "https://github.com/ringavirda/science-nonline"

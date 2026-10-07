@@ -4,4 +4,4 @@
 ``[tool.setuptools.dynamic]``; ``dtfit.__version__`` re-exports it at runtime.
 """
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"

@@ -5,7 +5,7 @@ All notable changes to `dtfit` are documented here. The format follows
 [SemVer](https://semver.org/) with the usual 0.x caveat - minor releases may
 carry breaking changes, and each one is listed explicitly under **Changed**.
 
-## [Unreleased]
+## [0.5.0] - 2026-10-07
 
 ### Added
 

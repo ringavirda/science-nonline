@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/ringavirda/science-nonline/actions/workflows/ci.yml/badge.svg)](https://github.com/ringavirda/science-nonline/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://github.com/ringavirda/science-nonline)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit/LICENSE)
 [![Typed](https://img.shields.io/badge/typed-yes-brightgreen)](https://peps.python.org/pep-0561/)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
@@ -20,11 +20,18 @@ identical to before.
 ## Installation
 
 ```bash
+pip install dtfit                        # core, from PyPI
+pip install 'dtfit[viz]'                 # + matplotlib plotting helpers
+```
+
+From a clone of the repository (this package lives at packages/dtfit):
+
+```bash
 python -m venv .venv        # create an isolated environment
 # Windows:  .venv\Scripts\activate
 # Linux/mac: source .venv/bin/activate
 
-# from the repo root (this package lives at packages/dtfit):
+# from the repo root:
 pip install -e packages/dtfit            # core
 pip install -e 'packages/dtfit[viz]'     # + matplotlib plotting helpers
 pip install -e 'packages/dtfit[dev]'     # + test/lint tooling
@@ -170,7 +177,7 @@ Adaptations still in trial (further image bases, fits of aggregated data and
 of windows aligned to jumps, weak-form ODE identification, the filter bank)
 live in the separate **`dtfit-experimental`** package (`dtfit_experimental`);
 the notebooks that measure them are indexed in
-[../dtfit-experimental/experiments/README.md](../dtfit-experimental/experiments/README.md).
+[dtfit-experimental/experiments/README.md](https://github.com/ringavirda/science-nonline/blob/main/packages/dtfit-experimental/experiments/README.md).
 
 Each method's mathematical grounding (in differential / non-Taylor
 transformations), full algorithm, optimizations, guards, applicability, usage
