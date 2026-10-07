@@ -32,6 +32,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Sequence
 
 import numpy as np
+from numpy.typing import NDArray
 
 import dtfit
 from dtfit._input import normalize_bounds, normalize_p0, resolve_model
@@ -642,7 +643,7 @@ def detect_jumps(
     s2 = spread ** 2 / 2.0 * float(np.median(n[good]))
     if not np.isfinite(s2) or s2 <= 0.0:
         return []
-    z = np.zeros(kf)
+    z: NDArray[np.float64] = np.zeros(kf)
     amp = np.zeros(kf)
     lvl = np.zeros((kf, 2))
     for b in good:

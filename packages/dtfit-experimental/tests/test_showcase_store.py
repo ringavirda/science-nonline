@@ -61,8 +61,8 @@ def test_paths_follow_the_environment(monkeypatch, tmp_path):
     assert paths.isd_dir(2024) == tmp_path / "elsewhere" / "2024"
     # the results directory moved out of the package and the CLI kept
     # writing into the package tree would fail this
-    assert str(paths.results_dir()).endswith(
-        "experiments/results/35_archive_showcase"
+    assert paths.results_dir().parts[-3:] == (
+        "experiments", "results", "35_archive_showcase"
     )
 
 
